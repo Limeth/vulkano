@@ -125,11 +125,13 @@
 //!
 //! Provides the path to the GLSL source to be compiled, relative to `Cargo.toml`.
 //! Cannot be used in conjunction with the `src` field.
+//! This path is always crate root-relative, even in virtual workspaces.
 //!
 //! ## `include: ["...", "...", ..., "..."]`
 //!
 //! Specifies the standard include directories to be searched through when using the
 //! `#include <...>` directive within a shader source.
+//! These paths are always crate root-relative, even in virtual workspaces.
 //! If `path` was specified, relative paths can also be used (`#include "..."`), without the need
 //! to specify one or more standard include directories. Relative paths are relative to the
 //! directory, which contains the source file the `#include "..."` directive is declared in.
@@ -159,7 +161,7 @@
 use std::env;
 use std::fs::File;
 use std::io::{Read, Result as IoResult};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use syn::parse::{Parse, ParseStream, Result};
 use syn::{Ident, LitStr, LitBool};
@@ -284,48 +286,64 @@ pub(self) fn read_file_to_string(full_path: &Path) -> IoResult<String> {
     Ok(buf)
 }
 
+/// Obtains the prefix needed for crate-relative path to become workspace-relative.
+fn get_workspace_prefix() -> PathBuf {
+    let crate_root_string = env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string());
+    let crate_root = Path::new(&crate_root_string);
+
+    let workspace_root = Path::new(".").canonicalize().unwrap();
+    match crate_root.strip_prefix(workspace_root) {
+        Err(_) => Path::new("").to_path_buf(),
+        Ok(prefix) => prefix.to_path_buf()
+    }
+}
+
 #[proc_macro]
 pub fn shader(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as MacroInput);
 
+    let workspace_prefix = get_workspace_prefix();
+
     let (path, source_code) = match input.source_kind {
         SourceKind::Src(source) => (None, source),
-		SourceKind::Path(path) => {
-			let crate_root_string = env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string());
-			let crate_root = Path::new(&crate_root_string);
-			let source = {
-				let full_path = crate_root.join(&path);
+        SourceKind::Path(path) => {
+            let crate_root_string = env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string());
+            let crate_root = Path::new(&crate_root_string);
+            let source = {
+                let full_path = crate_root.join(&path);
 
-				if full_path.is_file() {
-					read_file_to_string(&full_path)
-						.expect(&format!("Error reading source from {:?}", path))
-				} else {
-					panic!("File {:?} was not found; note that the path must be relative to your Cargo.toml", path);
-				}
-			};
+                if full_path.is_file() {
+                    read_file_to_string(&full_path)
+                        .expect(&format!("Error reading source from {:?}", path))
+                } else {
+                    panic!("File {:?} was not found; note that the path must be relative to your Cargo.toml", path);
+                }
+            };
 
-			// We need to take into account that `path` has to be crate-relative, but this proc macro
-			// works with paths relative to workspace, which in case of virtual workspaces
-			// is not the same as CARGO_MANIFEST_DIR
-			let path = {
-				// If this fails we have bigger problems
-				let workspace_root = Path::new(".").canonicalize().unwrap();
-				let workspace_prefix = match crate_root.strip_prefix(workspace_root) {
-					Err(_) => Path::new(""),
-					Ok(prefix) => prefix
-				};
+            // We need to take into account that `path` has to be crate-relative, but this proc macro
+            // works with paths relative to workspace, which in case of virtual workspaces
+            // is not the same as CARGO_MANIFEST_DIR
+            let path = {
+                let prefixed_path = workspace_prefix.join(&path);
+                match prefixed_path.to_str() {
+                    None => path.clone(),
+                    Some(s) => s.to_string()
+                }
+            };
 
-				let prefixed_path = workspace_prefix.join(&path);
-				match prefixed_path.to_str() {
-					None => path.clone(),
-					Some(s) => s.to_string()
-				}
-			};
-
-			(Some(path), source)
-		}
+            (Some(path), source)
+        }
     };
 
-    let content = codegen::compile(path, &source_code, input.shader_kind, &input.include_directories).unwrap();
+    let mut include_directories = Vec::with_capacity(input.include_directories.len());
+    for include_directory in input.include_directories {
+        let prefixed_path = workspace_prefix.join(Path::new(&include_directory));
+        match prefixed_path.to_str() {
+            None => include_directories.push(include_directory),
+            Some(new_path) => include_directories.push(new_path.to_string())
+        };
+    }
+
+    let content = codegen::compile(path, &source_code, input.shader_kind, &include_directories).unwrap();
     codegen::reflect("Shader", content.as_binary(), input.dump).unwrap().into()
 }
