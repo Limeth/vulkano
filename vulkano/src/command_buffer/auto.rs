@@ -859,15 +859,22 @@ impl<P> AutoCommandBufferBuilder<P> {
                 buffer_offset: 0,
                 buffer_row_length: 0,
                 buffer_image_height: 0,
-                image_aspect: if destination.has_color() {
-                    UnsafeCommandBufferBuilderImageAspect {
-                        color: true,
-                        depth: false,
-                        stencil: false,
-                    }
-                } else {
-                    unimplemented!()
-                },
+
+				// TODO: What does this change break?
+				image_aspect: UnsafeCommandBufferBuilderImageAspect {
+					color: destination.has_color(),
+					depth: destination.has_depth(),
+					stencil: destination.has_stencil()
+				},
+                // image_aspect: if destination.has_color() {
+                //     UnsafeCommandBufferBuilderImageAspect {
+                //         color: true,
+                //         depth: false,
+                //         stencil: false,
+                //     }
+                // } else {
+                //     unimplemented!()
+                // },
                 image_mip_level: mipmap,
                 image_base_array_layer: first_layer,
                 image_layer_count: num_layers,
