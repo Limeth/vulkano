@@ -12,22 +12,22 @@
 #![cfg(test)]
 
 use std::ffi::CString;
-use format::Format;
-use framebuffer::Subpass;
-use descriptor::pipeline_layout::EmptyPipelineDesc;
-use descriptor::pipeline_layout::PipelineLayoutDesc;
-use pipeline::GraphicsPipeline;
-use pipeline::GraphicsPipelineParams;
-use pipeline::GraphicsPipelineCreationError;
-use pipeline::blend::Blend;
-use pipeline::depth_stencil::DepthStencil;
-use pipeline::input_assembly::InputAssembly;
-use pipeline::input_assembly::PrimitiveTopology;
-use pipeline::multisample::Multisample;
-use pipeline::shader::ShaderModule;
-use pipeline::shader::EmptyShaderInterfaceDef;
-use pipeline::vertex::SingleBufferDefinition;
-use pipeline::viewport::ViewportsState;
+use crate::format::Format;
+use crate::framebuffer::Subpass;
+use crate::descriptor::pipeline_layout::EmptyPipelineDesc;
+use crate::descriptor::pipeline_layout::PipelineLayoutDesc;
+use crate::pipeline::GraphicsPipeline;
+use crate::pipeline::GraphicsPipelineParams;
+use crate::pipeline::GraphicsPipelineCreationError;
+use crate::pipeline::blend::Blend;
+use crate::pipeline::depth_stencil::DepthStencil;
+use crate::pipeline::input_assembly::InputAssembly;
+use crate::pipeline::input_assembly::PrimitiveTopology;
+use crate::pipeline::multisample::Multisample;
+use crate::pipeline::shader::ShaderModule;
+use crate::pipeline::shader::EmptyShaderInterfaceDef;
+use crate::pipeline::vertex::SingleBufferDefinition;
+use crate::pipeline::viewport::ViewportsState;
 
 #[test]
 fn create() {
@@ -229,7 +229,7 @@ fn no_depth_attachment() {
 
 
 mod simple_rp {
-    use format::Format;
+    use crate::format::Format;
 
     single_pass_renderpass!{
         attachments: {

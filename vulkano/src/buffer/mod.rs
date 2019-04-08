@@ -77,19 +77,6 @@
 //! for how to create a buffer view.
 //!
 
-pub use self::cpu_access::CpuAccessibleBuffer;
-pub use self::cpu_pool::CpuBufferPool;
-pub use self::device_local::DeviceLocalBuffer;
-pub use self::immutable::ImmutableBuffer;
-pub use self::slice::BufferSlice;
-pub use self::sys::BufferCreationError;
-pub use self::traits::BufferAccess;
-pub use self::traits::BufferInner;
-pub use self::traits::TypedBufferAccess;
-pub use self::usage::BufferUsage;
-pub use self::view::BufferView;
-pub use self::view::BufferViewRef;
-
 pub mod cpu_access;
 pub mod cpu_pool;
 pub mod device_local;
@@ -100,3 +87,16 @@ pub mod view;
 mod slice;
 mod traits;
 mod usage;
+
+pub use cpu_access::CpuAccessibleBuffer;
+pub use cpu_pool::CpuBufferPool;
+
+pub use device_local::DeviceLocalBuffer;
+pub use immutable::ImmutableBuffer;
+pub use slice::BufferSlice;
+pub use sys::BufferCreationError;
+
+pub use traits::{BufferAccess, BufferInner, TypedBufferAccess};
+
+pub use usage::BufferUsage;
+pub use view::{BufferView, BufferViewRef};

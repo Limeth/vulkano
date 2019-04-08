@@ -9,23 +9,21 @@
 
 use std::sync::Arc;
 
-use buffer::BufferAccess;
-use format::ClearValue;
-use format::Format;
-use format::FormatDesc;
-use image::Dimensions;
-use image::ImageInner;
-use image::ImageLayout;
-use image::ViewType;
-use image::sys::UnsafeImageView;
-use image::traits::ImageAccess;
-use image::traits::ImageClearValue;
-use image::traits::ImageContent;
-use image::traits::ImageViewAccess;
-use swapchain::Swapchain;
-use sync::AccessError;
-
-use OomError;
+use crate::{
+	buffer::BufferAccess,
+	format::{ClearValue, Format, FormatDesc},
+	image::{
+		sys::UnsafeImageView,
+		traits::{ImageAccess, ImageClearValue, ImageContent, ImageViewAccess},
+		ImageDimensions,
+		ImageInner,
+		ImageLayout,
+		ViewType
+	},
+	swapchain::Swapchain,
+	sync::AccessError,
+	OomError
+};
 
 /// An image that is part of a swapchain.
 ///
@@ -42,151 +40,102 @@ use OomError;
 /// again.
 // TODO: #[derive(Debug)]
 pub struct SwapchainImage<W> {
-    swapchain: Arc<Swapchain<W>>,
-    image_offset: usize,
-    view: UnsafeImageView,
+	swapchain: Arc<Swapchain<W>>,
+	image_offset: usize,
+	view: UnsafeImageView
 }
 
 impl<W> SwapchainImage<W> {
-    /// Builds a `SwapchainImage` from raw components.
-    ///
-    /// This is an internal method that you shouldn't call.
-    pub unsafe fn from_raw(swapchain: Arc<Swapchain<W>>, id: usize)
-                           -> Result<Arc<SwapchainImage<W>>, OomError> {
-        let image = swapchain.raw_image(id).unwrap();
-        let view = UnsafeImageView::raw(&image.image, ViewType::Dim2d, 0 .. 1, 0 .. 1)?;
+	/// Builds a `SwapchainImage` from raw components.
+	///
+	/// This is an internal method that you shouldn't call.
+	pub unsafe fn from_raw(
+		swapchain: Arc<Swapchain<W>>, id: usize
+	) -> Result<Arc<SwapchainImage<W>>, OomError> {
+		let image = swapchain.raw_image(id).unwrap();
+		let view = UnsafeImageView::raw(&image.image, ViewType::Dim2D, 0 .. 1, 0 .. 1)?;
 
-        Ok(Arc::new(SwapchainImage {
-                        swapchain: swapchain.clone(),
-                        image_offset: id,
-                        view: view,
-                    }))
-    }
+		Ok(Arc::new(SwapchainImage { swapchain: swapchain.clone(), image_offset: id, view }))
+	}
 
-    /// Returns the dimensions of the image.
-    ///
-    /// A `SwapchainImage` is always two-dimensional.
-    #[inline]
-    pub fn dimensions(&self) -> [u32; 2] {
-        let dims = self.my_image().image.dimensions();
-        [dims.width(), dims.height()]
-    }
+	/// Returns the dimensions of the image.
+	///
+	/// A `SwapchainImage` is always two-dimensional.
+	pub fn dimensions(&self) -> [u32; 2] {
+		let dims = self.my_image().image.dimensions();
+		[dims.width(), dims.height()]
+	}
 
-    /// Returns the swapchain this image belongs to.
-    #[inline]
-    pub fn swapchain(&self) -> &Arc<Swapchain<W>> {
-        &self.swapchain
-    }
+	/// Returns the swapchain this image belongs to.
+	pub fn swapchain(&self) -> &Arc<Swapchain<W>> { &self.swapchain }
 
-    #[inline]
-    fn my_image(&self) -> ImageInner {
-        self.swapchain.raw_image(self.image_offset).unwrap()
-    }
+	fn my_image(&self) -> ImageInner { self.swapchain.raw_image(self.image_offset).unwrap() }
 }
 
 unsafe impl<W> ImageAccess for SwapchainImage<W> {
-    #[inline]
-    fn inner(&self) -> ImageInner {
-        self.my_image()
-    }
+	fn inner(&self) -> ImageInner { self.my_image() }
 
-    #[inline]
-    fn initial_layout_requirement(&self) -> ImageLayout {
-        ImageLayout::PresentSrc
-    }
+	fn initial_layout_requirement(&self) -> ImageLayout { ImageLayout::PresentSrc }
 
-    #[inline]
-    fn final_layout_requirement(&self) -> ImageLayout {
-        ImageLayout::PresentSrc
-    }
+	fn final_layout_requirement(&self) -> ImageLayout { ImageLayout::PresentSrc }
 
-    #[inline]
-    fn conflicts_buffer(&self, other: &BufferAccess) -> bool {
-        false
-    }
+	fn conflicts_buffer(&self, other: &BufferAccess) -> bool { false }
 
-    #[inline]
-    fn conflicts_image(&self, other: &ImageAccess) -> bool {
-        self.my_image().image.key() == other.conflict_key() // TODO:
-    }
+	fn conflicts_image(&self, other: &ImageAccess) -> bool {
+		self.my_image().image.key() == other.conflict_key() // TODO:
+	}
 
-    #[inline]
-    fn conflict_key(&self) -> u64 {
-        self.my_image().image.key()
-    }
+	fn conflict_key(&self) -> u64 { self.my_image().image.key() }
 
-    #[inline]
-    fn try_gpu_lock(&self, _: bool, _: ImageLayout) -> Result<(), AccessError> {
-        // Swapchain image are only accessible after being acquired.
-        Err(AccessError::SwapchainImageAcquireOnly)
-    }
+	fn try_gpu_lock(&self, _: bool, _: ImageLayout) -> Result<(), AccessError> {
+		// Swapchain image are only accessible after being acquired.
+		Err(AccessError::SwapchainImageAcquireOnly)
+	}
 
-    #[inline]
-    unsafe fn increase_gpu_lock(&self) {
-    }
+	unsafe fn increase_gpu_lock(&self) {}
 
-    #[inline]
-    unsafe fn unlock(&self, _: Option<ImageLayout>) {
-        // TODO: store that the image was initialized
-    }
+	unsafe fn unlock(&self, _: Option<ImageLayout>) {
+		// TODO: store that the image was initialized
+	}
 }
 
 unsafe impl<W> ImageClearValue<<Format as FormatDesc>::ClearValue> for SwapchainImage<W> {
-    #[inline]
-    fn decode(&self, value: <Format as FormatDesc>::ClearValue) -> Option<ClearValue> {
-        Some(self.swapchain.format().decode_clear_value(value))
-    }
+	fn decode(&self, value: <Format as FormatDesc>::ClearValue) -> Option<ClearValue> {
+		Some(self.swapchain.format().decode_clear_value(value))
+	}
 }
 
-unsafe impl<P,W> ImageContent<P> for SwapchainImage<W> {
-    #[inline]
-    fn matches_format(&self) -> bool {
-        true // FIXME:
-    }
+unsafe impl<P, W> ImageContent<P> for SwapchainImage<W> {
+	fn matches_format(&self) -> bool {
+		true // FIXME:
+	}
 }
 
 unsafe impl<W> ImageViewAccess for SwapchainImage<W> {
-    #[inline]
-    fn parent(&self) -> &ImageAccess {
-        self
-    }
+	fn parent(&self) -> &ImageAccess { self }
 
-    #[inline]
-    fn dimensions(&self) -> Dimensions {
-        let dims = self.swapchain.dimensions();
-        Dimensions::Dim2d {
-            width: dims[0],
-            height: dims[1],
-        }
-    }
+	fn dimensions(&self) -> ImageDimensions {
+		let dims = self.swapchain.dimensions();
+		ImageDimensions::Dim2D { width: dims[0], height: dims[1] }
+	}
 
-    #[inline]
-    fn inner(&self) -> &UnsafeImageView {
-        &self.view
-    }
+	fn inner(&self) -> &UnsafeImageView { &self.view }
 
-    #[inline]
-    fn descriptor_set_storage_image_layout(&self) -> ImageLayout {
-        ImageLayout::ShaderReadOnlyOptimal
-    }
+	fn descriptor_set_storage_image_layout(&self) -> ImageLayout {
+		ImageLayout::ShaderReadOnlyOptimal
+	}
 
-    #[inline]
-    fn descriptor_set_combined_image_sampler_layout(&self) -> ImageLayout {
-        ImageLayout::ShaderReadOnlyOptimal
-    }
+	fn descriptor_set_combined_image_sampler_layout(&self) -> ImageLayout {
+		ImageLayout::ShaderReadOnlyOptimal
+	}
 
-    #[inline]
-    fn descriptor_set_sampled_image_layout(&self) -> ImageLayout {
-        ImageLayout::ShaderReadOnlyOptimal
-    }
+	fn descriptor_set_sampled_image_layout(&self) -> ImageLayout {
+		ImageLayout::ShaderReadOnlyOptimal
+	}
 
-    #[inline]
-    fn descriptor_set_input_attachment_layout(&self) -> ImageLayout {
-        ImageLayout::ShaderReadOnlyOptimal
-    }
+	fn descriptor_set_input_attachment_layout(&self) -> ImageLayout {
+		ImageLayout::ShaderReadOnlyOptimal
+	}
 
-    #[inline]
-    fn identity_swizzle(&self) -> bool {
-        true
-    }
+	fn identity_swizzle(&self) -> bool { true }
 }

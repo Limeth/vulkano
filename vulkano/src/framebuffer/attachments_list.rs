@@ -7,74 +7,57 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use SafeDeref;
-use image::ImageViewAccess;
+use crate::{image::ImageViewAccess, SafeDeref};
 use std::sync::Arc;
-//use sync::AccessFlagBits;
-//use sync::PipelineStages;
+// use crate::sync::AccessFlagBits;
+// use crate::sync::PipelineStages;
 
 /// A list of attachments.
 // TODO: rework this trait
 pub unsafe trait AttachmentsList {
-    fn num_attachments(&self) -> usize;
+	fn num_attachments(&self) -> usize;
 
-    fn as_image_view_access(&self, index: usize) -> Option<&ImageViewAccess>;
+	fn as_image_view_access(&self, index: usize) -> Option<&ImageViewAccess>;
 }
 
 unsafe impl<T> AttachmentsList for T
-    where T: SafeDeref,
-          T::Target: AttachmentsList
+where
+	T: SafeDeref,
+	T::Target: AttachmentsList
 {
-    #[inline]
-    fn num_attachments(&self) -> usize {
-        (**self).num_attachments()
-    }
+	fn num_attachments(&self) -> usize { (**self).num_attachments() }
 
-    #[inline]
-    fn as_image_view_access(&self, index: usize) -> Option<&ImageViewAccess> {
-        (**self).as_image_view_access(index)
-    }
+	fn as_image_view_access(&self, index: usize) -> Option<&ImageViewAccess> {
+		(**self).as_image_view_access(index)
+	}
 }
 
 unsafe impl AttachmentsList for () {
-    #[inline]
-    fn num_attachments(&self) -> usize {
-        0
-    }
+	fn num_attachments(&self) -> usize { 0 }
 
-    #[inline]
-    fn as_image_view_access(&self, _: usize) -> Option<&ImageViewAccess> {
-        None
-    }
+	fn as_image_view_access(&self, _: usize) -> Option<&ImageViewAccess> { None }
 }
 
 unsafe impl AttachmentsList for Vec<Arc<ImageViewAccess + Send + Sync>> {
-    #[inline]
-    fn num_attachments(&self) -> usize {
-        self.len()
-    }
+	fn num_attachments(&self) -> usize { self.len() }
 
-    #[inline]
-    fn as_image_view_access(&self, index: usize) -> Option<&ImageViewAccess> {
-        self.get(index).map(|v| &**v as &_)
-    }
+	fn as_image_view_access(&self, index: usize) -> Option<&ImageViewAccess> {
+		self.get(index).map(|v| &**v as &_)
+	}
 }
 
 unsafe impl<A, B> AttachmentsList for (A, B)
-    where A: AttachmentsList,
-          B: ImageViewAccess
+where
+	A: AttachmentsList,
+	B: ImageViewAccess
 {
-    #[inline]
-    fn num_attachments(&self) -> usize {
-        self.0.num_attachments() + 1
-    }
+	fn num_attachments(&self) -> usize { self.0.num_attachments() + 1 }
 
-    #[inline]
-    fn as_image_view_access(&self, index: usize) -> Option<&ImageViewAccess> {
-        if index == self.0.num_attachments() {
-            Some(&self.1)
-        } else {
-            self.0.as_image_view_access(index)
-        }
-    }
+	fn as_image_view_access(&self, index: usize) -> Option<&ImageViewAccess> {
+		if index == self.0.num_attachments() {
+			Some(&self.1)
+		} else {
+			self.0.as_image_view_access(index)
+		}
+	}
 }

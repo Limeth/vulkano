@@ -56,23 +56,23 @@
 //!   GPU will return an object that implements [the `GpuFuture` trait](sync/index.html).
 //!   `GpuFuture`s allow you to chain multiple submissions together and are essential to performing
 //!   multiple operations on multiple different GPU queues.
-//!
 
-//#![warn(missing_docs)]        // TODO: activate
+//#![warn(missing_docs)] // TODO: activate
 #![allow(dead_code)] // TODO: remove
 #![allow(unused_variables)] // TODO: remove
 
-extern crate crossbeam;
-extern crate fnv;
-#[macro_use]
-extern crate lazy_static;
-extern crate shared_library;
-extern crate smallvec;
-extern crate vk_sys as vk;
-pub extern crate half;
+use std::{
+	error,
+	fmt,
+	ops::Deref,
+	sync::{Arc, MutexGuard}
+};
 
-#[macro_use]
-mod tests;
+pub use half;
+use vk_sys as vk;
+
+// #[macro_use]
+// mod tests;
 
 #[macro_use]
 mod extensions;
@@ -84,7 +84,7 @@ pub mod command_buffer;
 pub mod descriptor;
 pub mod device;
 pub mod format;
-#[macro_use]
+// #[macro_use]
 pub mod framebuffer;
 pub mod image;
 pub mod instance;
@@ -95,104 +95,84 @@ pub mod sampler;
 pub mod swapchain;
 pub mod sync;
 
-use std::error;
-use std::fmt;
-use std::ops::Deref;
-use std::sync::Arc;
-use std::sync::MutexGuard;
-
 /// Alternative to the `Deref` trait. Contrary to `Deref`, must always return the same object.
 pub unsafe trait SafeDeref: Deref {}
-unsafe impl<'a, T: ?Sized> SafeDeref for &'a T {
-}
-unsafe impl<T: ?Sized> SafeDeref for Arc<T> {
-}
-unsafe impl<T: ?Sized> SafeDeref for Box<T> {
-}
+unsafe impl<'a, T: ?Sized> SafeDeref for &'a T {}
+unsafe impl<T: ?Sized> SafeDeref for Arc<T> {}
+unsafe impl<T: ?Sized> SafeDeref for Box<T> {}
 
 pub trait VulkanHandle {
-    fn value(&self) -> u64;
+	fn value(&self) -> u64;
 }
-
 impl VulkanHandle for usize {
-    #[inline]
-    fn value(&self) -> u64 { *self as u64 }
+	fn value(&self) -> u64 { *self as u64 }
 }
 impl VulkanHandle for u64 {
-    #[inline]
-    fn value(&self) -> u64 { *self }
+	fn value(&self) -> u64 { *self }
 }
 
 /// Gives access to the internal identifier of an object.
 pub unsafe trait VulkanObject {
-    /// The type of the object.
-    type Object: VulkanHandle;
+	/// The type of the object.
+	type Object: VulkanHandle;
 
-    /// The `DebugReportObjectTypeEXT` of the internal Vulkan handle.
-    const TYPE: vk::DebugReportObjectTypeEXT;
+	/// The `DebugReportObjectTypeEXT` of the internal Vulkan handle.
+	const TYPE: vk::DebugReportObjectTypeEXT;
 
-    /// Returns a reference to the object.
-    fn internal_object(&self) -> Self::Object;
+	/// Returns a reference to the object.
+	fn internal_object(&self) -> Self::Object;
 }
 
 /// Gives access to the internal identifier of an object.
 // TODO: remove ; crappy design
 pub unsafe trait SynchronizedVulkanObject {
-    /// The type of the object.
-    type Object: VulkanHandle;
+	/// The type of the object.
+	type Object: VulkanHandle;
 
-    /// Returns a reference to the object.
-    fn internal_object_guard(&self) -> MutexGuard<Self::Object>;
+	/// Returns a reference to the object.
+	fn internal_object_guard(&self) -> MutexGuard<Self::Object>;
 }
 
 /// Error type returned by most Vulkan functions.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OomError {
-    /// There is no memory available on the host (ie. the CPU, RAM, etc.).
-    OutOfHostMemory,
-    /// There is no memory available on the device (ie. video memory).
-    OutOfDeviceMemory,
+	/// There is no memory available on the host (ie. the CPU, RAM, etc.).
+	OutOfHostMemory,
+	/// There is no memory available on the device (ie. video memory).
+	OutOfDeviceMemory
 }
-
-impl error::Error for OomError {
-    #[inline]
-    fn description(&self) -> &str {
-        match *self {
-            OomError::OutOfHostMemory => "no memory available on the host",
-            OomError::OutOfDeviceMemory => "no memory available on the graphical device",
-        }
-    }
-}
-
 impl fmt::Display for OomError {
-    #[inline]
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
-    }
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			OomError::OutOfHostMemory => write!(f, "No memory available on the host"),
+			OomError::OutOfDeviceMemory => write!(f, "No memory available on the graphical device")
+		}
+	}
 }
-
+impl error::Error for OomError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
+}
 impl From<Error> for OomError {
-    #[inline]
-    fn from(err: Error) -> OomError {
-        match err {
-            Error::OutOfHostMemory => OomError::OutOfHostMemory,
-            Error::OutOfDeviceMemory => OomError::OutOfDeviceMemory,
-            _ => panic!("unexpected error: {:?}", err),
-        }
-    }
+	fn from(err: Error) -> OomError {
+		match err {
+			Error::OutOfHostMemory => OomError::OutOfHostMemory,
+			Error::OutOfDeviceMemory => OomError::OutOfDeviceMemory,
+			_ => panic!("unexpected error: {:?}", err)
+		}
+	}
 }
 
 /// All possible success codes returned by any Vulkan function.
 #[derive(Debug, Copy, Clone)]
 #[repr(u32)]
 enum Success {
-    Success = vk::SUCCESS,
-    NotReady = vk::NOT_READY,
-    Timeout = vk::TIMEOUT,
-    EventSet = vk::EVENT_SET,
-    EventReset = vk::EVENT_RESET,
-    Incomplete = vk::INCOMPLETE,
-    Suboptimal = vk::SUBOPTIMAL_KHR,
+	Success = vk::SUCCESS,
+	NotReady = vk::NOT_READY,
+	Timeout = vk::TIMEOUT,
+	EventSet = vk::EVENT_SET,
+	EventReset = vk::EVENT_RESET,
+	Incomplete = vk::INCOMPLETE,
+	Suboptimal = vk::SUBOPTIMAL_KHR
 }
 
 /// All possible errors returned by any Vulkan function.
@@ -203,54 +183,56 @@ enum Success {
 #[repr(u32)]
 // TODO: being pub is necessary because of the weird visibility rules in rustc
 pub(crate) enum Error {
-    OutOfHostMemory = vk::ERROR_OUT_OF_HOST_MEMORY,
-    OutOfDeviceMemory = vk::ERROR_OUT_OF_DEVICE_MEMORY,
-    InitializationFailed = vk::ERROR_INITIALIZATION_FAILED,
-    DeviceLost = vk::ERROR_DEVICE_LOST,
-    MemoryMapFailed = vk::ERROR_MEMORY_MAP_FAILED,
-    LayerNotPresent = vk::ERROR_LAYER_NOT_PRESENT,
-    ExtensionNotPresent = vk::ERROR_EXTENSION_NOT_PRESENT,
-    FeatureNotPresent = vk::ERROR_FEATURE_NOT_PRESENT,
-    IncompatibleDriver = vk::ERROR_INCOMPATIBLE_DRIVER,
-    TooManyObjects = vk::ERROR_TOO_MANY_OBJECTS,
-    FormatNotSupported = vk::ERROR_FORMAT_NOT_SUPPORTED,
-    SurfaceLost = vk::ERROR_SURFACE_LOST_KHR,
-    NativeWindowInUse = vk::ERROR_NATIVE_WINDOW_IN_USE_KHR,
-    OutOfDate = vk::ERROR_OUT_OF_DATE_KHR,
-    IncompatibleDisplay = vk::ERROR_INCOMPATIBLE_DISPLAY_KHR,
-    ValidationFailed = vk::ERROR_VALIDATION_FAILED_EXT,
-    OutOfPoolMemory = vk::ERROR_OUT_OF_POOL_MEMORY_KHR,
+	OutOfHostMemory = vk::ERROR_OUT_OF_HOST_MEMORY,
+	OutOfDeviceMemory = vk::ERROR_OUT_OF_DEVICE_MEMORY,
+	InitializationFailed = vk::ERROR_INITIALIZATION_FAILED,
+	DeviceLost = vk::ERROR_DEVICE_LOST,
+	MemoryMapFailed = vk::ERROR_MEMORY_MAP_FAILED,
+	LayerNotPresent = vk::ERROR_LAYER_NOT_PRESENT,
+	ExtensionNotPresent = vk::ERROR_EXTENSION_NOT_PRESENT,
+	FeatureNotPresent = vk::ERROR_FEATURE_NOT_PRESENT,
+	IncompatibleDriver = vk::ERROR_INCOMPATIBLE_DRIVER,
+	TooManyObjects = vk::ERROR_TOO_MANY_OBJECTS,
+	FormatNotSupported = vk::ERROR_FORMAT_NOT_SUPPORTED,
+	SurfaceLost = vk::ERROR_SURFACE_LOST_KHR,
+	NativeWindowInUse = vk::ERROR_NATIVE_WINDOW_IN_USE_KHR,
+	OutOfDate = vk::ERROR_OUT_OF_DATE_KHR,
+	IncompatibleDisplay = vk::ERROR_INCOMPATIBLE_DISPLAY_KHR,
+	ValidationFailed = vk::ERROR_VALIDATION_FAILED_EXT,
+	OutOfPoolMemory = vk::ERROR_OUT_OF_POOL_MEMORY_KHR
 }
 
 /// Checks whether the result returned correctly.
 fn check_errors(result: vk::Result) -> Result<Success, Error> {
-    match result {
-        vk::SUCCESS => Ok(Success::Success),
-        vk::NOT_READY => Ok(Success::NotReady),
-        vk::TIMEOUT => Ok(Success::Timeout),
-        vk::EVENT_SET => Ok(Success::EventSet),
-        vk::EVENT_RESET => Ok(Success::EventReset),
-        vk::INCOMPLETE => Ok(Success::Incomplete),
-        vk::ERROR_OUT_OF_HOST_MEMORY => Err(Error::OutOfHostMemory),
-        vk::ERROR_OUT_OF_DEVICE_MEMORY => Err(Error::OutOfDeviceMemory),
-        vk::ERROR_INITIALIZATION_FAILED => Err(Error::InitializationFailed),
-        vk::ERROR_DEVICE_LOST => Err(Error::DeviceLost),
-        vk::ERROR_MEMORY_MAP_FAILED => Err(Error::MemoryMapFailed),
-        vk::ERROR_LAYER_NOT_PRESENT => Err(Error::LayerNotPresent),
-        vk::ERROR_EXTENSION_NOT_PRESENT => Err(Error::ExtensionNotPresent),
-        vk::ERROR_FEATURE_NOT_PRESENT => Err(Error::FeatureNotPresent),
-        vk::ERROR_INCOMPATIBLE_DRIVER => Err(Error::IncompatibleDriver),
-        vk::ERROR_TOO_MANY_OBJECTS => Err(Error::TooManyObjects),
-        vk::ERROR_FORMAT_NOT_SUPPORTED => Err(Error::FormatNotSupported),
-        vk::ERROR_SURFACE_LOST_KHR => Err(Error::SurfaceLost),
-        vk::ERROR_NATIVE_WINDOW_IN_USE_KHR => Err(Error::NativeWindowInUse),
-        vk::SUBOPTIMAL_KHR => Ok(Success::Suboptimal),
-        vk::ERROR_OUT_OF_DATE_KHR => Err(Error::OutOfDate),
-        vk::ERROR_INCOMPATIBLE_DISPLAY_KHR => Err(Error::IncompatibleDisplay),
-        vk::ERROR_VALIDATION_FAILED_EXT => Err(Error::ValidationFailed),
-        vk::ERROR_OUT_OF_POOL_MEMORY_KHR => Err(Error::OutOfPoolMemory),
-        vk::ERROR_INVALID_SHADER_NV => panic!("Vulkan function returned \
-                                               VK_ERROR_INVALID_SHADER_NV"),
-        c => unreachable!("Unexpected error code returned by Vulkan: {}", c),
-    }
+	match result {
+		vk::SUCCESS => Ok(Success::Success),
+		vk::NOT_READY => Ok(Success::NotReady),
+		vk::TIMEOUT => Ok(Success::Timeout),
+		vk::EVENT_SET => Ok(Success::EventSet),
+		vk::EVENT_RESET => Ok(Success::EventReset),
+		vk::INCOMPLETE => Ok(Success::Incomplete),
+		vk::ERROR_OUT_OF_HOST_MEMORY => Err(Error::OutOfHostMemory),
+		vk::ERROR_OUT_OF_DEVICE_MEMORY => Err(Error::OutOfDeviceMemory),
+		vk::ERROR_INITIALIZATION_FAILED => Err(Error::InitializationFailed),
+		vk::ERROR_DEVICE_LOST => Err(Error::DeviceLost),
+		vk::ERROR_MEMORY_MAP_FAILED => Err(Error::MemoryMapFailed),
+		vk::ERROR_LAYER_NOT_PRESENT => Err(Error::LayerNotPresent),
+		vk::ERROR_EXTENSION_NOT_PRESENT => Err(Error::ExtensionNotPresent),
+		vk::ERROR_FEATURE_NOT_PRESENT => Err(Error::FeatureNotPresent),
+		vk::ERROR_INCOMPATIBLE_DRIVER => Err(Error::IncompatibleDriver),
+		vk::ERROR_TOO_MANY_OBJECTS => Err(Error::TooManyObjects),
+		vk::ERROR_FORMAT_NOT_SUPPORTED => Err(Error::FormatNotSupported),
+		vk::ERROR_SURFACE_LOST_KHR => Err(Error::SurfaceLost),
+		vk::ERROR_NATIVE_WINDOW_IN_USE_KHR => Err(Error::NativeWindowInUse),
+		vk::SUBOPTIMAL_KHR => Ok(Success::Suboptimal),
+		vk::ERROR_OUT_OF_DATE_KHR => Err(Error::OutOfDate),
+		vk::ERROR_INCOMPATIBLE_DISPLAY_KHR => Err(Error::IncompatibleDisplay),
+		vk::ERROR_VALIDATION_FAILED_EXT => Err(Error::ValidationFailed),
+		vk::ERROR_OUT_OF_POOL_MEMORY_KHR => Err(Error::OutOfPoolMemory),
+		vk::ERROR_INVALID_SHADER_NV => panic!(
+			"Vulkan function returned \
+			 VK_ERROR_INVALID_SHADER_NV"
+		),
+		c => unreachable!("Unexpected error code returned by Vulkan: {}", c)
+	}
 }

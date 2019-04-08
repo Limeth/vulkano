@@ -63,21 +63,22 @@
 //! # }
 //! ```
 
-pub use self::bufferless::BufferlessDefinition;
-pub use self::bufferless::BufferlessVertices;
-pub use self::definition::AttributeInfo;
-pub use self::definition::IncompatibleVertexDefinitionError;
-pub use self::definition::InputRate;
-pub use self::definition::VertexDefinition;
-pub use self::definition::VertexSource;
-pub use self::impl_vertex::VertexMember;
-pub use self::instance_buffer::SingleInstanceBufferDefinition;
-pub use self::one_one::OneVertexOneInstanceDefinition;
-pub use self::single::SingleBufferDefinition;
-pub use self::two::TwoBuffersDefinition;
-pub use self::vertex::Vertex;
-pub use self::vertex::VertexMemberInfo;
-pub use self::vertex::VertexMemberTy;
+pub use self::{
+	bufferless::{BufferlessDefinition, BufferlessVertices},
+	definition::{
+		AttributeInfo,
+		IncompatibleVertexDefinitionError,
+		InputRate,
+		VertexDefinition,
+		VertexSource
+	},
+	impl_vertex::VertexMember,
+	instance_buffer::SingleInstanceBufferDefinition,
+	one_one::OneVertexOneInstanceDefinition,
+	single::SingleBufferDefinition,
+	two::TwoBuffersDefinition,
+	vertex::{Vertex, VertexMemberInfo, VertexMemberTy}
+};
 
 mod bufferless;
 mod definition;

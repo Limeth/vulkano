@@ -7,46 +7,47 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use std::error;
-use std::fmt;
+use std::{error, fmt};
 
-use descriptor::pipeline_layout::PipelineLayoutAbstract;
-use descriptor::pipeline_layout::PipelineLayoutPushConstantsCompatible;
+use crate::descriptor::pipeline_layout::{
+	PipelineLayoutAbstract,
+	PipelineLayoutPushConstantsCompatible
+};
 
 /// Checks whether push constants are compatible with the pipeline.
-pub fn check_push_constants_validity<Pl, Pc>(pipeline: &Pl, push_constants: &Pc)
-                                             -> Result<(), CheckPushConstantsValidityError>
-    where Pl: ?Sized + PipelineLayoutAbstract + PipelineLayoutPushConstantsCompatible<Pc>,
-          Pc: ?Sized
+pub fn check_push_constants_validity<Pl, Pc>(
+	pipeline: &Pl, push_constants: &Pc
+) -> Result<(), CheckPushConstantsValidityError>
+where
+	Pl: ?Sized + PipelineLayoutAbstract + PipelineLayoutPushConstantsCompatible<Pc>,
+	Pc: ?Sized
 {
-    if !pipeline.is_compatible(push_constants) {
-        return Err(CheckPushConstantsValidityError::IncompatiblePushConstants);
-    }
+	if !pipeline.is_compatible(push_constants) {
+		return Err(CheckPushConstantsValidityError::IncompatiblePushConstants)
+	}
 
-    Ok(())
+	Ok(())
 }
 
 /// Error that can happen when checking push constants validity.
 #[derive(Debug, Copy, Clone)]
 pub enum CheckPushConstantsValidityError {
-    /// The push constants are incompatible with the pipeline layout.
-    IncompatiblePushConstants,
+	/// The push constants are incompatible with the pipeline layout.
+	IncompatiblePushConstants
 }
 
 impl error::Error for CheckPushConstantsValidityError {
-    #[inline]
-    fn description(&self) -> &str {
-        match *self {
-            CheckPushConstantsValidityError::IncompatiblePushConstants => {
-                "the push constants are incompatible with the pipeline layout"
-            },
-        }
-    }
+	fn description(&self) -> &str {
+		match *self {
+			CheckPushConstantsValidityError::IncompatiblePushConstants => {
+				"the push constants are incompatible with the pipeline layout"
+			}
+		}
+	}
 }
 
 impl fmt::Display for CheckPushConstantsValidityError {
-    #[inline]
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
-    }
+	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+		write!(fmt, "{}", error::Error::description(self))
+	}
 }

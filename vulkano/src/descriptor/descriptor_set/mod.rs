@@ -35,36 +35,45 @@
 //! - The `DescriptorSetsCollection` trait is implemented on collections of types that implement
 //!   `DescriptorSet`. It is what you pass to the draw functions.
 
-use SafeDeref;
-use buffer::BufferAccess;
-use descriptor::descriptor::DescriptorDesc;
-use image::ImageViewAccess;
+use crate::{
+	buffer::BufferAccess,
+	descriptor::descriptor::DescriptorDesc,
+	image::ImageViewAccess,
+	SafeDeref
+};
 
-pub use self::collection::DescriptorSetsCollection;
-pub use self::fixed_size_pool::FixedSizeDescriptorSet;
-pub use self::fixed_size_pool::FixedSizeDescriptorSetBuilder;
-pub use self::fixed_size_pool::FixedSizeDescriptorSetBuilderArray;
-pub use self::fixed_size_pool::FixedSizeDescriptorSetsPool;
-pub use self::persistent::PersistentDescriptorSet;
-pub use self::persistent::PersistentDescriptorSetBuf;
-pub use self::persistent::PersistentDescriptorSetBufView;
-pub use self::persistent::PersistentDescriptorSetBuildError;
-pub use self::persistent::PersistentDescriptorSetBuilder;
-pub use self::persistent::PersistentDescriptorSetBuilderArray;
-pub use self::persistent::PersistentDescriptorSetError;
-pub use self::persistent::PersistentDescriptorSetImg;
-pub use self::persistent::PersistentDescriptorSetSampler;
-pub use self::std_pool::StdDescriptorPool;
-pub use self::std_pool::StdDescriptorPoolAlloc;
-pub use self::sys::DescriptorPool;
-pub use self::sys::DescriptorPoolAlloc;
-pub use self::sys::DescriptorPoolAllocError;
-pub use self::sys::DescriptorWrite;
-pub use self::sys::DescriptorsCount;
-pub use self::sys::UnsafeDescriptorPool;
-pub use self::sys::UnsafeDescriptorPoolAllocIter;
-pub use self::sys::UnsafeDescriptorSet;
-pub use self::unsafe_layout::UnsafeDescriptorSetLayout;
+pub use self::{
+	collection::DescriptorSetsCollection,
+	fixed_size_pool::{
+		FixedSizeDescriptorSet,
+		FixedSizeDescriptorSetBuilder,
+		FixedSizeDescriptorSetBuilderArray,
+		FixedSizeDescriptorSetsPool
+	},
+	persistent::{
+		PersistentDescriptorSet,
+		PersistentDescriptorSetBuf,
+		PersistentDescriptorSetBufView,
+		PersistentDescriptorSetBuildError,
+		PersistentDescriptorSetBuilder,
+		PersistentDescriptorSetBuilderArray,
+		PersistentDescriptorSetError,
+		PersistentDescriptorSetImg,
+		PersistentDescriptorSetSampler
+	},
+	std_pool::{StdDescriptorPool, StdDescriptorPoolAlloc},
+	sys::{
+		DescriptorPool,
+		DescriptorPoolAlloc,
+		DescriptorPoolAllocError,
+		DescriptorWrite,
+		DescriptorsCount,
+		UnsafeDescriptorPool,
+		UnsafeDescriptorPoolAllocIter,
+		UnsafeDescriptorSet
+	},
+	unsafe_layout::UnsafeDescriptorSetLayout
+};
 
 pub mod collection;
 
@@ -78,78 +87,59 @@ mod unsafe_layout;
 ///
 /// Objects of this type can be passed when submitting a draw command.
 pub unsafe trait DescriptorSet: DescriptorSetDesc {
-    /// Returns the inner `UnsafeDescriptorSet`.
-    fn inner(&self) -> &UnsafeDescriptorSet;
+	/// Returns the inner `UnsafeDescriptorSet`.
+	fn inner(&self) -> &UnsafeDescriptorSet;
 
-    /// Returns the number of buffers within this descriptor set.
-    fn num_buffers(&self) -> usize;
+	/// Returns the number of buffers within this descriptor set.
+	fn num_buffers(&self) -> usize;
 
-    /// Returns the `index`th buffer of this descriptor set, or `None` if out of range. Also
-    /// returns the index of the descriptor that uses this buffer.
-    ///
-    /// The valid range is between 0 and `num_buffers()`.
-    fn buffer(&self, index: usize) -> Option<(&BufferAccess, u32)>;
+	/// Returns the `index`th buffer of this descriptor set, or `None` if out of range. Also
+	/// returns the index of the descriptor that uses this buffer.
+	///
+	/// The valid range is between 0 and `num_buffers()`.
+	fn buffer(&self, index: usize) -> Option<(&BufferAccess, u32)>;
 
-    /// Returns the number of images within this descriptor set.
-    fn num_images(&self) -> usize;
+	/// Returns the number of images within this descriptor set.
+	fn num_images(&self) -> usize;
 
-    /// Returns the `index`th image of this descriptor set, or `None` if out of range. Also returns
-    /// the index of the descriptor that uses this image.
-    ///
-    /// The valid range is between 0 and `num_images()`.
-    fn image(&self, index: usize) -> Option<(&ImageViewAccess, u32)>;
+	/// Returns the `index`th image of this descriptor set, or `None` if out of range. Also returns
+	/// the index of the descriptor that uses this image.
+	///
+	/// The valid range is between 0 and `num_images()`.
+	fn image(&self, index: usize) -> Option<(&ImageViewAccess, u32)>;
 }
 
 unsafe impl<T> DescriptorSet for T
-    where T: SafeDeref,
-          T::Target: DescriptorSet
+where
+	T: SafeDeref,
+	T::Target: DescriptorSet
 {
-    #[inline]
-    fn inner(&self) -> &UnsafeDescriptorSet {
-        (**self).inner()
-    }
+	fn inner(&self) -> &UnsafeDescriptorSet { (**self).inner() }
 
-    #[inline]
-    fn num_buffers(&self) -> usize {
-        (**self).num_buffers()
-    }
+	fn num_buffers(&self) -> usize { (**self).num_buffers() }
 
-    #[inline]
-    fn buffer(&self, index: usize) -> Option<(&BufferAccess, u32)> {
-        (**self).buffer(index)
-    }
+	fn buffer(&self, index: usize) -> Option<(&BufferAccess, u32)> { (**self).buffer(index) }
 
-    #[inline]
-    fn num_images(&self) -> usize {
-        (**self).num_images()
-    }
+	fn num_images(&self) -> usize { (**self).num_images() }
 
-    #[inline]
-    fn image(&self, index: usize) -> Option<(&ImageViewAccess, u32)> {
-        (**self).image(index)
-    }
+	fn image(&self, index: usize) -> Option<(&ImageViewAccess, u32)> { (**self).image(index) }
 }
 
 /// Trait for objects that describe the layout of the descriptors of a set.
 pub unsafe trait DescriptorSetDesc {
-    /// Returns the number of binding slots in the set.
-    fn num_bindings(&self) -> usize;
+	/// Returns the number of binding slots in the set.
+	fn num_bindings(&self) -> usize;
 
-    /// Returns a description of a descriptor, or `None` if out of range.
-    fn descriptor(&self, binding: usize) -> Option<DescriptorDesc>;
+	/// Returns a description of a descriptor, or `None` if out of range.
+	fn descriptor(&self, binding: usize) -> Option<DescriptorDesc>;
 }
 
 unsafe impl<T> DescriptorSetDesc for T
-    where T: SafeDeref,
-          T::Target: DescriptorSetDesc
+where
+	T: SafeDeref,
+	T::Target: DescriptorSetDesc
 {
-    #[inline]
-    fn num_bindings(&self) -> usize {
-        (**self).num_bindings()
-    }
+	fn num_bindings(&self) -> usize { (**self).num_bindings() }
 
-    #[inline]
-    fn descriptor(&self, binding: usize) -> Option<DescriptorDesc> {
-        (**self).descriptor(binding)
-    }
+	fn descriptor(&self, binding: usize) -> Option<DescriptorDesc> { (**self).descriptor(binding) }
 }

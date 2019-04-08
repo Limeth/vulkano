@@ -49,21 +49,22 @@
 //!
 //! TODO: write this section
 
-pub use self::empty::EmptyPipelineDesc;
-pub use self::limits_check::PipelineLayoutLimitsError;
-pub use self::runtime_desc::RuntimePipelineDesc;
-pub use self::runtime_desc::RuntimePipelineDescError;
-pub use self::sys::PipelineLayout;
-pub use self::sys::PipelineLayoutCreationError;
-pub use self::sys::PipelineLayoutSys;
-pub use self::traits::PipelineLayoutAbstract;
-pub use self::traits::PipelineLayoutDesc;
-pub use self::traits::PipelineLayoutDescPcRange;
-pub use self::traits::PipelineLayoutNotSupersetError;
-pub use self::traits::PipelineLayoutPushConstantsCompatible;
-pub use self::traits::PipelineLayoutSetsCompatible;
-pub use self::traits::PipelineLayoutSuperset;
-pub use self::union::PipelineLayoutDescUnion;
+pub use self::{
+	empty::EmptyPipelineDesc,
+	limits_check::PipelineLayoutLimitsError,
+	runtime_desc::{RuntimePipelineDesc, RuntimePipelineDescError},
+	sys::{PipelineLayout, PipelineLayoutCreationError, PipelineLayoutSys},
+	traits::{
+		PipelineLayoutAbstract,
+		PipelineLayoutDesc,
+		PipelineLayoutDescPcRange,
+		PipelineLayoutNotSupersetError,
+		PipelineLayoutPushConstantsCompatible,
+		PipelineLayoutSetsCompatible,
+		PipelineLayoutSuperset
+	},
+	union::PipelineLayoutDescUnion
+};
 
 pub(crate) use self::tweaks::PipelineLayoutDescTweaks;
 
@@ -72,5 +73,5 @@ mod limits_check;
 mod runtime_desc;
 mod sys;
 mod traits;
-mod union;
 mod tweaks;
+mod union;

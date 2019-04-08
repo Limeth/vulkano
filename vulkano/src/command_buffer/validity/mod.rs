@@ -9,20 +9,25 @@
 
 //! Functions that check the validity of commands.
 
-pub use self::blit_image::{CheckBlitImageError, check_blit_image};
-pub use self::clear_color_image::{CheckClearColorImageError, check_clear_color_image};
-pub use self::copy_buffer::{CheckCopyBuffer, CheckCopyBufferError, check_copy_buffer};
-pub use self::copy_image::{CheckCopyImageError, check_copy_image};
-pub use self::copy_image_buffer::{CheckCopyBufferImageError, CheckCopyBufferImageTy,
-                                  check_copy_buffer_image};
-pub use self::descriptor_sets::{CheckDescriptorSetsValidityError, check_descriptor_sets_validity};
-pub use self::dispatch::{CheckDispatchError, check_dispatch};
-pub use self::dynamic_state::{CheckDynamicStateValidityError, check_dynamic_state_validity};
-pub use self::fill_buffer::{CheckFillBufferError, check_fill_buffer};
-pub use self::index_buffer::{CheckIndexBuffer, CheckIndexBufferError, check_index_buffer};
-pub use self::push_constants::{CheckPushConstantsValidityError, check_push_constants_validity};
-pub use self::update_buffer::{CheckUpdateBufferError, check_update_buffer};
-pub use self::vertex_buffers::{CheckVertexBuffer, CheckVertexBufferError, check_vertex_buffers};
+pub use self::{
+	blit_image::{check_blit_image, CheckBlitImageError},
+	clear_color_image::{check_clear_color_image, CheckClearColorImageError},
+	copy_buffer::{check_copy_buffer, CheckCopyBuffer, CheckCopyBufferError},
+	copy_image::{check_copy_image, CheckCopyImageError},
+	copy_image_buffer::{
+		check_copy_buffer_image,
+		CheckCopyBufferImageError,
+		CheckCopyBufferImageTy
+	},
+	descriptor_sets::{check_descriptor_sets_validity, CheckDescriptorSetsValidityError},
+	dispatch::{check_dispatch, CheckDispatchError},
+	dynamic_state::{check_dynamic_state_validity, CheckDynamicStateValidityError},
+	fill_buffer::{check_fill_buffer, CheckFillBufferError},
+	index_buffer::{check_index_buffer, CheckIndexBuffer, CheckIndexBufferError},
+	push_constants::{check_push_constants_validity, CheckPushConstantsValidityError},
+	update_buffer::{check_update_buffer, CheckUpdateBufferError},
+	vertex_buffers::{check_vertex_buffers, CheckVertexBuffer, CheckVertexBufferError}
+};
 
 mod blit_image;
 mod clear_color_image;

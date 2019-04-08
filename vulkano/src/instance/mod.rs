@@ -14,13 +14,12 @@
 //! For example:
 //!
 //! ```no_run
-//! use vulkano::instance::Instance;
-//! use vulkano::instance::InstanceExtensions;
+//! use vulkano::instance::{Instance, InstanceExtensions};
 //!
 //! let instance = match Instance::new(None, &InstanceExtensions::none(), None) {
-//!     Ok(i) => i,
-//!     Err(err) => panic!("Couldn't build instance: {:?}", err)
-//! };
+//! 	Ok(i) => i,
+//! 	Err(err) => panic!("Couldn't build instance: {:?}", err)
+//! 	};
 //! ```
 //!
 //! Creating an instance initializes everything and allows you to enumerate physical devices,
@@ -33,8 +32,8 @@
 //!
 //! # let instance = Instance::new(None, &InstanceExtensions::none(), None).unwrap();
 //! for physical_device in PhysicalDevice::enumerate(&instance) {
-//!     println!("Available device: {}", physical_device.name());
-//! }
+//! 	println!("Available device: {}", physical_device.name());
+//! 	}
 //! ```
 //!
 //! # Extensions
@@ -56,19 +55,18 @@
 //! succeed on anything else than an Android-running device.
 //!
 //! ```no_run
-//! use vulkano::instance::Instance;
-//! use vulkano::instance::InstanceExtensions;
+//! use vulkano::instance::{Instance, InstanceExtensions};
 //!
 //! let extensions = InstanceExtensions {
-//!     khr_surface: true,
-//!     khr_android_surface: true,
-//!     .. InstanceExtensions::none()
-//! };
+//! 	khr_surface: true,
+//! 	khr_android_surface: true,
+//! 	..InstanceExtensions::none()
+//! 	};
 //!
 //! let instance = match Instance::new(None, &extensions, None) {
-//!     Ok(i) => i,
-//!     Err(err) => panic!("Couldn't build instance: {:?}", err)
-//! };
+//! 	Ok(i) => i,
+//! 	Err(err) => panic!("Couldn't build instance: {:?}", err)
+//! 	};
 //! ```
 //!
 //! # Application info
@@ -106,27 +104,29 @@
 //! `device` module for more info.
 //!
 
-pub use self::extensions::InstanceExtensions;
-pub use self::extensions::RawInstanceExtensions;
-pub use self::instance::ApplicationInfo;
-pub use self::instance::Instance;
-pub use self::instance::InstanceCreationError;
-pub use self::instance::MemoryHeap;
-pub use self::instance::MemoryHeapsIter;
-pub use self::instance::MemoryType;
-pub use self::instance::MemoryTypesIter;
-pub use self::instance::PhysicalDevice;
-pub use self::instance::PhysicalDeviceType;
-pub use self::instance::PhysicalDevicesIter;
-pub use self::instance::QueueFamiliesIter;
-pub use self::instance::QueueFamily;
-pub use self::layers::LayerProperties;
-pub use self::layers::LayersIterator;
-pub use self::layers::LayersListError;
-pub use self::layers::layers_list;
-pub use self::limits::Limits;
-pub use self::loader::LoadingError;
-pub use version::Version;
+pub use extensions::{InstanceExtensions, RawInstanceExtensions};
+
+pub use instance::{
+	ApplicationInfo,
+	Instance,
+	InstanceCreationError,
+	MemoryHeap,
+	MemoryHeapsIter,
+	MemoryType,
+	MemoryTypesIter,
+	PhysicalDevice,
+	PhysicalDeviceType,
+	PhysicalDevicesIter,
+	QueueFamiliesIter,
+	QueueFamily
+};
+
+pub use layers::{layers_list, LayerProperties, LayersIterator, LayersListError};
+pub use limits::Limits;
+
+pub use loader::LoadingError;
+
+pub use crate::version::Version;
 
 pub mod debug;
 pub mod loader;

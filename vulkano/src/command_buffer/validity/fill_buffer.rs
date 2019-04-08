@@ -7,94 +7,88 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use std::error;
-use std::fmt;
+use std::{error, fmt};
 
-use VulkanObject;
-use buffer::BufferAccess;
-use device::Device;
-use device::DeviceOwned;
+use crate::{
+	buffer::BufferAccess,
+	device::{Device, DeviceOwned},
+	VulkanObject
+};
 
 /// Checks whether a fill buffer command is valid.
 ///
 /// # Panic
 ///
 /// - Panics if the buffer not created with `device`.
-///
 pub fn check_fill_buffer<B>(device: &Device, buffer: &B) -> Result<(), CheckFillBufferError>
-    where B: ?Sized + BufferAccess
+where
+	B: ?Sized + BufferAccess
 {
-    assert_eq!(buffer.inner().buffer.device().internal_object(),
-               device.internal_object());
+	assert_eq!(buffer.inner().buffer.device().internal_object(), device.internal_object());
 
-    if !buffer.inner().buffer.usage_transfer_destination() {
-        return Err(CheckFillBufferError::BufferMissingUsage);
-    }
+	if !buffer.inner().buffer.usage_transfer_destination() {
+		return Err(CheckFillBufferError::BufferMissingUsage)
+	}
 
-    if buffer.inner().offset % 4 != 0 {
-        return Err(CheckFillBufferError::WrongAlignment);
-    }
+	if buffer.inner().offset % 4 != 0 {
+		return Err(CheckFillBufferError::WrongAlignment)
+	}
 
-    Ok(())
+	Ok(())
 }
 
 /// Error that can happen when attempting to add a `fill_buffer` command.
 #[derive(Debug, Copy, Clone)]
 pub enum CheckFillBufferError {
-    /// The "transfer destination" usage must be enabled on the buffer.
-    BufferMissingUsage,
-    /// The data or size must be 4-bytes aligned.
-    WrongAlignment,
+	/// The "transfer destination" usage must be enabled on the buffer.
+	BufferMissingUsage,
+	/// The data or size must be 4-bytes aligned.
+	WrongAlignment
 }
 
 impl error::Error for CheckFillBufferError {
-    #[inline]
-    fn description(&self) -> &str {
-        match *self {
-            CheckFillBufferError::BufferMissingUsage => {
-                "the transfer destination usage must be enabled on the buffer"
-            },
-            CheckFillBufferError::WrongAlignment => {
-                "the offset or size are not aligned to 4 bytes"
-            },
-        }
-    }
+	fn description(&self) -> &str {
+		match *self {
+			CheckFillBufferError::BufferMissingUsage => {
+				"the transfer destination usage must be enabled on the buffer"
+			}
+			CheckFillBufferError::WrongAlignment => "the offset or size are not aligned to 4 bytes"
+		}
+	}
 }
 
 impl fmt::Display for CheckFillBufferError {
-    #[inline]
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
-    }
+	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+		write!(fmt, "{}", error::Error::description(self))
+	}
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use buffer::BufferUsage;
-    use buffer::CpuAccessibleBuffer;
+	use super::*;
+	use crate::buffer::{BufferUsage, CpuAccessibleBuffer};
 
-    #[test]
-    fn missing_usage() {
-        let (device, queue) = gfx_dev_and_queue!();
-        let buffer =
-            CpuAccessibleBuffer::from_data(device.clone(), BufferUsage::vertex_buffer(), 0u32)
-                .unwrap();
+	#[test]
+	fn missing_usage() {
+		let (device, queue) = gfx_dev_and_queue!();
+		let buffer =
+			CpuAccessibleBuffer::from_data(device.clone(), BufferUsage::vertex_buffer(), 0u32)
+				.unwrap();
 
-        match check_fill_buffer(&device, &buffer) {
-            Err(CheckFillBufferError::BufferMissingUsage) => (),
-            _ => panic!(),
-        }
-    }
+		match check_fill_buffer(&device, &buffer) {
+			Err(CheckFillBufferError::BufferMissingUsage) => (),
+			_ => panic!()
+		}
+	}
 
-    #[test]
-    fn wrong_device() {
-        let (dev1, queue) = gfx_dev_and_queue!();
-        let (dev2, _) = gfx_dev_and_queue!();
-        let buffer = CpuAccessibleBuffer::from_data(dev1, BufferUsage::all(), 0u32).unwrap();
+	#[test]
+	fn wrong_device() {
+		let (dev1, queue) = gfx_dev_and_queue!();
+		let (dev2, _) = gfx_dev_and_queue!();
+		let buffer = CpuAccessibleBuffer::from_data(dev1, BufferUsage::all(), 0u32).unwrap();
 
-        assert_should_panic!({
-                                 let _ = check_fill_buffer(&dev2, &buffer);
-                             });
-    }
+		assert_should_panic!({
+			let _ = check_fill_buffer(&dev2, &buffer);
+		});
+	}
 }

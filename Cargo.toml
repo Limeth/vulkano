@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "examples",
     "vk-sys",
     "vulkano",
     "vulkano-shaders",

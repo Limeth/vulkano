@@ -40,22 +40,21 @@
 #[deprecated(note = "No longer needed")]
 #[derive(Debug, Copy, Clone)]
 pub struct Multisample {
-    pub rasterization_samples: u32,
-    pub sample_mask: [u32; 4],
-    pub sample_shading: Option<f32>,
-    pub alpha_to_coverage: bool,
-    pub alpha_to_one: bool,
+	pub rasterization_samples: u32,
+	pub sample_mask: [u32; 4],
+	pub sample_shading: Option<f32>,
+	pub alpha_to_coverage: bool,
+	pub alpha_to_one: bool
 }
 
 impl Multisample {
-    #[inline]
-    pub fn disabled() -> Multisample {
-        Multisample {
-            rasterization_samples: 1,
-            sample_mask: [0xffffffff; 4],
-            sample_shading: None,
-            alpha_to_coverage: false,
-            alpha_to_one: false,
-        }
-    }
+	pub fn disabled() -> Multisample {
+		Multisample {
+			rasterization_samples: 1,
+			sample_mask: [0xffffffff; 4],
+			sample_shading: None,
+			alpha_to_coverage: false,
+			alpha_to_one: false
+		}
+	}
 }

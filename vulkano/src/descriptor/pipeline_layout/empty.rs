@@ -7,9 +7,10 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use descriptor::descriptor::DescriptorDesc;
-use descriptor::pipeline_layout::PipelineLayoutDesc;
-use descriptor::pipeline_layout::PipelineLayoutDescPcRange;
+use crate::descriptor::{
+	descriptor::DescriptorDesc,
+	pipeline_layout::{PipelineLayoutDesc, PipelineLayoutDescPcRange}
+};
 
 /// Description of an empty pipeline layout.
 ///
@@ -18,8 +19,7 @@ use descriptor::pipeline_layout::PipelineLayoutDescPcRange;
 /// ```
 /// # use std::sync::Arc;
 /// # use vulkano::device::Device;
-/// use vulkano::descriptor::pipeline_layout::EmptyPipelineDesc;
-/// use vulkano::descriptor::pipeline_layout::PipelineLayoutDesc;
+/// use vulkano::descriptor::pipeline_layout::{EmptyPipelineDesc, PipelineLayoutDesc};
 ///
 /// # let device: Arc<Device> = return;
 /// let pipeline_layout = EmptyPipelineDesc.build(device.clone()).unwrap();
@@ -28,28 +28,13 @@ use descriptor::pipeline_layout::PipelineLayoutDescPcRange;
 pub struct EmptyPipelineDesc;
 
 unsafe impl PipelineLayoutDesc for EmptyPipelineDesc {
-    #[inline]
-    fn num_sets(&self) -> usize {
-        0
-    }
+	fn num_sets(&self) -> usize { 0 }
 
-    #[inline]
-    fn num_bindings_in_set(&self, _: usize) -> Option<usize> {
-        None
-    }
+	fn num_bindings_in_set(&self, _: usize) -> Option<usize> { None }
 
-    #[inline]
-    fn descriptor(&self, _: usize, _: usize) -> Option<DescriptorDesc> {
-        None
-    }
+	fn descriptor(&self, _: usize, _: usize) -> Option<DescriptorDesc> { None }
 
-    #[inline]
-    fn num_push_constants_ranges(&self) -> usize {
-        0
-    }
+	fn num_push_constants_ranges(&self) -> usize { 0 }
 
-    #[inline]
-    fn push_constants_range(&self, _: usize) -> Option<PipelineLayoutDescPcRange> {
-        None
-    }
+	fn push_constants_range(&self, _: usize) -> Option<PipelineLayoutDescPcRange> { None }
 }

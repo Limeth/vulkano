@@ -7,18 +7,22 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use std::collections::HashSet;
-use std::ffi::{CStr, CString};
-use std::fmt;
-use std::iter::FromIterator;
-use std::ptr;
-use std::str;
+use std::{
+	collections::HashSet,
+	ffi::{CStr, CString},
+	fmt,
+	iter::FromIterator,
+	ptr,
+	str
+};
 
-use VulkanObject;
-use check_errors;
-use instance::PhysicalDevice;
-use extensions::SupportedExtensionsError;
-use vk;
+use crate::{
+	check_errors,
+	extensions::SupportedExtensionsError,
+	instance::PhysicalDevice,
+	VulkanObject
+};
+use vk_sys as vk;
 
 macro_rules! device_extensions {
     ($sname:ident, $rawname:ident, $($ext:ident => $s:expr,)*) => (
@@ -104,16 +108,16 @@ macro_rules! device_extensions {
 }
 
 device_extensions! {
-    DeviceExtensions,
-    RawDeviceExtensions,
-    khr_swapchain => b"VK_KHR_swapchain",
-    khr_display_swapchain => b"VK_KHR_display_swapchain",
-    khr_sampler_mirror_clamp_to_edge => b"VK_KHR_sampler_mirror_clamp_to_edge",
-    khr_maintenance1 => b"VK_KHR_maintenance1",
-    khr_get_memory_requirements2 => b"VK_KHR_get_memory_requirements2",
-    khr_dedicated_allocation => b"VK_KHR_dedicated_allocation",
-    khr_incremental_present => b"VK_KHR_incremental_present",
-    ext_debug_marker => b"VK_EXT_debug_marker",
+	DeviceExtensions,
+	RawDeviceExtensions,
+	khr_swapchain => b"VK_KHR_swapchain",
+	khr_display_swapchain => b"VK_KHR_display_swapchain",
+	khr_sampler_mirror_clamp_to_edge => b"VK_KHR_sampler_mirror_clamp_to_edge",
+	khr_maintenance1 => b"VK_KHR_maintenance1",
+	khr_get_memory_requirements2 => b"VK_KHR_get_memory_requirements2",
+	khr_dedicated_allocation => b"VK_KHR_dedicated_allocation",
+	khr_incremental_present => b"VK_KHR_incremental_present",
+	ext_debug_marker => b"VK_EXT_debug_marker",
 }
 
 /// This helper type can only be instantiated inside this module.
@@ -124,11 +128,11 @@ pub struct Unbuildable(());
 
 #[cfg(test)]
 mod tests {
-    use device::{DeviceExtensions, RawDeviceExtensions};
+	use crate::device::{DeviceExtensions, RawDeviceExtensions};
 
-    #[test]
-    fn empty_extensions() {
-        let d: RawDeviceExtensions = (&DeviceExtensions::none()).into();
-        assert!(d.iter().next().is_none());
-    }
+	#[test]
+	fn empty_extensions() {
+		let d: RawDeviceExtensions = (&DeviceExtensions::none()).into();
+		assert!(d.iter().next().is_none());
+	}
 }

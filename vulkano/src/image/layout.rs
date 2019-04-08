@@ -7,7 +7,7 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use vk;
+use vk_sys as vk;
 
 /// Layout of an image.
 ///
@@ -29,14 +29,14 @@ use vk;
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u32)]
 pub enum ImageLayout {
-    Undefined = vk::IMAGE_LAYOUT_UNDEFINED,
-    General = vk::IMAGE_LAYOUT_GENERAL,
-    ColorAttachmentOptimal = vk::IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    DepthStencilAttachmentOptimal = vk::IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-    DepthStencilReadOnlyOptimal = vk::IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
-    ShaderReadOnlyOptimal = vk::IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    TransferSrcOptimal = vk::IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-    TransferDstOptimal = vk::IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-    Preinitialized = vk::IMAGE_LAYOUT_PREINITIALIZED,
-    PresentSrc = vk::IMAGE_LAYOUT_PRESENT_SRC_KHR,
+	Undefined = vk::IMAGE_LAYOUT_UNDEFINED,
+	General = vk::IMAGE_LAYOUT_GENERAL,
+	ColorAttachmentOptimal = vk::IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	DepthStencilAttachmentOptimal = vk::IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+	DepthStencilReadOnlyOptimal = vk::IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+	ShaderReadOnlyOptimal = vk::IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+	TransferSrcOptimal = vk::IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+	TransferDstOptimal = vk::IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+	Preinitialized = vk::IMAGE_LAYOUT_PREINITIALIZED,
+	PresentSrc = vk::IMAGE_LAYOUT_PRESENT_SRC_KHR
 }

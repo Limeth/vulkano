@@ -87,33 +87,27 @@ macro_rules! ordered_passes_renderpass {
 
             #[allow(unsafe_code)]
             unsafe impl RenderPassDesc for CustomRenderPassDesc {
-                #[inline]
-                fn num_attachments(&self) -> usize {
+                                fn num_attachments(&self) -> usize {
                     num_attachments()
                 }
 
-                #[inline]
-                fn attachment_desc(&self, id: usize) -> Option<AttachmentDescription> {
+                                fn attachment_desc(&self, id: usize) -> Option<AttachmentDescription> {
                     attachment(self, id)
                 }
 
-                #[inline]
-                fn num_subpasses(&self) -> usize {
+                                fn num_subpasses(&self) -> usize {
                     num_subpasses()
                 }
 
-                #[inline]
-                fn subpass_desc(&self, id: usize) -> Option<PassDescription> {
+                                fn subpass_desc(&self, id: usize) -> Option<PassDescription> {
                     subpass(id)
                 }
 
-                #[inline]
-                fn num_dependencies(&self) -> usize {
+                                fn num_dependencies(&self) -> usize {
                     num_dependencies()
                 }
 
-                #[inline]
-                fn dependency_desc(&self, id: usize) -> Option<PassDependencyDescription> {
+                                fn dependency_desc(&self, id: usize) -> Option<PassDependencyDescription> {
                     dependency(id)
                 }
             }
@@ -125,8 +119,7 @@ macro_rules! ordered_passes_renderpass {
                 }
             }
 
-            #[inline]
-            fn num_attachments() -> usize {
+                        fn num_attachments() -> usize {
                 #![allow(unused_assignments)]
                 #![allow(unused_mut)]
                 #![allow(unused_variables)]
@@ -135,8 +128,7 @@ macro_rules! ordered_passes_renderpass {
                 num
             }
 
-            #[inline]
-            fn attachment(desc: &CustomRenderPassDesc, id: usize) -> Option<AttachmentDescription> {
+                        fn attachment(desc: &CustomRenderPassDesc, id: usize) -> Option<AttachmentDescription> {
                 #![allow(unused_assignments)]
                 #![allow(unused_mut)]
 
@@ -164,8 +156,7 @@ macro_rules! ordered_passes_renderpass {
                 None
             }
 
-            #[inline]
-            fn num_subpasses() -> usize {
+                        fn num_subpasses() -> usize {
                 #![allow(unused_assignments)]
                 #![allow(unused_mut)]
                 #![allow(unused_variables)]
@@ -174,8 +165,7 @@ macro_rules! ordered_passes_renderpass {
                 num
             }
 
-            #[inline]
-            fn subpass(id: usize) -> Option<PassDescription> {
+                        fn subpass(id: usize) -> Option<PassDescription> {
                 #![allow(unused_assignments)]
                 #![allow(unused_mut)]
                 #![allow(unused_variables)]
@@ -232,13 +222,11 @@ macro_rules! ordered_passes_renderpass {
                 None
             }
 
-            #[inline]
-            fn num_dependencies() -> usize {
+                        fn num_dependencies() -> usize {
                 num_subpasses().saturating_sub(1)
             }
 
-            #[inline]
-            fn dependency(id: usize) -> Option<PassDependencyDescription> {
+                        fn dependency(id: usize) -> Option<PassDependencyDescription> {
                 let num_passes = num_subpasses();
 
                 if id + 1 >= num_passes {
@@ -348,31 +336,32 @@ macro_rules! ordered_passes_renderpass {
 
 #[cfg(test)]
 mod tests {
-    use format::Format;
+	use crate::format::Format;
 
-    #[test]
-    fn single_pass_resolve() {
-        let (device, _) = gfx_dev_and_queue!();
-        let _ = single_pass_renderpass!(device.clone(),
-            attachments: {
-                a: {
-                    load: Clear,
-                    store: DontCare,
-                    format: Format::R8G8B8A8Unorm,
-                    samples: 4,
-                },
-                b: {
-                    load: DontCare,
-                    store: Store,
-                    format: Format::R8G8B8A8Unorm,
-                    samples: 1,
-                }
-            },
-            pass: {
-                color: [a],
-                depth_stencil: {},
-                resolve: [b],
-            }
-        ).unwrap();
-    }
+	#[test]
+	fn single_pass_resolve() {
+		let (device, _) = gfx_dev_and_queue!();
+		let _ = single_pass_renderpass!(device.clone(),
+			attachments: {
+				a: {
+					load: Clear,
+					store: DontCare,
+					format: Format::R8G8B8A8Unorm,
+					samples: 4,
+				},
+				b: {
+					load: DontCare,
+					store: Store,
+					format: Format::R8G8B8A8Unorm,
+					samples: 1,
+				}
+			},
+			pass: {
+				color: [a],
+				depth_stencil: {},
+				resolve: [b],
+			}
+		)
+		.unwrap();
+	}
 }

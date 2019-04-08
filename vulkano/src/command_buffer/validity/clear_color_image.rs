@@ -7,68 +7,63 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use std::error;
-use std::fmt;
+use std::{error, fmt};
 
-use VulkanObject;
-use device::Device;
-use image::ImageAccess;
+use crate::{device::Device, image::ImageAccess, VulkanObject};
 
 /// Checks whether a clear color image command is valid.
 ///
 /// # Panic
 ///
 /// - Panics if the destination was not created with `device`.
-///
-pub fn check_clear_color_image<I>(device: &Device, image: &I, first_layer: u32, num_layers: u32,
-                                  first_mipmap: u32, num_mipmaps: u32)
-                                  -> Result<(), CheckClearColorImageError>
-    where I: ?Sized + ImageAccess
+pub fn check_clear_color_image<I>(
+	device: &Device, image: &I, first_layer: u32, num_layers: u32, first_mipmap: u32,
+	num_mipmaps: u32
+) -> Result<(), CheckClearColorImageError>
+where
+	I: ?Sized + ImageAccess
 {
-    assert_eq!(image.inner().image.device().internal_object(),
-               device.internal_object());
+	assert_eq!(image.inner().image.device().internal_object(), device.internal_object());
 
-    if !image.inner().image.usage_transfer_destination() {
-        return Err(CheckClearColorImageError::MissingTransferUsage);
-    }
+	if !image.inner().image.usage_transfer_destination() {
+		return Err(CheckClearColorImageError::MissingTransferUsage)
+	}
 
-    if first_layer + num_layers > image.dimensions().array_layers() {
-        return Err(CheckClearColorImageError::OutOfRange);
-    }
+	if first_layer + num_layers > image.dimensions().array_layers() {
+		return Err(CheckClearColorImageError::OutOfRange)
+	}
 
-    if first_mipmap + num_mipmaps > image.mipmap_levels() {
-        return Err(CheckClearColorImageError::OutOfRange);
-    }
+	if first_mipmap + num_mipmaps > image.mipmap_levels() {
+		return Err(CheckClearColorImageError::OutOfRange)
+	}
 
-    Ok(())
+	Ok(())
 }
 
 /// Error that can happen from `check_clear_color_image`.
 #[derive(Debug, Copy, Clone)]
 pub enum CheckClearColorImageError {
-    /// The image is missing the transfer destination usage.
-    MissingTransferUsage,
-    /// The array layers and mipmap levels are out of range.
-    OutOfRange,
+	/// The image is missing the transfer destination usage.
+	MissingTransferUsage,
+	/// The array layers and mipmap levels are out of range.
+	OutOfRange
 }
 
 impl error::Error for CheckClearColorImageError {
-    #[inline]
-    fn description(&self) -> &str {
-        match *self {
-            CheckClearColorImageError::MissingTransferUsage => {
-                "the image is missing the transfer destination usage"
-            },
-            CheckClearColorImageError::OutOfRange => {
-                "the array layers and mipmap levels are out of range"
-            },
-        }
-    }
+	fn description(&self) -> &str {
+		match *self {
+			CheckClearColorImageError::MissingTransferUsage => {
+				"the image is missing the transfer destination usage"
+			}
+			CheckClearColorImageError::OutOfRange => {
+				"the array layers and mipmap levels are out of range"
+			}
+		}
+	}
 }
 
 impl fmt::Display for CheckClearColorImageError {
-    #[inline]
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
-    }
+	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+		write!(fmt, "{}", error::Error::description(self))
+	}
 }

@@ -48,14 +48,15 @@
 //! that represents the moment when the execution will end on the GPU.
 //!
 //! ```
-//! use vulkano::command_buffer::AutoCommandBufferBuilder;
-//! use vulkano::command_buffer::CommandBuffer;
+//! use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBuffer};
 //!
 //! # let device: std::sync::Arc<vulkano::device::Device> = return;
 //! # let queue: std::sync::Arc<vulkano::device::Queue> = return;
-//! let cb = AutoCommandBufferBuilder::new(device.clone(), queue.family()).unwrap()
-//!     // TODO: add an actual command to this example
-//!     .build().unwrap();
+//! let cb = AutoCommandBufferBuilder::new(device.clone(), queue.family())
+//! 	.unwrap()
+//! 	// TODO: add an actual command to this example
+//! 	.build()
+//! 	.unwrap();
 //!
 //! let _future = cb.execute(queue.clone());
 //! ```
@@ -73,32 +74,32 @@
 //! alternative command pool implementations and use them. See the `pool` module for more
 //! information.
 
-pub use self::auto::AutoCommandBuffer;
-pub use self::auto::AutoCommandBufferBuilder;
-pub use self::auto::AutoCommandBufferBuilderContextError;
-pub use self::auto::BeginRenderPassError;
-pub use self::auto::BlitImageError;
-pub use self::auto::BuildError;
-pub use self::auto::ClearColorImageError;
-pub use self::auto::CopyBufferError;
-pub use self::auto::CopyBufferImageError;
-pub use self::auto::CopyImageError;
-pub use self::auto::DispatchError;
-pub use self::auto::DrawError;
-pub use self::auto::DrawIndexedError;
-pub use self::auto::DrawIndexedIndirectError;
-pub use self::auto::DrawIndirectError;
-pub use self::auto::ExecuteCommandsError;
-pub use self::auto::FillBufferError;
-pub use self::auto::UpdateBufferError;
-pub use self::state_cacher::StateCacher;
-pub use self::state_cacher::StateCacherOutcome;
-pub use self::traits::CommandBuffer;
-pub use self::traits::CommandBufferExecError;
-pub use self::traits::CommandBufferExecFuture;
+pub use self::{
+	auto::{
+		AutoCommandBuffer,
+		AutoCommandBufferBuilder,
+		AutoCommandBufferBuilderContextError,
+		BeginRenderPassError,
+		BlitImageError,
+		BuildError,
+		ClearColorImageError,
+		CopyBufferError,
+		CopyBufferImageError,
+		CopyImageError,
+		DispatchError,
+		DrawError,
+		DrawIndexedError,
+		DrawIndexedIndirectError,
+		DrawIndirectError,
+		ExecuteCommandsError,
+		FillBufferError,
+		UpdateBufferError
+	},
+	state_cacher::{StateCacher, StateCacherOutcome},
+	traits::{CommandBuffer, CommandBufferExecError, CommandBufferExecFuture}
+};
 
-use pipeline::viewport::Scissor;
-use pipeline::viewport::Viewport;
+use crate::pipeline::viewport::{Scissor, Viewport};
 
 pub mod pool;
 pub mod submit;
@@ -113,54 +114,45 @@ mod traits;
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct DrawIndirectCommand {
-    pub vertex_count: u32,
-    pub instance_count: u32,
-    pub first_vertex: u32,
-    pub first_instance: u32,
+	pub vertex_count: u32,
+	pub instance_count: u32,
+	pub first_vertex: u32,
+	pub first_instance: u32
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct DrawIndexedIndirectCommand {
-    pub index_count: u32,
-    pub instance_count: u32,
-    pub first_index: u32,
-    pub vertex_offset: u32,
-    pub first_instance: u32,
+	pub index_count: u32,
+	pub instance_count: u32,
+	pub first_index: u32,
+	pub vertex_offset: u32,
+	pub first_instance: u32
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct DispatchIndirectCommand {
-    pub x: u32,
-    pub y: u32,
-    pub z: u32,
+	pub x: u32,
+	pub y: u32,
+	pub z: u32
 }
 
 /// The dynamic state to use for a draw command.
 // TODO: probably not the right location
 #[derive(Debug, Clone)]
 pub struct DynamicState {
-    pub line_width: Option<f32>,
-    pub viewports: Option<Vec<Viewport>>,
-    pub scissors: Option<Vec<Scissor>>,
-    // TODO: missing fields
+	pub line_width: Option<f32>,
+	pub viewports: Option<Vec<Viewport>>,
+	pub scissors: Option<Vec<Scissor>> // TODO: missing fields
 }
 
 impl DynamicState {
-    #[inline]
-    pub fn none() -> DynamicState {
-        DynamicState {
-            line_width: None,
-            viewports: None,
-            scissors: None,
-        }
-    }
+	pub fn none() -> DynamicState {
+		DynamicState { line_width: None, viewports: None, scissors: None }
+	}
 }
 
 impl Default for DynamicState {
-    #[inline]
-    fn default() -> DynamicState {
-        DynamicState::none()
-    }
+	fn default() -> DynamicState { DynamicState::none() }
 }

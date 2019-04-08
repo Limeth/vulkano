@@ -13,7 +13,7 @@ use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
 use vulkano::device::{Device, DeviceExtensions};
 use vulkano::format::Format;
 use vulkano::framebuffer::{Framebuffer, FramebufferAbstract, Subpass, RenderPassAbstract};
-use vulkano::image::{SwapchainImage, ImmutableImage, Dimensions};
+use vulkano::image::{SwapchainImage, ImmutableImage,ImageDimensions};
 use vulkano::instance::{Instance, PhysicalDevice};
 use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::viewport::Viewport;
@@ -27,7 +27,7 @@ use vulkano_win::VkSurfaceBuild;
 
 use winit::{EventsLoop, Window, WindowBuilder, Event, WindowEvent};
 
-use image::ImageFormat;
+use crate::image::ImageFormat;
 
 use std::sync::Arc;
 
@@ -118,7 +118,7 @@ fn main() {
 
         ImmutableImage::from_iter(
             image_data.iter().cloned(),
-            Dimensions::Dim2d { width: 93, height: 93 },
+           ImageDimensions::Dim2D { width: 93, height: 93 },
             Format::R8G8B8A8Srgb,
             queue.clone()
         ).unwrap()

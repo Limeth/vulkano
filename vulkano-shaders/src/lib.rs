@@ -5,9 +5,9 @@
 //!
 //! ```
 //! mod vs {
-//!     vulkano_shaders::shader!{
-//!         ty: "vertex",
-//!         src: "
+//! 	vulkano_shaders::shader! {
+//! 	ty: "vertex",
+//! 	src: "
 //! #version 450
 //!
 //! layout(location = 0) in vec3 position;
@@ -15,8 +15,8 @@
 //! void main() {
 //!     gl_Position = vec4(position, 1.0);
 //! }"
-//!     }
-//! }
+//! 			}
+//! 	}
 //! # fn main() {}
 //! ```
 //!
@@ -152,19 +152,26 @@
 //! [pipeline]: https://docs.rs/vulkano/*/vulkano/pipeline/index.html
 
 #![doc(html_logo_url = "https://raw.githubusercontent.com/vulkano-rs/vulkano/master/logo.png")]
-
 #![recursion_limit = "1024"]
-#[macro_use] extern crate quote;
-#[macro_use] extern crate syn;
-             extern crate proc_macro;
+#[macro_use]
+extern crate quote;
+#[macro_use]
+extern crate syn;
+extern crate proc_macro;
 
-use std::env;
-use std::fs::File;
-use std::io::{Read, Result as IoResult};
-use std::path::{Path, PathBuf};
+use std::{
+	env,
+	fs::File,
+	io::{Read, Result as IoResult},
+	path::{Path, PathBuf}
+};
 
-use syn::parse::{Parse, ParseStream, Result};
-use syn::{Ident, LitStr, LitBool};
+use syn::{
+	parse::{Parse, ParseStream, Result},
+	Ident,
+	LitBool,
+	LitStr
+};
 
 mod codegen;
 mod descriptor_sets;
@@ -172,178 +179,178 @@ mod entry_point;
 mod enums;
 mod parse;
 mod spec_consts;
-mod structs;
 mod spirv_search;
+mod structs;
 
 use crate::codegen::ShaderKind;
 
 enum SourceKind {
-    Src(String),
-    Path(String),
+	Src(String),
+	Path(String)
 }
 
 struct MacroInput {
-    shader_kind: ShaderKind,
-    source_kind: SourceKind,
-    include_directories: Vec<String>,
-    dump: bool,
+	shader_kind: ShaderKind,
+	source_kind: SourceKind,
+	include_directories: Vec<String>,
+	dump: bool
 }
 
 impl Parse for MacroInput {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let mut dump = None;
-        let mut shader_kind = None;
-        let mut source_kind = None;
-        let mut include_directories = Vec::new();
+	fn parse(input: ParseStream) -> Result<Self> {
+		let mut dump = None;
+		let mut shader_kind = None;
+		let mut source_kind = None;
+		let mut include_directories = Vec::new();
 
-        while !input.is_empty() {
-            let name: Ident = input.parse()?;
-            input.parse::<Token![:]>()?;
+		while !input.is_empty() {
+			let name: Ident = input.parse()?;
+			input.parse::<Token![:]>()?;
 
-            match name.to_string().as_ref() {
-                "ty" => {
-                    if shader_kind.is_some() {
-                        panic!("Only one `ty` can be defined")
-                    }
+			match name.to_string().as_ref() {
+				"ty" => {
+					if shader_kind.is_some() {
+						panic!("Only one `ty` can be defined")
+					}
 
-                    let ty: LitStr = input.parse()?;
-                    let ty = match ty.value().as_ref() {
-                        "vertex" => ShaderKind::Vertex,
-                        "fragment" => ShaderKind::Fragment,
-                        "geometry" => ShaderKind::Geometry,
-                        "tess_ctrl" => ShaderKind::TessControl,
-                        "tess_eval" => ShaderKind::TessEvaluation,
-                        "compute" => ShaderKind::Compute,
-                        _ => panic!("Unexpected shader type, valid values: vertex, fragment, geometry, tess_ctrl, tess_eval, compute")
-                    };
-                    shader_kind = Some(ty);
-                }
-                "src" => {
-                    if source_kind.is_some() {
-                        panic!("Only one `src` or `path` can be defined")
-                    }
+					let ty: LitStr = input.parse()?;
+					let ty = match ty.value().as_ref() {
+						"vertex" => ShaderKind::Vertex,
+						"fragment" => ShaderKind::Fragment,
+						"geometry" => ShaderKind::Geometry,
+						"tess_ctrl" => ShaderKind::TessControl,
+						"tess_eval" => ShaderKind::TessEvaluation,
+						"compute" => ShaderKind::Compute,
+						_ => panic!("Unexpected shader type, valid values: vertex, fragment, geometry, tess_ctrl, tess_eval, compute")
+					};
+					shader_kind = Some(ty);
+				}
+				"src" => {
+					if source_kind.is_some() {
+						panic!("Only one `src` or `path` can be defined")
+					}
 
-                    let src: LitStr = input.parse()?;
-                    source_kind = Some(SourceKind::Src(src.value()));
-                }
-                "path" => {
-                    if source_kind.is_some() {
-                        panic!("Only one `src` or `path` can be defined")
-                    }
+					let src: LitStr = input.parse()?;
+					source_kind = Some(SourceKind::Src(src.value()));
+				}
+				"path" => {
+					if source_kind.is_some() {
+						panic!("Only one `src` or `path` can be defined")
+					}
 
-                    let path: LitStr = input.parse()?;
-                    source_kind = Some(SourceKind::Path(path.value()));
-                }
-                "include" => {
-                    let in_brackets;
-                    bracketed!(in_brackets in input);
+					let path: LitStr = input.parse()?;
+					source_kind = Some(SourceKind::Path(path.value()));
+				}
+				"include" => {
+					let in_brackets;
+					bracketed!(in_brackets in input);
 
-                    while !in_brackets.is_empty() {
-                        let path: LitStr = in_brackets.parse()?;
+					while !in_brackets.is_empty() {
+						let path: LitStr = in_brackets.parse()?;
 
-                        include_directories.push(path.value());
+						include_directories.push(path.value());
 
-                        if !in_brackets.is_empty() {
-                            in_brackets.parse::<Token![,]>()?;
-                        }
-                    }
-                }
-                "dump" => {
-                    if dump.is_some() {
-                        panic!("Only one `dump` can be defined")
-                    }
-                    let dump_lit: LitBool = input.parse()?;
-                    dump = Some(dump_lit.value);
-                }
-                name => panic!(format!("Unknown field name: {}", name))
-            }
+						if !in_brackets.is_empty() {
+							in_brackets.parse::<Token![,]>()?;
+						}
+					}
+				}
+				"dump" => {
+					if dump.is_some() {
+						panic!("Only one `dump` can be defined")
+					}
+					let dump_lit: LitBool = input.parse()?;
+					dump = Some(dump_lit.value);
+				}
+				name => panic!(format!("Unknown field name: {}", name))
+			}
 
-            if !input.is_empty() {
-                input.parse::<Token![,]>()?;
-            }
-        }
+			if !input.is_empty() {
+				input.parse::<Token![,]>()?;
+			}
+		}
 
-        let shader_kind = match shader_kind {
-            Some(shader_kind) => shader_kind,
-            None => panic!("Please provide a shader type e.g. `ty: \"vertex\"`")
-        };
+		let shader_kind = match shader_kind {
+			Some(shader_kind) => shader_kind,
+			None => panic!("Please provide a shader type e.g. `ty: \"vertex\"`")
+		};
 
-        let source_kind = match source_kind {
-            Some(source_kind) => source_kind,
-            None => panic!("Please provide a source e.g. `path: \"foo.glsl\"` or `src: \"glsl source code here ...\"`")
-        };
+		let source_kind = match source_kind {
+			Some(source_kind) => source_kind,
+			None => panic!("Please provide a source e.g. `path: \"foo.glsl\"` or `src: \"glsl source code here ...\"`")
+		};
 
-        let dump = dump.unwrap_or(false);
+		let dump = dump.unwrap_or(false);
 
-        Ok(MacroInput { shader_kind, source_kind, include_directories, dump })
-    }
+		Ok(MacroInput { shader_kind, source_kind, include_directories, dump })
+	}
 }
 
 pub(self) fn read_file_to_string(full_path: &Path) -> IoResult<String> {
-    let mut buf = String::new();
-    File::open(full_path)
-        .and_then(|mut file| file.read_to_string(&mut buf))?;
-    Ok(buf)
+	let mut buf = String::new();
+	File::open(full_path).and_then(|mut file| file.read_to_string(&mut buf))?;
+	Ok(buf)
 }
 
 /// Obtains the prefix needed for crate-relative path to become workspace-relative.
 fn get_workspace_prefix() -> PathBuf {
-    let crate_root_string = env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string());
-    let crate_root = Path::new(&crate_root_string);
+	let crate_root_string = env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string());
+	let crate_root = Path::new(&crate_root_string);
 
-    let workspace_root = Path::new(".").canonicalize().unwrap();
-    match crate_root.strip_prefix(workspace_root) {
-        Err(_) => Path::new("").to_path_buf(),
-        Ok(prefix) => prefix.to_path_buf()
-    }
+	let workspace_root = Path::new(".").canonicalize().unwrap();
+	match crate_root.strip_prefix(workspace_root) {
+		Err(_) => Path::new("").to_path_buf(),
+		Ok(prefix) => prefix.to_path_buf()
+	}
 }
 
 #[proc_macro]
 pub fn shader(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input = parse_macro_input!(input as MacroInput);
+	let input = parse_macro_input!(input as MacroInput);
 
-    let workspace_prefix = get_workspace_prefix();
+	let workspace_prefix = get_workspace_prefix();
 
-    let (path, source_code) = match input.source_kind {
-        SourceKind::Src(source) => (None, source),
-        SourceKind::Path(path) => {
-            let crate_root_string = env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string());
-            let crate_root = Path::new(&crate_root_string);
-            let source = {
-                let full_path = crate_root.join(&path);
+	let (path, source_code) = match input.source_kind {
+		SourceKind::Src(source) => (None, source),
+		SourceKind::Path(path) => {
+			let crate_root_string = env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string());
+			let crate_root = Path::new(&crate_root_string);
+			let source = {
+				let full_path = crate_root.join(&path);
 
-                if full_path.is_file() {
-                    read_file_to_string(&full_path)
-                        .expect(&format!("Error reading source from {:?}", path))
-                } else {
-                    panic!("File {:?} was not found; note that the path must be relative to your Cargo.toml", path);
-                }
-            };
+				if full_path.is_file() {
+					read_file_to_string(&full_path)
+						.expect(&format!("Error reading source from {:?}", path))
+				} else {
+					panic!("File {:?} was not found; note that the path must be relative to your Cargo.toml", path);
+				}
+			};
 
-            // We need to take into account that `path` has to be crate-relative, but this proc macro
-            // works with paths relative to workspace, which in case of virtual workspaces
-            // is not the same as CARGO_MANIFEST_DIR
-            let path = {
-                let prefixed_path = workspace_prefix.join(&path);
-                match prefixed_path.to_str() {
-                    None => path.clone(),
-                    Some(s) => s.to_string()
-                }
-            };
+			// We need to take into account that `path` has to be crate-relative, but this proc macro
+			// works with paths relative to workspace, which in case of virtual workspaces
+			// is not the same as CARGO_MANIFEST_DIR
+			let path = {
+				let prefixed_path = workspace_prefix.join(&path);
+				match prefixed_path.to_str() {
+					None => path.clone(),
+					Some(s) => s.to_string()
+				}
+			};
 
-            (Some(path), source)
-        }
-    };
+			(Some(path), source)
+		}
+	};
 
-    let mut include_directories = Vec::with_capacity(input.include_directories.len());
-    for include_directory in input.include_directories {
-        let prefixed_path = workspace_prefix.join(Path::new(&include_directory));
-        match prefixed_path.to_str() {
-            None => include_directories.push(include_directory),
-            Some(new_path) => include_directories.push(new_path.to_string())
-        };
-    }
+	let mut include_directories = Vec::with_capacity(input.include_directories.len());
+	for include_directory in input.include_directories {
+		let prefixed_path = workspace_prefix.join(Path::new(&include_directory));
+		match prefixed_path.to_str() {
+			None => include_directories.push(include_directory),
+			Some(new_path) => include_directories.push(new_path.to_string())
+		};
+	}
 
-    let content = codegen::compile(path, &source_code, input.shader_kind, &include_directories).unwrap();
-    codegen::reflect("Shader", content.as_binary(), input.dump).unwrap().into()
+	let content =
+		codegen::compile(path, &source_code, input.shader_kind, &include_directories).unwrap();
+	codegen::reflect("Shader", content.as_binary(), input.dump).unwrap().into()
 }

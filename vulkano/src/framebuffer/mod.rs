@@ -41,8 +41,7 @@
 //! call the `build_render_pass` method on it.
 //!
 //! ```
-//! use vulkano::framebuffer::EmptySinglePassRenderPassDesc;
-//! use vulkano::framebuffer::RenderPassDesc;
+//! use vulkano::framebuffer::{EmptySinglePassRenderPassDesc, RenderPassDesc};
 //!
 //! # let device: std::sync::Arc<vulkano::device::Device> = return;
 //! let desc = EmptySinglePassRenderPassDesc;
@@ -90,34 +89,34 @@
 //! about how to create a framebuffer.
 //!
 
-pub use self::attachments_list::AttachmentsList;
-pub use self::compat_atch::IncompatibleRenderPassAttachmentError;
-pub use self::compat_atch::ensure_image_view_compatible;
-pub use self::desc::AttachmentDescription;
-pub use self::desc::PassDependencyDescription;
-pub use self::desc::PassDescription;
-pub use self::desc::LoadOp;
-pub use self::desc::RenderPassDesc;
-pub use self::desc::RenderPassDescAttachments;
-pub use self::desc::RenderPassDescDependencies;
-pub use self::desc::RenderPassDescSubpasses;
-pub use self::desc::StoreOp;
-pub use self::empty::EmptySinglePassRenderPassDesc;
-pub use self::framebuffer::Framebuffer;
-pub use self::framebuffer::FramebufferBuilder;
-pub use self::framebuffer::FramebufferCreationError;
-pub use self::framebuffer::FramebufferSys;
-pub use self::sys::RenderPass;
-pub use self::sys::RenderPassCreationError;
-pub use self::sys::RenderPassSys;
-pub use self::traits::FramebufferAbstract;
-pub use self::traits::RenderPassAbstract;
-pub use self::traits::RenderPassCompatible;
-pub use self::traits::RenderPassDescClearValues;
-pub use self::traits::RenderPassSubpassInterface;
-pub use self::traits::Subpass;
+pub use self::{
+	attachments_list::AttachmentsList,
+	compat_atch::{ensure_image_view_compatible, IncompatibleRenderPassAttachmentError},
+	desc::{
+		AttachmentDescription,
+		LoadOp,
+		PassDependencyDescription,
+		PassDescription,
+		RenderPassDesc,
+		RenderPassDescAttachments,
+		RenderPassDescDependencies,
+		RenderPassDescSubpasses,
+		StoreOp
+	},
+	empty::EmptySinglePassRenderPassDesc,
+	framebuffer::{Framebuffer, FramebufferBuilder, FramebufferCreationError, FramebufferSys},
+	sys::{RenderPass, RenderPassCreationError, RenderPassSys},
+	traits::{
+		FramebufferAbstract,
+		RenderPassAbstract,
+		RenderPassCompatible,
+		RenderPassDescClearValues,
+		RenderPassSubpassInterface,
+		Subpass
+	}
+};
 
-use vk;
+use vk_sys as vk;
 
 #[macro_use]
 mod macros;
@@ -133,8 +132,8 @@ mod traits;
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u32)]
 pub enum SubpassContents {
-    /// The subpass will only directly contain commands.
-    Inline = vk::SUBPASS_CONTENTS_INLINE,
-    /// The subpass will only contain secondary command buffers invocations.
-    SecondaryCommandBuffers = vk::SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS,
+	/// The subpass will only directly contain commands.
+	Inline = vk::SUBPASS_CONTENTS_INLINE,
+	/// The subpass will only contain secondary command buffers invocations.
+	SecondaryCommandBuffers = vk::SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS
 }

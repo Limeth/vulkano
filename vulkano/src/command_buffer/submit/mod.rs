@@ -13,17 +13,19 @@
 //! module. These structs are low-level and unsafe, and are mostly used to implement other parts
 //! of vulkano, so you are encouraged to not use them directly.
 
-pub use self::bind_sparse::SubmitBindSparseBatchBuilder;
-pub use self::bind_sparse::SubmitBindSparseBufferBindBuilder;
-pub use self::bind_sparse::SubmitBindSparseBuilder;
-pub use self::bind_sparse::SubmitBindSparseError;
-pub use self::bind_sparse::SubmitBindSparseImageBindBuilder;
-pub use self::bind_sparse::SubmitBindSparseImageOpaqueBindBuilder;
-pub use self::queue_present::SubmitPresentBuilder;
-pub use self::queue_present::SubmitPresentError;
-pub use self::queue_submit::SubmitCommandBufferBuilder;
-pub use self::queue_submit::SubmitCommandBufferError;
-pub use self::semaphores_wait::SubmitSemaphoresWaitBuilder;
+pub use self::{
+	bind_sparse::{
+		SubmitBindSparseBatchBuilder,
+		SubmitBindSparseBufferBindBuilder,
+		SubmitBindSparseBuilder,
+		SubmitBindSparseError,
+		SubmitBindSparseImageBindBuilder,
+		SubmitBindSparseImageOpaqueBindBuilder
+	},
+	queue_present::{SubmitPresentBuilder, SubmitPresentError},
+	queue_submit::{SubmitCommandBufferBuilder, SubmitCommandBufferError},
+	semaphores_wait::SubmitSemaphoresWaitBuilder
+};
 
 mod bind_sparse;
 mod queue_present;
@@ -33,20 +35,19 @@ mod semaphores_wait;
 /// Contains all the possible submission builders.
 #[derive(Debug)]
 pub enum SubmitAnyBuilder<'a> {
-    Empty,
-    SemaphoresWait(SubmitSemaphoresWaitBuilder<'a>),
-    CommandBuffer(SubmitCommandBufferBuilder<'a>),
-    QueuePresent(SubmitPresentBuilder<'a>),
-    BindSparse(SubmitBindSparseBuilder<'a>),
+	Empty,
+	SemaphoresWait(SubmitSemaphoresWaitBuilder<'a>),
+	CommandBuffer(SubmitCommandBufferBuilder<'a>),
+	QueuePresent(SubmitPresentBuilder<'a>),
+	BindSparse(SubmitBindSparseBuilder<'a>)
 }
 
 impl<'a> SubmitAnyBuilder<'a> {
-    /// Returns true if equal to `SubmitAnyBuilder::Empty`.
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        match self {
-            &SubmitAnyBuilder::Empty => true,
-            _ => false,
-        }
-    }
+	/// Returns true if equal to `SubmitAnyBuilder::Empty`.
+	pub fn is_empty(&self) -> bool {
+		match self {
+			&SubmitAnyBuilder::Empty => true,
+			_ => false
+		}
+	}
 }

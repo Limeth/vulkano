@@ -121,10 +121,7 @@
 //!
 //! ```no_run
 //! # use vulkano::device::DeviceExtensions;
-//! let ext = DeviceExtensions {
-//!     khr_swapchain: true,
-//!     .. DeviceExtensions::none()
-//! };
+//! let ext = DeviceExtensions { khr_swapchain: true, ..DeviceExtensions::none() };
 //! ```
 //!
 //! Then, query the capabilities of the surface with
@@ -232,23 +229,24 @@
 //!    command to present the image on the screen after the draw operations are finished.
 //!
 //! ```
-//! use vulkano::swapchain;
-//! use vulkano::sync::GpuFuture;
+//! use vulkano::{swapchain, sync::GpuFuture};
 //! # let queue: ::std::sync::Arc<::vulkano::device::Queue> = return;
 //! # let mut swapchain: ::std::sync::Arc<swapchain::Swapchain<()>> = return;
 //! // let mut (swapchain, images) = Swapchain::new(...);
 //! loop {
 //!     # let mut command_buffer: ::vulkano::command_buffer::AutoCommandBuffer<()> = return;
-//!     let (image_num, acquire_future)
-//!         = swapchain::acquire_next_image(swapchain.clone(), None).unwrap();
+//! 	let (image_num, acquire_future) =
+//! 		swapchain::acquire_next_image(swapchain.clone(), None).unwrap();
 //!
-//!     // The command_buffer contains the draw commands that modify the framebuffer
-//!     // constructed from images[image_num]
-//!     acquire_future
-//!         .then_execute(queue.clone(), command_buffer).unwrap()
-//!         .then_swapchain_present(queue.clone(), swapchain.clone(), image_num)
-//!         .then_signal_fence_and_flush().unwrap();
-//! }
+//! 	// The command_buffer contains the draw commands that modify the framebuffer
+//! 	// constructed from images[image_num]
+//! 	acquire_future
+//! 		.then_execute(queue.clone(), command_buffer)
+//! 		.unwrap()
+//! 		.then_swapchain_present(queue.clone(), swapchain.clone(), image_num)
+//! 		.then_signal_fence_and_flush()
+//! 		.unwrap();
+//! 	}
 //! ```
 //!
 //! ## Recreating a swapchain
@@ -265,9 +263,10 @@
 //! TODO: suboptimal stuff
 //!
 //! ```
-//! use vulkano::swapchain;
-//! use vulkano::swapchain::AcquireError;
-//! use vulkano::sync::GpuFuture;
+//! use vulkano::{
+//! 	swapchain::{self, AcquireError},
+//! 	sync::GpuFuture
+//! 	};
 //!
 //! // let mut swapchain = Swapchain::new(...);
 //! # let mut swapchain: (::std::sync::Arc<::vulkano::swapchain::Swapchain<()>>, _) = return;
@@ -275,57 +274,65 @@
 //! let mut recreate_swapchain = false;
 //!
 //! loop {
-//!     if recreate_swapchain {
-//!         swapchain = swapchain.0.recreate_with_dimension([1024, 768]).unwrap();
-//!         recreate_swapchain = false;
-//!     }
+//! 	if recreate_swapchain {
+//! 		swapchain = swapchain.0.recreate_with_dimension([1024, 768]).unwrap();
+//! 		recreate_swapchain = false;
+//! 		}
 //!
-//!     let (ref swapchain, ref _images) = swapchain;
+//! 	let (ref swapchain, ref _images) = swapchain;
 //!
-//!     let (index, acq_future) = match swapchain::acquire_next_image(swapchain.clone(), None) {
-//!         Ok(r) => r,
-//!         Err(AcquireError::OutOfDate) => { recreate_swapchain = true; continue; },
-//!         Err(err) => panic!("{:?}", err)
-//!     };
+//! 	let (index, acq_future) = match swapchain::acquire_next_image(swapchain.clone(), None) {
+//! 		Ok(r) => r,
+//! 		Err(AcquireError::OutOfDate) => {
+//! 			recreate_swapchain = true;
+//! 			continue
+//! 			}
+//! 		Err(err) => panic!("{:?}", err)
+//! 		};
 //!
-//!     // ...
+//! 	// ...
 //!
-//!     let final_future = acq_future
-//!         // .then_execute(...)
-//!         .then_swapchain_present(queue.clone(), swapchain.clone(), index)
-//!         .then_signal_fence_and_flush().unwrap(); // TODO: PresentError?
-//! }
+//! 	let final_future = acq_future
+//! 		// .then_execute(...)
+//! 		.then_swapchain_present(queue.clone(), swapchain.clone(), index)
+//! 		.then_signal_fence_and_flush()
+//! 		.unwrap(); // TODO: PresentError?
+//! 	}
 //! ```
 //!
 
 use std::sync::atomic::AtomicBool;
 
-pub use self::capabilities::Capabilities;
-pub use self::capabilities::ColorSpace;
-pub use self::capabilities::CompositeAlpha;
-pub use self::capabilities::PresentMode;
-pub use self::capabilities::SupportedCompositeAlpha;
-pub use self::capabilities::SupportedCompositeAlphaIter;
-pub use self::capabilities::SupportedPresentModes;
-pub use self::capabilities::SupportedPresentModesIter;
-pub use self::capabilities::SupportedSurfaceTransforms;
-pub use self::capabilities::SupportedSurfaceTransformsIter;
-pub use self::capabilities::SurfaceTransform;
-pub use self::present_region::PresentRegion;
-pub use self::present_region::RectangleLayer;
-pub use self::surface::CapabilitiesError;
-pub use self::surface::Surface;
-pub use self::surface::SurfaceCreationError;
-pub use self::swapchain::AcquireError;
-pub use self::swapchain::AcquiredImage;
-pub use self::swapchain::PresentFuture;
-pub use self::swapchain::Swapchain;
-pub use self::swapchain::SwapchainAcquireFuture;
-pub use self::swapchain::SwapchainCreationError;
-pub use self::swapchain::acquire_next_image;
-pub use self::swapchain::acquire_next_image_raw;
-pub use self::swapchain::present;
-pub use self::swapchain::present_incremental;
+pub use capabilities::{
+	Capabilities,
+	ColorSpace,
+	CompositeAlpha,
+	PresentMode,
+	SupportedCompositeAlpha,
+	SupportedCompositeAlphaIter,
+	SupportedPresentModes,
+	SupportedPresentModesIter,
+	SupportedSurfaceTransforms,
+	SupportedSurfaceTransformsIter,
+	SurfaceTransform
+};
+
+pub use present_region::{PresentRegion, RectangleLayer};
+
+pub use surface::{CapabilitiesError, Surface, SurfaceCreationError};
+
+pub use swapchain::{
+	acquire_next_image,
+	acquire_next_image_raw,
+	present,
+	present_incremental,
+	AcquireError,
+	AcquiredImage,
+	PresentFuture,
+	Swapchain,
+	SwapchainAcquireFuture,
+	SwapchainCreationError
+};
 
 mod capabilities;
 pub mod display;
@@ -337,5 +344,5 @@ mod swapchain;
 /// flag.
 // TODO: use pub(crate) maybe?
 unsafe trait SurfaceSwapchainLock {
-    fn flag(&self) -> &AtomicBool;
+	fn flag(&self) -> &AtomicBool;
 }

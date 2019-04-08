@@ -9,36 +9,37 @@
 
 use std::iter;
 
-use buffer::BufferUsage;
-use buffer::CpuAccessibleBuffer;
-use command_buffer::synced::base::SyncCommandBufferBuilder;
-use command_buffer::synced::base::SyncCommandBufferBuilderError;
-use command_buffer::sys::Flags;
-use command_buffer::sys::Kind;
-use device::Device;
+use crate::{
+	buffer::{BufferUsage, CpuAccessibleBuffer},
+	command_buffer::{
+		synced::base::{SyncCommandBufferBuilder, SyncCommandBufferBuilderError},
+		sys::{Flags, Kind}
+	},
+	device::Device
+};
 
 #[test]
 fn basic_creation() {
-    unsafe {
-        let (device, queue) = gfx_dev_and_queue!();
-        let pool = Device::standard_command_pool(&device, queue.family());
-        SyncCommandBufferBuilder::new(&pool, Kind::primary(), Flags::None).unwrap();
-    }
+	unsafe {
+		let (device, queue) = gfx_dev_and_queue!();
+		let pool = Device::standard_command_pool(&device, queue.family());
+		SyncCommandBufferBuilder::new(&pool, Kind::primary(), Flags::None).unwrap();
+	}
 }
 
 #[test]
 fn basic_conflict() {
-    unsafe {
-        let (device, queue) = gfx_dev_and_queue!();
+	unsafe {
+		let (device, queue) = gfx_dev_and_queue!();
 
-        let pool = Device::standard_command_pool(&device, queue.family());
-        let mut sync = SyncCommandBufferBuilder::new(&pool, Kind::primary(), Flags::None).unwrap();
+		let pool = Device::standard_command_pool(&device, queue.family());
+		let mut sync = SyncCommandBufferBuilder::new(&pool, Kind::primary(), Flags::None).unwrap();
 
-        let buf = CpuAccessibleBuffer::from_data(device, BufferUsage::all(), 0u32).unwrap();
+		let buf = CpuAccessibleBuffer::from_data(device, BufferUsage::all(), 0u32).unwrap();
 
-        match sync.copy_buffer(buf.clone(), buf.clone(), iter::once((0, 0, 4))) {
-            Err(SyncCommandBufferBuilderError::Conflict { .. }) => (),
-            _ => panic!(),
-        };
-    }
+		match sync.copy_buffer(buf.clone(), buf.clone(), iter::once((0, 0, 4))) {
+			Err(SyncCommandBufferBuilderError::Conflict { .. }) => (),
+			_ => panic!()
+		};
+	}
 }

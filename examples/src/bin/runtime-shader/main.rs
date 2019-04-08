@@ -147,8 +147,7 @@ fn main() {
     impl Iterator for VertInputIter {
         type Item = ShaderInterfaceDefEntry;
 
-        #[inline]
-        fn next(&mut self) -> Option<Self::Item> {
+                fn next(&mut self) -> Option<Self::Item> {
             // There are things to consider when giving out entries:
             // * There must be only one entry per one location, you can't have
             //   `color' and `position' entries both at 0..1 locations.  They also
@@ -173,8 +172,7 @@ fn main() {
             None
         }
 
-        #[inline]
-        fn size_hint(&self) -> (usize, Option<usize>) {
+                fn size_hint(&self) -> (usize, Option<usize>) {
             // We must return exact number of entries left in iterator.
             let len = (2 - self.0) as usize;
             (len, Some(len))
@@ -202,8 +200,7 @@ fn main() {
     impl Iterator for VertOutputIter {
         type Item = ShaderInterfaceDefEntry;
 
-        #[inline]
-        fn next(&mut self) -> Option<Self::Item> {
+                fn next(&mut self) -> Option<Self::Item> {
             if self.0 == 0 {
                 self.0 += 1;
                 return Some(ShaderInterfaceDefEntry {
@@ -215,8 +212,7 @@ fn main() {
             None
         }
 
-        #[inline]
-        fn size_hint(&self) -> (usize, Option<usize>) {
+                fn size_hint(&self) -> (usize, Option<usize>) {
             let len = (1 - self.0) as usize;
             (len, Some(len))
         }
@@ -256,8 +252,7 @@ fn main() {
     impl Iterator for FragInputIter {
         type Item = ShaderInterfaceDefEntry;
 
-        #[inline]
-        fn next(&mut self) -> Option<Self::Item> {
+                fn next(&mut self) -> Option<Self::Item> {
             if self.0 == 0 {
                 self.0 += 1;
                 return Some(ShaderInterfaceDefEntry {
@@ -269,8 +264,7 @@ fn main() {
             None
         }
 
-        #[inline]
-        fn size_hint(&self) -> (usize, Option<usize>) {
+                fn size_hint(&self) -> (usize, Option<usize>) {
             let len = (1 - self.0) as usize;
             (len, Some(len))
         }
@@ -294,8 +288,7 @@ fn main() {
     impl Iterator for FragOutputIter {
         type Item = ShaderInterfaceDefEntry;
 
-        #[inline]
-        fn next(&mut self) -> Option<Self::Item> {
+                fn next(&mut self) -> Option<Self::Item> {
             // Note that color fragment color entry will be determined
             // automatically by Vulkano.
             if self.0 == 0 {
@@ -308,8 +301,7 @@ fn main() {
             }
             None
         }
-        #[inline]
-        fn size_hint(&self) -> (usize, Option<usize>) {
+                fn size_hint(&self) -> (usize, Option<usize>) {
             let len = (1 - self.0) as usize;
             (len, Some(len))
         }
