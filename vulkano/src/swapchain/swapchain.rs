@@ -492,7 +492,7 @@ impl<W> Swapchain<W> {
 	/// Returns the color space of the images of the swapchain.
 	///
 	/// See the documentation of `Swapchain::new`.
-	pub fn color_space(&self) -> ColorSpace { self. color_space }
+	pub fn color_space(&self) -> ColorSpace { self.color_space }
 
 	/// Returns the dimensions of the images of the swapchain.
 	///

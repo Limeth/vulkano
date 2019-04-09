@@ -1,16 +1,6 @@
-// Copyright (c) 2016 The vulkano developers
-// Licensed under the Apache License, Version 2.0
-// <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT
-// license <LICENSE-MIT or http://opensource.org/licenses/MIT>,
-// at your option. All files in the project carrying such
-// notice may not be copied, modified, or distributed except
-// according to those terms.
-
 use crate::{
 	buffer::BufferAccess,
 	format::{
-		ClearValue,
 		Format,
 		PossibleDepthFormatDesc,
 		PossibleDepthStencilFormatDesc,
@@ -19,15 +9,29 @@ use crate::{
 		PossibleStencilFormatDesc,
 		PossibleUintFormatDesc
 	},
-	image::{
-		sys::{UnsafeImage, UnsafeImageView},
-		ImageDimensions,
-		ImageLayout
-	},
-	sampler::Sampler,
+	image::{sys::UnsafeImage, ImageDimensions, ImageLayout},
 	sync::AccessError,
 	SafeDeref
 };
+
+/// Inner information about an image.
+#[derive(Copy, Clone, Debug)]
+pub struct ImageInner<'a> {
+	/// The underlying image object.
+	pub image: &'a UnsafeImage,
+
+	/// The first layer of `image` to consider.
+	pub first_layer: usize,
+
+	/// The number of layers of `image` to consider.
+	pub num_layers: usize,
+
+	/// The first mipmap level of `image` to consider.
+	pub first_mipmap_level: usize,
+
+	/// The number of mipmap levels of `image` to consider.
+	pub num_mipmap_levels: usize
+}
 
 /// Trait for types that represent the way a GPU can access an image.
 pub unsafe trait ImageAccess {
@@ -192,26 +196,6 @@ pub unsafe trait ImageAccess {
 	/// - The transitioned layout must not be `Undefined`.
 	unsafe fn unlock(&self, transitioned_layout: Option<ImageLayout>);
 }
-
-/// Inner information about an image.
-#[derive(Copy, Clone, Debug)]
-pub struct ImageInner<'a> {
-	/// The underlying image object.
-	pub image: &'a UnsafeImage,
-
-	/// The first layer of `image` to consider.
-	pub first_layer: usize,
-
-	/// The number of layers of `image` to consider.
-	pub num_layers: usize,
-
-	/// The first mipmap level of `image` to consider.
-	pub first_mipmap_level: usize,
-
-	/// The number of mipmap levels of `image` to consider.
-	pub num_mipmap_levels: usize
-}
-
 unsafe impl<T> ImageAccess for T
 where
 	T: SafeDeref,
@@ -278,97 +262,4 @@ unsafe impl<I: ImageAccess> ImageAccess for ImageAccessFromUndefinedLayout<I> {
 	unsafe fn increase_gpu_lock(&self) { self.image.increase_gpu_lock() }
 
 	unsafe fn unlock(&self, new_layout: Option<ImageLayout>) { self.image.unlock(new_layout) }
-}
-
-/// Extension trait for images. Checks whether the value `T` can be used as a clear value for the
-/// given image.
-// TODO: isn't that for image views instead?
-pub unsafe trait ImageClearValue<T>: ImageAccess {
-	fn decode(&self, t: T) -> Option<ClearValue>;
-}
-
-pub unsafe trait ImageContent<P>: ImageAccess {
-	/// Checks whether pixels of type `P` match the format of the image.
-	fn matches_format(&self) -> bool;
-}
-
-/// Trait for types that represent the GPU can access an image view.
-pub unsafe trait ImageViewAccess {
-	fn parent(&self) -> &ImageAccess;
-
-	/// Returns the dimensions of the image view.
-	fn dimensions(&self) -> ImageDimensions;
-
-	/// Returns the inner unsafe image view object used by this image view.
-	fn inner(&self) -> &UnsafeImageView;
-
-	/// Returns the format of this view. This can be different from the parent's format.
-	fn format(&self) -> Format {
-		// TODO: remove this default impl
-		self.inner().format()
-	}
-
-	fn samples(&self) -> u32 { self.parent().samples() }
-
-	/// Returns the image layout to use in a descriptor with the given subresource.
-	fn descriptor_set_storage_image_layout(&self) -> ImageLayout;
-	/// Returns the image layout to use in a descriptor with the given subresource.
-	fn descriptor_set_combined_image_sampler_layout(&self) -> ImageLayout;
-	/// Returns the image layout to use in a descriptor with the given subresource.
-	fn descriptor_set_sampled_image_layout(&self) -> ImageLayout;
-	/// Returns the image layout to use in a descriptor with the given subresource.
-	fn descriptor_set_input_attachment_layout(&self) -> ImageLayout;
-
-	/// Returns true if the view doesn't use components swizzling.
-	///
-	/// Must be true when the view is used as a framebuffer attachment or TODO: I don't remember
-	/// the other thing.
-	fn identity_swizzle(&self) -> bool;
-
-	/// Returns true if the given sampler can be used with this image view.
-	///
-	/// This method should check whether the sampler's configuration can be used with the format
-	/// of the view.
-	// TODO: return a Result and propagate it when binding to a descriptor set
-	fn can_be_sampled(&self, _sampler: &Sampler) -> bool {
-		true // FIXME
-	}
-
-	// fn usable_as_render_pass_attachment(&self, ???) -> Result<(), ???>;
-}
-
-unsafe impl<T> ImageViewAccess for T
-where
-	T: SafeDeref,
-	T::Target: ImageViewAccess
-{
-	fn parent(&self) -> &ImageAccess { (**self).parent() }
-
-	fn inner(&self) -> &UnsafeImageView { (**self).inner() }
-
-	fn dimensions(&self) -> ImageDimensions { (**self).dimensions() }
-
-	fn descriptor_set_storage_image_layout(&self) -> ImageLayout {
-		(**self).descriptor_set_storage_image_layout()
-	}
-
-	fn descriptor_set_combined_image_sampler_layout(&self) -> ImageLayout {
-		(**self).descriptor_set_combined_image_sampler_layout()
-	}
-
-	fn descriptor_set_sampled_image_layout(&self) -> ImageLayout {
-		(**self).descriptor_set_sampled_image_layout()
-	}
-
-	fn descriptor_set_input_attachment_layout(&self) -> ImageLayout {
-		(**self).descriptor_set_input_attachment_layout()
-	}
-
-	fn identity_swizzle(&self) -> bool { (**self).identity_swizzle() }
-
-	fn can_be_sampled(&self, sampler: &Sampler) -> bool { (**self).can_be_sampled(sampler) }
-}
-
-pub unsafe trait AttachmentImageView: ImageViewAccess {
-	fn accept(&self, initial_layout: ImageLayout, final_layout: ImageLayout) -> bool;
 }

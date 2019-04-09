@@ -15,9 +15,9 @@ use crate::{
 		descriptor::{
 			DescriptorDesc,
 			DescriptorDescTy,
-			DescriptorImageDescDimensions,
 			DescriptorImageDesc,
 			DescriptorImageDescArray,
+			DescriptorImageDescDimensions,
 			DescriptorType
 		},
 		descriptor_set::{
