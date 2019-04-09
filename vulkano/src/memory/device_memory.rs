@@ -422,8 +422,9 @@ impl fmt::Display for DeviceMemoryAllocError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			DeviceMemoryAllocError::OomError(e) => e.fmt(f),
-			DeviceMemoryAllocError::TooManyObjects
-			=> write!(f, "The maximum number of allocations has been exceeded"),
+			DeviceMemoryAllocError::TooManyObjects => {
+				write!(f, "The maximum number of allocations has been exceeded")
+			}
 			DeviceMemoryAllocError::MemoryMapFailed => write!(f, "Memory map failed")
 		}
 	}

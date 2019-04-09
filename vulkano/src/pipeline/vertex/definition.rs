@@ -94,9 +94,7 @@ impl fmt::Display for IncompatibleVertexDefinitionError {
 	}
 }
 impl error::Error for IncompatibleVertexDefinitionError {
-	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-		None
-	}
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
 
 /// Extension trait of `VertexDefinition`. The `L` parameter is an acceptable vertex source for this

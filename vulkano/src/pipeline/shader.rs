@@ -480,9 +480,7 @@ impl fmt::Display for ShaderInterfaceMismatchError {
 	}
 }
 impl error::Error for ShaderInterfaceMismatchError {
-	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-		None
-	}
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
 
 /// Trait for types that contain specialization data for shaders.

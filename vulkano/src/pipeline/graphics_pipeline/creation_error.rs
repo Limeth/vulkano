@@ -287,9 +287,7 @@ impl From<IncompatibleVertexDefinitionError> for GraphicsPipelineCreationError {
 impl From<Error> for GraphicsPipelineCreationError {
 	fn from(err: Error) -> GraphicsPipelineCreationError {
 		match err {
-			Error::OutOfHostMemory => {
-				GraphicsPipelineCreationError::OomError(OomError::from(err))
-			}
+			Error::OutOfHostMemory => GraphicsPipelineCreationError::OomError(OomError::from(err)),
 			Error::OutOfDeviceMemory => {
 				GraphicsPipelineCreationError::OomError(OomError::from(err))
 			}

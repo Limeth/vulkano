@@ -474,8 +474,9 @@ impl fmt::Display for RenderPassCreationError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			RenderPassCreationError::OomError(e) => e.fmt(f),
-			RenderPassCreationError::ColorAttachmentsLimitExceeded
-			=> write!(f, "The maximum number of color attachments has been exceeded")
+			RenderPassCreationError::ColorAttachmentsLimitExceeded => {
+				write!(f, "The maximum number of color attachments has been exceeded")
+			}
 		}
 	}
 }
@@ -494,9 +495,7 @@ impl From<Error> for RenderPassCreationError {
 	fn from(err: Error) -> RenderPassCreationError {
 		match err {
 			Error::OutOfHostMemory => RenderPassCreationError::OomError(OomError::from(err)),
-			Error::OutOfDeviceMemory => {
-				RenderPassCreationError::OomError(OomError::from(err))
-			}
+			Error::OutOfDeviceMemory => RenderPassCreationError::OomError(OomError::from(err)),
 			_ => panic!("unexpected error: {:?}", err)
 		}
 	}

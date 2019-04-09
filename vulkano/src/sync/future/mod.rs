@@ -301,10 +301,7 @@ pub enum AccessError {
 	AlreadyInUse,
 
 	/// The image layout was unexpected.
-	UnexpectedImageLayout {
-		expected: ImageLayout,
-		requested: ImageLayout
-	},
+	UnexpectedImageLayout { expected: ImageLayout, requested: ImageLayout },
 
 	/// The image was in uninitialized or preinitialized layout.
 	ImageNotInitialized {
@@ -324,20 +321,24 @@ impl fmt::Display for AccessError {
 			AccessError::ExclusiveDenied => write!(f, "Exclusive access was denied"),
 			AccessError::AlreadyInUse => write!(f, "The resource is already in use"),
 
-			AccessError::UnexpectedImageLayout { expected, requested }
-			=> write!(f, "The image layout ({:?}) was unexpected ({:?})", requested, expected),
-			AccessError::ImageNotInitialized { requested }
-			=> write!(f, "The image was in uninitialized or preinitialized layout, requested: {:?}", requested),
+			AccessError::UnexpectedImageLayout { expected, requested } => {
+				write!(f, "The image layout ({:?}) was unexpected ({:?})", requested, expected)
+			}
+			AccessError::ImageNotInitialized { requested } => write!(
+				f,
+				"The image was in uninitialized or preinitialized layout, requested: {:?}",
+				requested
+			),
 
 			AccessError::BufferNotInitialized => write!(f, "Buffer was not initialized"),
-			AccessError::SwapchainImageAcquireOnly => write!(f, "Swapchain image can only be used after it has been acquired")
+			AccessError::SwapchainImageAcquireOnly => {
+				write!(f, "Swapchain image can only be used after it has been acquired")
+			}
 		}
 	}
 }
 impl error::Error for AccessError {
-	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-		None
-	}
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
 
 /// Error that can happen when checking whether we have access to a resource.
@@ -394,10 +395,8 @@ impl fmt::Display for FlushError {
 		match self {
 			FlushError::AccessError(e) => e.fmt(f),
 			FlushError::OomError(e) => e.fmt(f),
-			
-			FlushError::DeviceLost => {
-				write!(f, "The connection to the device device was lost")
-			}
+
+			FlushError::DeviceLost => write!(f, "The connection to the device device was lost"),
 			FlushError::SurfaceLost => write!(f, "The surface was lost"),
 			FlushError::OutOfDate => write!(f, "The swapchain is out of date"),
 			FlushError::Timeout => write!(f, "The flush operation didn't happen in given time")

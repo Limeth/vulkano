@@ -281,7 +281,7 @@ impl fmt::Display for ComputePipelineCreationError {
 		match self {
 			ComputePipelineCreationError::OomError(e) => e.fmt(f),
 			ComputePipelineCreationError::PipelineLayoutCreationError(e) => e.fmt(f),
-			ComputePipelineCreationError::IncompatiblePipelineLayout(e) => e.fmt(f),
+			ComputePipelineCreationError::IncompatiblePipelineLayout(e) => e.fmt(f)
 		}
 	}
 }
