@@ -235,60 +235,44 @@ pub enum PipelineLayoutCreationError {
 	OomError(OomError),
 	/// The pipeline layout description doesn't fulfill the limit requirements.
 	LimitsError(PipelineLayoutLimitsError),
-	/// One of the push constants range didn't obey the rules. The list of stages must not be
-	/// empty, the size must not be 0, and the size must be a multiple or 4.
+	/// The list of stages must not be empty,
+	/// the size must not be 0, and the size must be a multiple or 4.
 	InvalidPushConstant
 }
-
-impl error::Error for PipelineLayoutCreationError {
-	fn description(&self) -> &str {
-		match *self {
-			PipelineLayoutCreationError::OomError(_) => "not enough memory available",
-			PipelineLayoutCreationError::LimitsError(_) => {
-				"the pipeline layout description doesn't fulfill the limit requirements"
-			}
-			PipelineLayoutCreationError::InvalidPushConstant => {
-				"one of the push constants range didn't obey the rules"
-			}
+impl fmt::Display for PipelineLayoutCreationError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			PipelineLayoutCreationError::OomError(e) => e.fmt(f),
+			PipelineLayoutCreationError::LimitsError(e) => e.fmt(f),
+			PipelineLayoutCreationError::InvalidPushConstant
+			=> write!(f, "The list of stages must not be empty, the size must not be 0, and the size must be a multiple or 4")
 		}
 	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			PipelineLayoutCreationError::OomError(ref err) => Some(err),
-			PipelineLayoutCreationError::LimitsError(ref err) => Some(err),
+}
+impl error::Error for PipelineLayoutCreationError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			PipelineLayoutCreationError::OomError(e) => e.source(),
+			PipelineLayoutCreationError::LimitsError(e) => e.source(),
 			_ => None
 		}
 	}
 }
-
-impl fmt::Display for PipelineLayoutCreationError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
-}
-
 impl From<OomError> for PipelineLayoutCreationError {
 	fn from(err: OomError) -> PipelineLayoutCreationError {
 		PipelineLayoutCreationError::OomError(err)
 	}
 }
-
 impl From<PipelineLayoutLimitsError> for PipelineLayoutCreationError {
 	fn from(err: PipelineLayoutLimitsError) -> PipelineLayoutCreationError {
 		PipelineLayoutCreationError::LimitsError(err)
 	}
 }
-
 impl From<Error> for PipelineLayoutCreationError {
 	fn from(err: Error) -> PipelineLayoutCreationError {
 		match err {
-			err @ Error::OutOfHostMemory => {
-				PipelineLayoutCreationError::OomError(OomError::from(err))
-			}
-			err @ Error::OutOfDeviceMemory => {
-				PipelineLayoutCreationError::OomError(OomError::from(err))
-			}
+			Error::OutOfHostMemory => PipelineLayoutCreationError::OomError(OomError::from(err)),
+			Error::OutOfDeviceMemory => PipelineLayoutCreationError::OomError(OomError::from(err)),
 			_ => panic!("unexpected error: {:?}", err)
 		}
 	}

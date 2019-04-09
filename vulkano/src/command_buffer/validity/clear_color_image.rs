@@ -48,22 +48,18 @@ pub enum CheckClearColorImageError {
 	/// The array layers and mipmap levels are out of range.
 	OutOfRange
 }
-
-impl error::Error for CheckClearColorImageError {
-	fn description(&self) -> &str {
-		match *self {
+impl fmt::Display for CheckClearColorImageError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
 			CheckClearColorImageError::MissingTransferUsage => {
-				"the image is missing the transfer destination usage"
+				write!(f, "The image is missing the transfer destination usage")
 			}
 			CheckClearColorImageError::OutOfRange => {
-				"the array layers and mipmap levels are out of range"
+				write!(f, "The array layers and mipmap levels are out of range")
 			}
 		}
 	}
 }
-
-impl fmt::Display for CheckClearColorImageError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for CheckClearColorImageError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }

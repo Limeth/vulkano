@@ -9,7 +9,13 @@
 
 use std::{error, fmt};
 
-use crate::{device::Device, format::FormatTy, image::ImageAccess, sampler::Filter, VulkanObject};
+use crate::{
+	device::Device,
+	format::FormatTy,
+	image::{ImageAccess, ImageDimensionType},
+	sampler::Filter,
+	VulkanObject
+};
 
 /// Checks whether a blit image command is valid.
 ///
@@ -158,8 +164,8 @@ where
 		return Err(CheckBlitImageError::DestinationCoordinatesOutOfRange)
 	}
 
-	match source_dimensions.dimensions() {
-		1 => {
+	match source_dimensions.dimension_type() {
+		ImageDimensionType::D1 => {
 			if source_top_left[1] != 0 || source_bottom_right[1] != 1 {
 				return Err(CheckBlitImageError::IncompatibleRangeForImageType)
 			}
@@ -167,17 +173,16 @@ where
 				return Err(CheckBlitImageError::IncompatibleRangeForImageType)
 			}
 		}
-		2 => {
+		ImageDimensionType::D2 | ImageDimensionType::Cube => {
 			if source_top_left[2] != 0 || source_bottom_right[2] != 1 {
 				return Err(CheckBlitImageError::IncompatibleRangeForImageType)
 			}
 		}
-		3 => {}
-		_ => unreachable!()
+		ImageDimensionType::D3 => {}
 	}
 
-	match destination_dimensions.dimensions() {
-		1 => {
+	match destination_dimensions.dimension_type() {
+		ImageDimensionType::D1 => {
 			if destination_top_left[1] != 0 || destination_bottom_right[1] != 1 {
 				return Err(CheckBlitImageError::IncompatibleRangeForImageType)
 			}
@@ -185,13 +190,12 @@ where
 				return Err(CheckBlitImageError::IncompatibleRangeForImageType)
 			}
 		}
-		2 => {
+		ImageDimensionType::D2 | ImageDimensionType::Cube => {
 			if destination_top_left[2] != 0 || destination_bottom_right[2] != 1 {
 				return Err(CheckBlitImageError::IncompatibleRangeForImageType)
 			}
 		}
-		3 => {}
-		_ => unreachable!()
+		ImageDimensionType::D3 => {}
 	}
 
 	Ok(())
@@ -223,52 +227,24 @@ pub enum CheckBlitImageError {
 	/// The top-left and/or bottom-right coordinates are incompatible with the image type.
 	IncompatibleRangeForImageType
 }
-
-impl error::Error for CheckBlitImageError {
-	fn description(&self) -> &str {
-		match *self {
-			CheckBlitImageError::MissingTransferSourceUsage => {
-				"the source is missing the transfer source usage"
-			}
-			CheckBlitImageError::MissingTransferDestinationUsage => {
-				"the destination is missing the transfer destination usage"
-			}
-			CheckBlitImageError::SourceFormatNotSupported => {
-				"the format of the source image doesn't support blit operations"
-			}
-			CheckBlitImageError::DestinationFormatNotSupported => {
-				"the format of the destination image doesn't support blit operations"
-			}
-			CheckBlitImageError::DepthStencilNearestMandatory => {
-				"you must use the nearest filter when blitting depth/stencil images"
-			}
-			CheckBlitImageError::DepthStencilFormatMismatch => {
-				"the format of the source and destination must be equal when blitting \
-				 depth/stencil images"
-			}
-			CheckBlitImageError::IncompatibleFormatsTypes { .. } => {
-				"the types of the source format and the destination format aren't compatible"
-			}
-			CheckBlitImageError::UnexpectedMultisampled => {
-				"blitting between multisampled images is forbidden"
-			}
-			CheckBlitImageError::SourceCoordinatesOutOfRange => {
-				"the offsets, array layers and/or mipmap levels are out of range in the source \
-				 image"
-			}
-			CheckBlitImageError::DestinationCoordinatesOutOfRange => {
-				"the offsets, array layers and/or mipmap levels are out of range in the \
-				 destination image"
-			}
-			CheckBlitImageError::IncompatibleRangeForImageType => {
-				"the top-left and/or bottom-right coordinates are incompatible with the image type"
-			}
+impl fmt::Display for CheckBlitImageError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			CheckBlitImageError::MissingTransferSourceUsage => write!(f, "The source is missing the transfer source usage"),
+			CheckBlitImageError::MissingTransferDestinationUsage => write!(f, "The destination is missing the transfer destination usage"),
+			CheckBlitImageError::SourceFormatNotSupported => write!(f, "The format of the source image doesn't support blit operations"),
+			CheckBlitImageError::DestinationFormatNotSupported => write!(f, "The format of the destination image doesn't support blit operations"),
+			CheckBlitImageError::DepthStencilNearestMandatory => write!(f, "You must use the nearest filter when blitting depth/stencil images"),
+			CheckBlitImageError::DepthStencilFormatMismatch => write!(f, "The format of the source and destination must be equal when blitting depth/stencil images"),
+			CheckBlitImageError::IncompatibleFormatsTypes { source_format_ty, destination_format_ty }
+				=> write!(f, "The types of the source format ({:?}) and the destination format ({:?}) aren't compatible", source_format_ty, destination_format_ty),
+			CheckBlitImageError::UnexpectedMultisampled => write!(f, "Blitting between multisampled images is forbidden"),
+			CheckBlitImageError::SourceCoordinatesOutOfRange => write!(f, "The offsets, array layers and/or mipmap levels are out of range in the source image"),
+			CheckBlitImageError::DestinationCoordinatesOutOfRange => write!(f, "The offsets, array layers and/or mipmap levels are out of range in the destination image"),
+			CheckBlitImageError::IncompatibleRangeForImageType => write!(f, "The top-left and/or bottom-right coordinates are incompatible with the image type")
 		}
 	}
 }
-
-impl fmt::Display for CheckBlitImageError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for CheckBlitImageError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }

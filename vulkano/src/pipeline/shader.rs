@@ -467,24 +467,21 @@ pub enum ShaderInterfaceMismatchError {
 		other_format: Format
 	}
 }
-
-impl error::Error for ShaderInterfaceMismatchError {
-	fn description(&self) -> &str {
-		match *self {
-			ShaderInterfaceMismatchError::ElementsCountMismatch { .. } => {
-				"the number of elements mismatches"
-			}
-			ShaderInterfaceMismatchError::MissingElement { .. } => "an element is missing",
-			ShaderInterfaceMismatchError::FormatMismatch { .. } => {
-				"the format of an element does not match"
-			}
+impl fmt::Display for ShaderInterfaceMismatchError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			ShaderInterfaceMismatchError::ElementsCountMismatch { self_elements, other_elements }
+			=> write!(f, "The number of elements is not the same between the two shader interfaces: {} != {}", self_elements, other_elements),
+			ShaderInterfaceMismatchError::MissingElement { location }
+			=> write!(f, "An element is missing from one of the interfaces: location = {}", location),
+			ShaderInterfaceMismatchError::FormatMismatch { location, self_format, other_format }
+			=> write!(f, "The format of an element does not match: {:?} != {:?}: location = {}", self_format, other_format, location)
 		}
 	}
 }
-
-impl fmt::Display for ShaderInterfaceMismatchError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
+impl error::Error for ShaderInterfaceMismatchError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		None
 	}
 }
 

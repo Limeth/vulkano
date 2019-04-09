@@ -270,41 +270,29 @@ pub enum BufferViewCreationError {
 	/// The maximum number of elements in the buffer view has been exceeded.
 	MaxTexelBufferElementsExceeded
 }
-
-impl error::Error for BufferViewCreationError {
-	fn description(&self) -> &str {
-		match *self {
-			BufferViewCreationError::OomError(_) => "out of memory when creating buffer view",
-			BufferViewCreationError::WrongBufferUsage => {
-				"the buffer is missing correct usage flags"
-			}
-			BufferViewCreationError::WrongBufferAlignment => {
-				"the offset within the buffer is not a multiple of the
-                 `min_texel_buffer_offset_alignment` limit"
-			}
-			BufferViewCreationError::UnsupportedFormat => {
-				"the requested format is not supported for this usage"
-			}
-			BufferViewCreationError::MaxTexelBufferElementsExceeded => {
-				"the maximum number of texel elements is exceeded"
-			}
+impl fmt::Display for BufferViewCreationError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			BufferViewCreationError::OomError(e) => e.fmt(f),
+			BufferViewCreationError::WrongBufferUsage
+				=> write!(f, "The buffer is missing the required usage flags"),
+			BufferViewCreationError::WrongBufferAlignment
+				=> write!(f, "The offset within the buffer is not a multiple of the `min_texel_buffer_offset_alignment` limit"),
+			BufferViewCreationError::UnsupportedFormat
+				=> write!(f, "The requested format is not supported for this usage"),
+				BufferViewCreationError::MaxTexelBufferElementsExceeded
+				=> write!(f, "The maximum number of texel elements is exceeded"),
 		}
 	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			BufferViewCreationError::OomError(ref err) => Some(err),
+}
+impl error::Error for BufferViewCreationError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			BufferViewCreationError::OomError(e) => e.source(),
 			_ => None
 		}
 	}
 }
-
-impl fmt::Display for BufferViewCreationError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
-}
-
 impl From<OomError> for BufferViewCreationError {
 	fn from(err: OomError) -> BufferViewCreationError { BufferViewCreationError::OomError(err) }
 }

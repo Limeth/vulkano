@@ -40,27 +40,25 @@ where
 /// Error that can happen when attempting to add a `fill_buffer` command.
 #[derive(Debug, Copy, Clone)]
 pub enum CheckFillBufferError {
-	/// The "transfer destination" usage must be enabled on the buffer.
+	/// The buffer is missing the transfer destination usage.
 	BufferMissingUsage,
 	/// The data or size must be 4-bytes aligned.
 	WrongAlignment
 }
-
-impl error::Error for CheckFillBufferError {
-	fn description(&self) -> &str {
-		match *self {
+impl fmt::Display for CheckFillBufferError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
 			CheckFillBufferError::BufferMissingUsage => {
-				"the transfer destination usage must be enabled on the buffer"
+				write!(f, "The buffer is missing the transfer destination usage")
 			}
-			CheckFillBufferError::WrongAlignment => "the offset or size are not aligned to 4 bytes"
+			CheckFillBufferError::WrongAlignment => {
+				write!(f, "The data or size must be 4-bytes aligned")
+			}
 		}
 	}
 }
-
-impl fmt::Display for CheckFillBufferError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for CheckFillBufferError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
 
 #[cfg(test)]

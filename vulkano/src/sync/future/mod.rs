@@ -300,53 +300,43 @@ pub enum AccessError {
 	/// The resource is already in use, and there is no tracking of concurrent usages.
 	AlreadyInUse,
 
+	/// The image layout was unexpected.
 	UnexpectedImageLayout {
-		allowed: ImageLayout,
+		expected: ImageLayout,
 		requested: ImageLayout
 	},
 
-	/// Trying to use an image without transitioning it from the "undefined" or "preinitialized"
-	/// layouts first.
+	/// The image was in uninitialized or preinitialized layout.
 	ImageNotInitialized {
 		/// The layout that was requested for the image.
 		requested: ImageLayout
 	},
 
-	/// Trying to use a buffer that still contains garbage data.
+	/// Buffer was not initialized.
 	BufferNotInitialized,
 
-	/// Trying to use a swapchain image without depending on a corresponding acquire image future.
+	/// Swapchain image can only be used after it has been acquired.
 	SwapchainImageAcquireOnly
 }
+impl fmt::Display for AccessError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			AccessError::ExclusiveDenied => write!(f, "Exclusive access was denied"),
+			AccessError::AlreadyInUse => write!(f, "The resource is already in use"),
 
-impl error::Error for AccessError {
-	fn description(&self) -> &str {
-		match *self {
-			AccessError::ExclusiveDenied => "only shared access is allowed for this resource",
-			AccessError::AlreadyInUse => {
-				"the resource is already in use, and there is no tracking of concurrent usages"
-			}
-			AccessError::UnexpectedImageLayout { .. } => {
-				unimplemented!() // TODO: find a description
-			}
-			AccessError::ImageNotInitialized { .. } => {
-				"trying to use an image without transitioning it from the undefined or \
-				 preinitialized layouts first"
-			}
-			AccessError::BufferNotInitialized => {
-				"trying to use a buffer that still contains garbage data"
-			}
-			AccessError::SwapchainImageAcquireOnly => {
-				"trying to use a swapchain image without depending on a corresponding acquire \
-				 image future"
-			}
+			AccessError::UnexpectedImageLayout { expected, requested }
+			=> write!(f, "The image layout ({:?}) was unexpected ({:?})", requested, expected),
+			AccessError::ImageNotInitialized { requested }
+			=> write!(f, "The image was in uninitialized or preinitialized layout, requested: {:?}", requested),
+
+			AccessError::BufferNotInitialized => write!(f, "Buffer was not initialized"),
+			AccessError::SwapchainImageAcquireOnly => write!(f, "Swapchain image can only be used after it has been acquired")
 		}
 	}
 }
-
-impl fmt::Display for AccessError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
+impl error::Error for AccessError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		None
 	}
 }
 
@@ -358,22 +348,22 @@ pub enum AccessCheckError {
 	/// The resource is unknown, therefore we cannot possibly answer whether we have access or not.
 	Unknown
 }
-
-impl error::Error for AccessCheckError {
-	fn description(&self) -> &str {
-		match *self {
-			AccessCheckError::Denied(_) => "access to the resource has been denied",
-			AccessCheckError::Unknown => "the resource is unknown"
+impl fmt::Display for AccessCheckError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			AccessCheckError::Denied(e) => e.fmt(f),
+			AccessCheckError::Unknown => write!(f, "The resource is unknown")
 		}
 	}
 }
-
-impl fmt::Display for AccessCheckError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
+impl error::Error for AccessCheckError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			AccessCheckError::Denied(e) => e.source(),
+			_ => None
+		}
 	}
 }
-
 impl From<AccessError> for AccessCheckError {
 	fn from(err: AccessError) -> AccessCheckError { AccessCheckError::Denied(err) }
 }
@@ -387,54 +377,45 @@ pub enum FlushError {
 	/// Not enough memory.
 	OomError(OomError),
 
-	/// The connection to the device has been lost.
+	/// The device was lost.
 	DeviceLost,
 
-	/// The surface is no longer accessible and must be recreated.
+	/// The surface was lost.
 	SurfaceLost,
 
-	/// The surface has changed in a way that makes the swapchain unusable. You must query the
-	/// surface's new properties and recreate a new swapchain if you want to continue drawing.
+	/// The swapchain is out of date.
 	OutOfDate,
 
-	/// The flush operation needed to block, but the timeout has elapsed.
+	/// The flush operation didn't happen in given time.
 	Timeout
 }
-
-impl error::Error for FlushError {
-	fn description(&self) -> &str {
-		match *self {
-			FlushError::AccessError(_) => "access to a resource has been denied",
-			FlushError::OomError(_) => "not enough memory",
-			FlushError::DeviceLost => "the connection to the device has been lost",
-			FlushError::SurfaceLost => "the surface of this swapchain is no longer valid",
-			FlushError::OutOfDate => "the swapchain needs to be recreated",
-			FlushError::Timeout => {
-				"the flush operation needed to block, but the timeout has \
-				 elapsed"
+impl fmt::Display for FlushError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			FlushError::AccessError(e) => e.fmt(f),
+			FlushError::OomError(e) => e.fmt(f),
+			
+			FlushError::DeviceLost => {
+				write!(f, "The connection to the device device was lost")
 			}
+			FlushError::SurfaceLost => write!(f, "The surface was lost"),
+			FlushError::OutOfDate => write!(f, "The swapchain is out of date"),
+			FlushError::Timeout => write!(f, "The flush operation didn't happen in given time")
 		}
 	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			FlushError::AccessError(ref err) => Some(err),
-			FlushError::OomError(ref err) => Some(err),
+}
+impl error::Error for FlushError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			FlushError::AccessError(e) => e.source(),
+			FlushError::OomError(e) => e.source(),
 			_ => None
 		}
 	}
 }
-
-impl fmt::Display for FlushError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
-}
-
 impl From<AccessError> for FlushError {
 	fn from(err: AccessError) -> FlushError { FlushError::AccessError(err) }
 }
-
 impl From<SubmitPresentError> for FlushError {
 	fn from(err: SubmitPresentError) -> FlushError {
 		match err {
@@ -445,7 +426,6 @@ impl From<SubmitPresentError> for FlushError {
 		}
 	}
 }
-
 impl From<SubmitCommandBufferError> for FlushError {
 	fn from(err: SubmitCommandBufferError) -> FlushError {
 		match err {
@@ -454,7 +434,6 @@ impl From<SubmitCommandBufferError> for FlushError {
 		}
 	}
 }
-
 impl From<SubmitBindSparseError> for FlushError {
 	fn from(err: SubmitBindSparseError) -> FlushError {
 		match err {
@@ -463,7 +442,6 @@ impl From<SubmitBindSparseError> for FlushError {
 		}
 	}
 }
-
 impl From<FenceWaitError> for FlushError {
 	fn from(err: FenceWaitError) -> FlushError {
 		match err {

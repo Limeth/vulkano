@@ -630,12 +630,13 @@ pub enum SamplerCreationError {
 	/// Not enough memory.
 	OomError(OomError),
 
-	/// Too many sampler objects have been created. You must destroy some before creating new ones.
+	/// Too many sampler objects have been created.
+	///
+	/// You must destroy some before creating new ones.
 	/// Note the specs guarantee that at least 4000 samplers can exist simultaneously.
 	TooManyObjects,
 
-	/// Using an anisotropy greater than 1.0 requires enabling the `sampler_anisotropy` feature
-	/// when creating the device.
+	/// Using an anisotropy greater than 1.0 requires the `sampler_anisotropy` feature.
 	SamplerAnisotropyFeatureNotEnabled,
 
 	/// The requested anisotropy level exceeds the device's limits.
@@ -654,45 +655,39 @@ pub enum SamplerCreationError {
 		maximum: f32
 	},
 
-	/// Using `MirrorClampToEdge` requires enabling the `VK_KHR_sampler_mirror_clamp_to_edge`
-	/// extension when creating the device.
+	/// Using `MirrorClampToEdge` requires the `VK_KHR_sampler_mirror_clamp_to_edge` extension.
 	SamplerMirrorClampToEdgeExtensionNotEnabled
 }
+impl fmt::Display for SamplerCreationError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			SamplerCreationError::OomError(e) => e.fmt(f),
 
-impl error::Error for SamplerCreationError {
-	fn description(&self) -> &str {
-		match *self {
-			SamplerCreationError::OomError(_) => "not enough memory available",
-			SamplerCreationError::TooManyObjects => "too many simultaneous sampler objects",
-			SamplerCreationError::SamplerAnisotropyFeatureNotEnabled => {
-				"the `sampler_anisotropy` feature is not enabled"
-			}
-			SamplerCreationError::AnisotropyLimitExceeded { .. } => "anisotropy limit exceeded",
-			SamplerCreationError::MipLodBiasLimitExceeded { .. } => "mip lod bias limit exceeded",
-			SamplerCreationError::SamplerMirrorClampToEdgeExtensionNotEnabled => {
-				"the device extension `VK_KHR_sampler_mirror_clamp_to_edge` is not enabled"
-			}
+			SamplerCreationError::TooManyObjects
+			=> write!(f, "Too many sampler object have been created"),
+
+			SamplerCreationError::SamplerAnisotropyFeatureNotEnabled
+			=> write!(f, "Using an anisotropy greater than 1.0 requires the `sampler_anisotropy` feature"),
+			SamplerCreationError::AnisotropyLimitExceeded { requested, maximum }
+			=> write!(f, "The requested anisotropy level ({}) exceeds the device's limits ({})", requested, maximum),
+			SamplerCreationError::MipLodBiasLimitExceeded { requested, maximum }
+			=> write!(f, "The requested mip lod bias ({}) exceeds the device's limits ({})", requested, maximum),
+			SamplerCreationError::SamplerMirrorClampToEdgeExtensionNotEnabled
+			=> write!(f, "Using `MirrorClampToEdge` requires the `VK_KHR_sampler_mirror_clamp_to_edge` extension")
 		}
 	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			SamplerCreationError::OomError(ref err) => Some(err),
+}
+impl error::Error for SamplerCreationError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			SamplerCreationError::OomError(e) => e.source(),
 			_ => None
 		}
 	}
 }
-
-impl fmt::Display for SamplerCreationError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
-}
-
 impl From<OomError> for SamplerCreationError {
 	fn from(err: OomError) -> SamplerCreationError { SamplerCreationError::OomError(err) }
 }
-
 impl From<Error> for SamplerCreationError {
 	fn from(err: Error) -> SamplerCreationError {
 		match err {

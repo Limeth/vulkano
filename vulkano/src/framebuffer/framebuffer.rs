@@ -434,7 +434,7 @@ pub enum FramebufferCreationError {
 		/// Attachment dimensions.
 		obtained: [u32; 3]
 	},
-	/// The number of attachments doesn't match the number expected by the render pass.
+	/// The number of attachments doesn't match the number expected.
 	AttachmentsCountMismatch {
 		/// Expected number of attachments.
 		expected: usize,
@@ -443,51 +443,40 @@ pub enum FramebufferCreationError {
 	},
 	/// One of the images cannot be used as the requested attachment.
 	IncompatibleAttachment(IncompatibleRenderPassAttachmentError),
-	/// The framebuffer has no attachment and no dimension was specified.
+	/// Cannot determing the dimensions because the framebuffer has
+	/// no attachments and no dimensions were specified.
 	CantDetermineDimensions
 }
-
-impl From<OomError> for FramebufferCreationError {
-	fn from(err: OomError) -> FramebufferCreationError { FramebufferCreationError::OomError(err) }
-}
-
-impl error::Error for FramebufferCreationError {
-	fn description(&self) -> &str {
-		match *self {
-			FramebufferCreationError::OomError(_) => "no memory available",
-			FramebufferCreationError::ImageDimensionsTooLarge => {
-				"the dimensions of the framebuffer are too large"
-			}
-			FramebufferCreationError::AttachmenImageDimensionsIncompatible { .. } => {
-				"the attachment has a size that isn't compatible with the framebuffer dimensions"
-			}
-			FramebufferCreationError::AttachmentsCountMismatch { .. } => {
-				"the number of attachments doesn't match the number expected by the render pass"
-			}
-			FramebufferCreationError::IncompatibleAttachment(_) => {
-				"one of the images cannot be used as the requested attachment"
-			}
-			FramebufferCreationError::CantDetermineDimensions => {
-				"the framebuffer has no attachment and no dimension was specified"
-			}
+impl fmt::Display for FramebufferCreationError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			FramebufferCreationError::OomError(e) => e.fmt(f),
+			FramebufferCreationError::ImageDimensionsTooLarge
+			=> write!(f, "The requested dimensions exceed the device's limits"),
+			FramebufferCreationError::AttachmenImageDimensionsIncompatible { expected, obtained }
+			=> write!(f, "An attachment has dimensions ({:?}) that aren't compatible with the framebuffer dimensions ({:?})",
+				expected, obtained
+			),
+			FramebufferCreationError::AttachmentsCountMismatch { expected, obtained }
+			=> write!(f, "The number of attachments ({}) doesn't match the number expected ({})", obtained, expected),
+			FramebufferCreationError::IncompatibleAttachment(e) => e.fmt(f),
+			FramebufferCreationError::CantDetermineDimensions
+			=> write!(f, "Cannot determing the dimensions because the framebuffer has no attachments and no dimensions were specified"),
 		}
 	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			FramebufferCreationError::OomError(ref err) => Some(err),
-			FramebufferCreationError::IncompatibleAttachment(ref err) => Some(err),
+}
+impl error::Error for FramebufferCreationError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			FramebufferCreationError::OomError(e) => e.source(),
+			FramebufferCreationError::IncompatibleAttachment(e) => e.source(),
 			_ => None
 		}
 	}
 }
-
-impl fmt::Display for FramebufferCreationError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl From<OomError> for FramebufferCreationError {
+	fn from(err: OomError) -> FramebufferCreationError { FramebufferCreationError::OomError(err) }
 }
-
 impl From<Error> for FramebufferCreationError {
 	fn from(err: Error) -> FramebufferCreationError {
 		FramebufferCreationError::from(OomError::from(err))

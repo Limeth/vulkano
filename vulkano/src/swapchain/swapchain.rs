@@ -592,7 +592,9 @@ impl fmt::Display for SwapchainCreationError {
 		match self {
 			SwapchainCreationError::OomError(e) => e.fmt(f),
 
-			SwapchainCreationError::DeviceLost => write!(f, "The device was lost"),
+			SwapchainCreationError::DeviceLost => {
+				write!(f, "The connection to the device was lost")
+			}
 			SwapchainCreationError::SurfaceLost => write!(f, "The surface was lost"),
 			SwapchainCreationError::SurfaceInUse => {
 				write!(f, "The surface is already in use by another swapchain")
@@ -740,7 +742,7 @@ unsafe impl<W> GpuFuture for SwapchainAcquireFuture<W> {
 
 		if layout != ImageLayout::Undefined && layout != ImageLayout::PresentSrc {
 			return Err(AccessCheckError::Denied(AccessError::UnexpectedImageLayout {
-				allowed: ImageLayout::PresentSrc,
+				expected: ImageLayout::PresentSrc,
 				requested: layout
 			}))
 		}
@@ -798,7 +800,7 @@ impl fmt::Display for AcquireError {
 		match self {
 			AcquireError::OomError(e) => e.fmt(f),
 
-			AcquireError::DeviceLost => write!(f, "The device was lost"),
+			AcquireError::DeviceLost => write!(f, "The connection to the device was lost"),
 			AcquireError::Timeout => write!(f, "No image was available in given time"),
 			AcquireError::SurfaceLost => write!(f, "The surface was lost"),
 			AcquireError::OutOfDate => write!(f, "The swapchain is out of date")

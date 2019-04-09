@@ -344,48 +344,40 @@ pub enum BufferCreationError {
 	/// Sparse aliasing was requested but the corresponding feature wasn't enabled.
 	SparseResidencyAliasedFeatureNotEnabled
 }
-
-impl error::Error for BufferCreationError {
-	fn description(&self) -> &str {
-		match *self {
-			BufferCreationError::AllocError(_) => "allocating memory failed",
+impl fmt::Display for BufferCreationError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			BufferCreationError::AllocError(e) => e.fmt(f),
 			BufferCreationError::SparseBindingFeatureNotEnabled => {
-				"sparse binding was requested but the corresponding feature wasn't enabled"
+				write!(f, "Sparse binding feature was not enabled")
 			}
 			BufferCreationError::SparseResidencyBufferFeatureNotEnabled => {
-				"sparse residency was requested but the corresponding feature wasn't enabled"
+				write!(f, "Sparse residency feature was not enables")
 			}
 			BufferCreationError::SparseResidencyAliasedFeatureNotEnabled => {
-				"sparse aliasing was requested but the corresponding feature wasn't enabled"
+				write!(f, "Sparse aliasing feature was not enables")
 			}
 		}
 	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			BufferCreationError::AllocError(ref err) => Some(err),
+}
+impl error::Error for BufferCreationError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			BufferCreationError::AllocError(e) => e.source(),
 			_ => None
 		}
 	}
 }
-
-impl fmt::Display for BufferCreationError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
-}
-
 impl From<OomError> for BufferCreationError {
 	fn from(err: OomError) -> BufferCreationError { BufferCreationError::AllocError(err.into()) }
 }
-
 impl From<Error> for BufferCreationError {
 	fn from(err: Error) -> BufferCreationError {
 		match err {
-			err @ Error::OutOfHostMemory => {
+			Error::OutOfHostMemory => {
 				BufferCreationError::AllocError(DeviceMemoryAllocError::from(err))
 			}
-			err @ Error::OutOfDeviceMemory => {
+			Error::OutOfDeviceMemory => {
 				BufferCreationError::AllocError(DeviceMemoryAllocError::from(err))
 			}
 			_ => panic!("unexpected error: {:?}", err)

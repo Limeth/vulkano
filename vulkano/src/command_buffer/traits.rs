@@ -322,7 +322,7 @@ where
 /// Error that can happen when attempting to execute a command buffer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CommandBufferExecError {
-	/// Access to a resource has been denied.
+	/// Access to a resource aws denied.
 	AccessError {
 		error: AccessError,
 		command_name: Cow<'static, str>,
@@ -330,41 +330,45 @@ pub enum CommandBufferExecError {
 		command_offset: usize
 	},
 
+	/// One of the one time command buffers has already been executed
+	///
 	/// The command buffer or one of the secondary command buffers it executes was created with the
 	/// "one time submit" flag, but has already been submitted it the past.
 	OneTimeSubmitAlreadySubmitted,
 
+	/// One of the non-concurrent command buffers is already in use
+	///
 	/// The command buffer or one of the secondary command buffers it executes is already in use by
 	/// the GPU and was not created with the "concurrent" flag.
 	ExclusiveAlreadyInUse /* TODO: missing entries (eg. wrong queue family, secondary command buffer) */
 }
-
-impl error::Error for CommandBufferExecError {
-	fn description(&self) -> &str {
-		match *self {
-			CommandBufferExecError::AccessError { .. } => "access to a resource has been denied",
+impl fmt::Display for CommandBufferExecError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			CommandBufferExecError::AccessError {
+				error,
+				command_name,
+				command_param,
+				command_offset
+			} => write!(
+				f,
+				"Access to a resource was denied: [{}] {}({}): {}",
+				command_offset, command_name, command_param, error
+			),
 			CommandBufferExecError::OneTimeSubmitAlreadySubmitted => {
-				"the command buffer or one of the secondary command buffers it executes was \
-				 created with the \"one time submit\" flag, but has already been submitted it \
-				 the past"
+				write!(f, "One of the one time command buffers has already been executed")
 			}
 			CommandBufferExecError::ExclusiveAlreadyInUse => {
-				"the command buffer or one of the secondary command buffers it executes is \
-				 already in use by the GPU and was not created with the \"concurrent\" flag"
+				write!(f, "One of the non-concurrent command buffers is already in use")
 			}
-		}
-	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			CommandBufferExecError::AccessError { ref error, .. } => Some(error),
-			_ => None
 		}
 	}
 }
-
-impl fmt::Display for CommandBufferExecError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
+impl error::Error for CommandBufferExecError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			CommandBufferExecError::AccessError { error, .. } => Some(error),
+			_ => None
+		}
 	}
 }

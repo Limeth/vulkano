@@ -66,7 +66,7 @@ pub struct AttributeInfo {
 /// Error that can happen when the vertex definition doesn't match the input of the vertex shader.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IncompatibleVertexDefinitionError {
-	/// An attribute of the vertex shader is missing in the vertex source.
+	/// The attribute of the vertex shader is missing in the vertex source.
 	MissingAttribute {
 		/// Name of the missing attribute.
 		attribute: String
@@ -82,24 +82,22 @@ pub enum IncompatibleVertexDefinitionError {
 		definition: (VertexMemberTy, usize)
 	}
 }
-
-impl error::Error for IncompatibleVertexDefinitionError {
-	fn description(&self) -> &str {
-		match *self {
-			IncompatibleVertexDefinitionError::MissingAttribute { .. } => "an attribute is missing",
-			IncompatibleVertexDefinitionError::FormatMismatch { .. } => {
-				"the format of an attribute does not match"
-			}
+impl fmt::Display for IncompatibleVertexDefinitionError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			IncompatibleVertexDefinitionError::MissingAttribute { attribute }
+			=> write!(f, "The attribute {} of the vertex shadewr is missing in the source", attribute),
+			IncompatibleVertexDefinitionError::FormatMismatch { attribute, shader, definition }
+			=> write!(f, "The format of an attribute {} does not match: in shader {}: {:?} vs in definition: {}: {:?}",
+			attribute, shader.1, shader.0, definition.1, definition.0)
 		}
 	}
 }
-
-impl fmt::Display for IncompatibleVertexDefinitionError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
+impl error::Error for IncompatibleVertexDefinitionError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		None
 	}
 }
-
 
 /// Extension trait of `VertexDefinition`. The `L` parameter is an acceptable vertex source for this
 /// vertex definition.

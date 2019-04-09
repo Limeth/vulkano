@@ -43,7 +43,7 @@
 
 use crate::{
 	format::Format,
-	image::ImageDimensions,
+	image::ImageDimensionType,
 	sync::{AccessFlagBits, PipelineStages}
 };
 use std::{cmp, error, fmt, ops::BitOr};
@@ -85,8 +85,8 @@ impl DescriptorDesc {
 
 		if self.array_count < other.array_count {
 			return Err(DescriptorDescSupersetError::ArrayTooSmall {
-				len: self.array_count,
-				required: other.array_count
+				obtained: self.array_count,
+				expected: other.array_count
 			})
 		}
 
@@ -249,15 +249,15 @@ impl DescriptorDescTy {
 			) => {
 				if me_multisampled != other_multisampled {
 					return Err(DescriptorDescSupersetError::MultisampledMismatch {
-						provided: me_multisampled,
+						obtained: me_multisampled,
 						expected: other_multisampled
 					})
 				}
 
 				if me_array_layers != other_array_layers {
 					return Err(DescriptorDescSupersetError::IncompatibleArrayLayers {
-						provided: me_array_layers,
-						required: other_array_layers
+						obtained: me_array_layers,
+						expected: other_array_layers
 					})
 				}
 
@@ -298,14 +298,14 @@ impl DescriptorDescTy {
 							Ok(())
 						} else {
 							Err(DescriptorDescSupersetError::FormatMismatch {
-								provided: Some(m),
+								obtained: Some(m),
 								expected: o
 							})
 						}
 					}
 					(None, None) => Ok(()),
 					(None, Some(a)) => Err(DescriptorDescSupersetError::FormatMismatch {
-						provided: Some(a),
+						obtained: Some(a),
 						expected: a
 					})
 				}
@@ -323,8 +323,8 @@ pub struct DescriptorImageDesc {
 	/// If `true`, the image can be sampled by the shader. Only images that were created with the
 	/// `sampled` usage can be attached to the descriptor.
 	pub sampled: bool,
-	/// The kind of image: one-dimensional, two-dimensional, three-dimensional, or cube.
-	pub dimensions: DescriptorImageDescDimensions,
+	/// The kind of image: one-dimensional, two-dimensional, cube or three-dimensional.
+	pub dimensions: ImageDimensionType,
 	/// The format of the image, or `None` if the format is unknown. If `Some`, only images with
 	/// exactly that format can be attached.
 	pub format: Option<Format>,
@@ -342,14 +342,14 @@ impl DescriptorImageDesc {
 	) -> Result<(), DescriptorDescSupersetError> {
 		if self.dimensions != other.dimensions {
 			return Err(DescriptorDescSupersetError::ImageDimensionsMismatch {
-				provided: self.dimensions,
+				obtained: self.dimensions,
 				expected: other.dimensions
 			})
 		}
 
 		if self.multisampled != other.multisampled {
 			return Err(DescriptorDescSupersetError::MultisampledMismatch {
-				provided: self.multisampled,
+				obtained: self.multisampled,
 				expected: other.multisampled
 			})
 		}
@@ -358,7 +358,7 @@ impl DescriptorImageDesc {
 			(Some(a), Some(b)) => {
 				if a != b {
 					return Err(DescriptorDescSupersetError::FormatMismatch {
-						provided: Some(a),
+						obtained: Some(a),
 						expected: b
 					})
 				}
@@ -367,7 +367,7 @@ impl DescriptorImageDesc {
 			(None, None) => (),
 			(None, Some(a)) => {
 				return Err(DescriptorDescSupersetError::FormatMismatch {
-					provided: None,
+					obtained: None,
 					expected: a
 				})
 			}
@@ -383,8 +383,8 @@ impl DescriptorImageDesc {
 					(Some(m), Some(o)) => {
 						if m < o {
 							return Err(DescriptorDescSupersetError::IncompatibleArrayLayers {
-								provided: DescriptorImageDescArray::Arrayed { max_layers: my_max },
-								required: DescriptorImageDescArray::Arrayed {
+								obtained: DescriptorImageDescArray::Arrayed { max_layers: my_max },
+								expected: DescriptorImageDescArray::Arrayed {
 									max_layers: other_max
 								}
 							})
@@ -393,8 +393,8 @@ impl DescriptorImageDesc {
 					(Some(_), None) => (),
 					(None, Some(m)) => {
 						return Err(DescriptorDescSupersetError::IncompatibleArrayLayers {
-							provided: DescriptorImageDescArray::Arrayed { max_layers: my_max },
-							required: DescriptorImageDescArray::Arrayed { max_layers: other_max }
+							obtained: DescriptorImageDescArray::Arrayed { max_layers: my_max },
+							expected: DescriptorImageDescArray::Arrayed { max_layers: other_max }
 						})
 					}
 					(None, None) => () // TODO: is this correct?
@@ -402,8 +402,8 @@ impl DescriptorImageDesc {
 			}
 			(a, b) => {
 				return Err(DescriptorDescSupersetError::IncompatibleArrayLayers {
-					provided: a,
-					required: b
+					obtained: a,
+					expected: b
 				})
 			}
 		};
@@ -417,30 +417,6 @@ impl DescriptorImageDesc {
 pub enum DescriptorImageDescArray {
 	NonArrayed,
 	Arrayed { max_layers: Option<u32> }
-}
-
-// TODO: documentation
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum DescriptorImageDescDimensions {
-	OneDimensional,
-	TwoDimensional,
-	ThreeDimensional,
-	Cube
-}
-
-impl DescriptorImageDescDimensions {
-	/// Builds the `DescriptorImageDescDimensions` that corresponds to actual dimensions.
-	pub fn from_dimensions(dims: ImageDimensions) -> DescriptorImageDescDimensions {
-		match dims {
-			ImageDimensions::Dim1D { .. } => DescriptorImageDescDimensions::OneDimensional,
-			ImageDimensions::Dim1DArray { .. } => DescriptorImageDescDimensions::OneDimensional,
-			ImageDimensions::Dim2D { .. } => DescriptorImageDescDimensions::TwoDimensional,
-			ImageDimensions::Dim2DArray { .. } => DescriptorImageDescDimensions::TwoDimensional,
-			ImageDimensions::Dim3D { .. } => DescriptorImageDescDimensions::ThreeDimensional,
-			ImageDimensions::Cubemap { .. } => DescriptorImageDescDimensions::Cube,
-			ImageDimensions::CubemapArray { .. } => DescriptorImageDescDimensions::Cube
-		}
-	}
 }
 
 // TODO: documentation
@@ -474,8 +450,8 @@ pub enum DescriptorType {
 pub enum DescriptorDescSupersetError {
 	/// The number of array elements of the descriptor is smaller than expected.
 	ArrayTooSmall {
-		len: u32,
-		required: u32
+		obtained: u32,
+		expected: u32
 	},
 
 	/// The descriptor type doesn't match the type of the other descriptor.
@@ -488,63 +464,68 @@ pub enum DescriptorDescSupersetError {
 	ShaderStagesNotSuperset,
 
 	ImageDimensionsMismatch {
-		provided: DescriptorImageDescDimensions,
-		expected: DescriptorImageDescDimensions
+		obtained: ImageDimensionType,
+		expected: ImageDimensionType
 	},
 
 	FormatMismatch {
-		provided: Option<Format>,
+		obtained: Option<Format>,
 		expected: Format
 	},
 
 	MultisampledMismatch {
-		provided: bool,
+		obtained: bool,
 		expected: bool
 	},
 
 	IncompatibleArrayLayers {
-		provided: DescriptorImageDescArray,
-		required: DescriptorImageDescArray
+		obtained: DescriptorImageDescArray,
+		expected: DescriptorImageDescArray
 	}
 }
-
-impl error::Error for DescriptorDescSupersetError {
-	fn description(&self) -> &str {
-		match *self {
-			DescriptorDescSupersetError::ArrayTooSmall { .. } => {
-				"the number of array elements of the descriptor is smaller than expected"
-			}
+impl fmt::Display for DescriptorDescSupersetError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			DescriptorDescSupersetError::ArrayTooSmall { obtained, expected } => write!(
+				f,
+				"The number of array elements of the descriptor ({}) is smaller than expected ({})",
+				obtained, expected
+			),
 			DescriptorDescSupersetError::TypeMismatch => {
-				"the descriptor type doesn't match the type of the other descriptor"
+				write!(f, "The descriptor type doesn't match the type of the other descriptor")
 			}
 			DescriptorDescSupersetError::MutabilityRequired => {
-				"the descriptor is marked as read-only, but the other is not"
+				write!(f, "The descriptor is marked as read-only, but the other is not")
 			}
 			DescriptorDescSupersetError::ShaderStagesNotSuperset => {
-				"the shader stages are not a superset of one another"
+				write!(f, "The shader stages are not a superset of one another")
 			}
-			DescriptorDescSupersetError::ImageDimensionsMismatch { .. } => {
-				"mismatch between the dimensions of the two descriptors"
-			}
-			DescriptorDescSupersetError::FormatMismatch { .. } => {
-				"mismatch between the format of the two descriptors"
-			}
-			DescriptorDescSupersetError::MultisampledMismatch { .. } => {
-				"mismatch between whether the descriptors are multisampled"
-			}
-			DescriptorDescSupersetError::IncompatibleArrayLayers { .. } => {
-				"the array layers of the descriptors aren't compatible"
-			}
+			DescriptorDescSupersetError::ImageDimensionsMismatch { obtained, expected } => write!(
+				f,
+				"Mismatch between the dimensions of the two descriptors: obtained {:?} expected {:?}",
+				obtained, expected
+			),
+			DescriptorDescSupersetError::FormatMismatch { obtained, expected } => write!(
+				f,
+				"Mismatch between the format of the two descriptors: obtained {:?} expected {:?}",
+				obtained, expected
+			),
+			DescriptorDescSupersetError::MultisampledMismatch { obtained, expected } => write!(
+				f,
+				"Mismatch between multisampledness: obtained {} expected {}",
+				obtained, expected
+			),
+			DescriptorDescSupersetError::IncompatibleArrayLayers { obtained, expected } => write!(
+				f,
+				"Mismatch between array layers: obtained {:?} expected {:?}",
+				obtained, expected
+			)
 		}
 	}
 }
-
-impl fmt::Display for DescriptorDescSupersetError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for DescriptorDescSupersetError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
-
 impl From<ShaderStagesSupersetError> for DescriptorDescSupersetError {
 	fn from(err: ShaderStagesSupersetError) -> DescriptorDescSupersetError {
 		match err {
@@ -711,17 +692,13 @@ impl From<ShaderStages> for PipelineStages {
 pub enum ShaderStagesSupersetError {
 	NotSuperset
 }
-
-impl error::Error for ShaderStagesSupersetError {
-	fn description(&self) -> &str {
-		match *self {
-			ShaderStagesSupersetError::NotSuperset => "shader stages not a superset"
+impl fmt::Display for ShaderStagesSupersetError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			ShaderStagesSupersetError::NotSuperset => write!(f, "Shader stages and not superset")
 		}
 	}
 }
-
-impl fmt::Display for ShaderStagesSupersetError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for ShaderStagesSupersetError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }

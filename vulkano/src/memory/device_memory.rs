@@ -239,9 +239,12 @@ impl Drop for DeviceMemory {
 ///
 /// # let device: std::sync::Arc<vulkano::device::Device> = return;
 /// // The memory type must be mappable.
-/// let mem_ty = device.physical_device().memory_types()
-///                     .filter(|t| t.is_host_visible())
-///                     .next().unwrap();    // Vk specs guarantee that this can't fail
+/// let mem_ty = device
+/// 	.physical_device()
+/// 	.memory_types()
+/// 	.filter(|t| t.is_host_visible())
+/// 	.next()
+/// 	.unwrap(); // Vk specs guarantee that this can't fail
 ///
 /// // Allocates 1KB of memory.
 /// let memory = DeviceMemory::alloc_and_map(device.clone(), mem_ty, 1024).unwrap();
@@ -249,9 +252,9 @@ impl Drop for DeviceMemory {
 /// // Get access to the content. Note that this is very unsafe for two reasons: 1) the content is
 /// // uninitialized, and 2) the access is unsynchronized.
 /// unsafe {
-///     let mut content = memory.read_write::<[u8]>(0 .. 1024);
-///     content[12] = 54;       // `content` derefs to a `&[u8]` or a `&mut [u8]`
-/// }
+/// 	let mut content = memory.read_write::<[u8]>(0 .. 1024);
+/// 	content[12] = 54; // `content` derefs to a `&[u8]` or a `&mut [u8]`
+/// 	}
 /// ```
 pub struct MappedDeviceMemory {
 	memory: DeviceMemory,
@@ -415,37 +418,29 @@ pub enum DeviceMemoryAllocError {
 	/// Memory map failed.
 	MemoryMapFailed
 }
-
-impl error::Error for DeviceMemoryAllocError {
-	fn description(&self) -> &str {
-		match *self {
-			DeviceMemoryAllocError::OomError(_) => "not enough memory available",
-			DeviceMemoryAllocError::TooManyObjects => {
-				"the maximum number of allocations has been exceeded"
-			}
-			DeviceMemoryAllocError::MemoryMapFailed => "memory map failed"
+impl fmt::Display for DeviceMemoryAllocError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			DeviceMemoryAllocError::OomError(e) => e.fmt(f),
+			DeviceMemoryAllocError::TooManyObjects
+			=> write!(f, "The maximum number of allocations has been exceeded"),
+			DeviceMemoryAllocError::MemoryMapFailed => write!(f, "Memory map failed")
 		}
 	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			DeviceMemoryAllocError::OomError(ref err) => Some(err),
+}
+impl error::Error for DeviceMemoryAllocError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			DeviceMemoryAllocError::OomError(e) => e.source(),
 			_ => None
 		}
 	}
 }
-
-impl fmt::Display for DeviceMemoryAllocError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
-}
-
 impl From<Error> for DeviceMemoryAllocError {
 	fn from(err: Error) -> DeviceMemoryAllocError {
 		match err {
-			e @ Error::OutOfHostMemory | e @ Error::OutOfDeviceMemory => {
-				DeviceMemoryAllocError::OomError(e.into())
+			Error::OutOfHostMemory | Error::OutOfDeviceMemory => {
+				DeviceMemoryAllocError::OomError(err.into())
 			}
 			Error::TooManyObjects => DeviceMemoryAllocError::TooManyObjects,
 			Error::MemoryMapFailed => DeviceMemoryAllocError::MemoryMapFailed,
@@ -453,7 +448,6 @@ impl From<Error> for DeviceMemoryAllocError {
 		}
 	}
 }
-
 impl From<OomError> for DeviceMemoryAllocError {
 	fn from(err: OomError) -> DeviceMemoryAllocError { DeviceMemoryAllocError::OomError(err) }
 }

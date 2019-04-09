@@ -26,7 +26,7 @@ use crate::{
 		ImageInner,
 		ImageLayout,
 		ImageUsage,
-		ViewType
+		ImageViewType
 	},
 	memory::{
 		pool::{
@@ -158,7 +158,7 @@ impl<F> AttachmentImage<F> {
 			image.bind_memory(mem.memory(), mem.offset())?;
 		}
 
-		let view = unsafe { UnsafeImageView::raw(&image, ViewType::Dim2D, 0 .. 1, 0 .. 1)? };
+		let view = unsafe { UnsafeImageView::raw(&image, ImageViewType::Dim2D, 0 .. 1, 0 .. 1)? };
 
 		Ok(Arc::new(AttachmentImage {
 			image,
@@ -207,12 +207,12 @@ where
 			if self.initialized.load(Ordering::SeqCst) {
 				return Err(AccessError::UnexpectedImageLayout {
 					requested: expected_layout,
-					allowed: self.attachment_layout
+					expected: self.attachment_layout
 				})
 			} else {
 				return Err(AccessError::UnexpectedImageLayout {
 					requested: expected_layout,
-					allowed: ImageLayout::Undefined
+					expected: ImageLayout::Undefined
 				})
 			}
 		}

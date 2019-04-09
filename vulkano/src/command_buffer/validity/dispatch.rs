@@ -36,21 +36,19 @@ pub enum CheckDispatchError {
 		max_supported: [u32; 3]
 	}
 }
-
-impl error::Error for CheckDispatchError {
-	fn description(&self) -> &str {
-		match *self {
-			CheckDispatchError::UnsupportedDimensions { .. } => {
-				"the dimensions are too large for the device's limits"
-			}
+impl fmt::Display for CheckDispatchError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			CheckDispatchError::UnsupportedDimensions { requested, max_supported } => write!(
+				f,
+				"The dimensions ({:?}) are too large for the device's limits ({:?})",
+				requested, max_supported
+			)
 		}
 	}
 }
-
-impl fmt::Display for CheckDispatchError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for CheckDispatchError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
 
 #[cfg(test)]

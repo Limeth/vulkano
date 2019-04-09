@@ -344,70 +344,50 @@ pub enum PipelineLayoutLimitsError {
 		requested: u32
 	}
 }
-
-impl error::Error for PipelineLayoutLimitsError {
-	fn description(&self) -> &str {
-		match *self {
-			PipelineLayoutLimitsError::MaxDescriptorSetsLimitExceeded { .. } => {
-				"the maximum number of descriptor sets has been exceeded"
-			}
-			PipelineLayoutLimitsError::MaxPushConstantsSizeExceeded { .. } => {
-				"the maximum size of push constants has been exceeded"
-			}
-			PipelineLayoutLimitsError::MaxPerStageResourcesLimitExceeded { .. } => {
-				"the `max_per_stage_resources()` limit has been exceeded"
-			}
-			PipelineLayoutLimitsError::MaxPerStageDescriptorSamplersLimitExceeded { .. } => {
-				"the `max_per_stage_descriptor_samplers()` limit has been exceeded"
-			}
-			PipelineLayoutLimitsError::MaxPerStageDescriptorUniformBuffersLimitExceeded {
-				..
-			} => "the `max_per_stage_descriptor_uniform_buffers()` limit has been exceeded",
-			PipelineLayoutLimitsError::MaxPerStageDescriptorStorageBuffersLimitExceeded {
-				..
-			} => "the `max_per_stage_descriptor_storage_buffers()` limit has been exceeded",
-			PipelineLayoutLimitsError::MaxPerStageDescriptorSampledImagesLimitExceeded {
-				..
-			} => "the `max_per_stage_descriptor_sampled_images()` limit has been exceeded",
-			PipelineLayoutLimitsError::MaxPerStageDescriptorStorageImagesLimitExceeded {
-				..
-			} => "the `max_per_stage_descriptor_storage_images()` limit has been exceeded",
-			PipelineLayoutLimitsError::MaxPerStageDescriptorInputAttachmentsLimitExceeded {
-				..
-			} => "the `max_per_stage_descriptor_input_attachments()` limit has been exceeded",
-			PipelineLayoutLimitsError::MaxDescriptorSetSamplersLimitExceeded { .. } => {
-				"the `max_descriptor_set_samplers()` limit has been exceeded"
-			}
-			PipelineLayoutLimitsError::MaxDescriptorSetUniformBuffersLimitExceeded { .. } => {
-				"the `max_descriptor_set_uniform_buffers()` limit has been exceeded"
-			}
-			PipelineLayoutLimitsError::MaxDescriptorSetUniformBuffersDynamicLimitExceeded {
-				..
-			} => "the `max_descriptor_set_uniform_buffers_dynamic()` limit has been exceeded",
-			PipelineLayoutLimitsError::MaxDescriptorSetStorageBuffersLimitExceeded { .. } => {
-				"the `max_descriptor_set_storage_buffers()` limit has been exceeded"
-			}
-			PipelineLayoutLimitsError::MaxDescriptorSetStorageBuffersDynamicLimitExceeded {
-				..
-			} => "the `max_descriptor_set_storage_buffers_dynamic()` limit has been exceeded",
-			PipelineLayoutLimitsError::MaxDescriptorSetSampledImagesLimitExceeded { .. } => {
-				"the `max_descriptor_set_sampled_images()` limit has been exceeded"
-			}
-			PipelineLayoutLimitsError::MaxDescriptorSetStorageImagesLimitExceeded { .. } => {
-				"the `max_descriptor_set_storage_images()` limit has been exceeded"
-			}
-			PipelineLayoutLimitsError::MaxDescriptorSetInputAttachmentsLimitExceeded { .. } => {
-				"the `max_descriptor_set_input_attachments()` limit has been exceeded"
-			}
+impl fmt::Display for PipelineLayoutLimitsError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			PipelineLayoutLimitsError::MaxDescriptorSetsLimitExceeded { limit, requested }
+				=> write!(f, "The maximum number of descriptor sets has been exceeded: limit {} requested {}", limit, requested),
+			PipelineLayoutLimitsError::MaxPushConstantsSizeExceeded { limit, requested }
+				=> write!(f, "The maximum size of push constants has been exceeded: limit {} requested {}", limit, requested),
+			PipelineLayoutLimitsError::MaxPerStageResourcesLimitExceeded { limit, requested }
+				=> write!(f, "The `max_per_stage_resources()` limit has been exceeded: limit {} requested {}", limit, requested),
+			PipelineLayoutLimitsError::MaxPerStageDescriptorSamplersLimitExceeded { limit, requested }
+				=> write!(f, "The `max_per_stage_descriptor_samplers()` limit has been exceeded: limit {} requested {}", limit, requested),
+			PipelineLayoutLimitsError::MaxPerStageDescriptorUniformBuffersLimitExceeded { limit, requested }
+				=> write!(f, "The `max_per_stage_descriptor_uniform_buffers()` limit has been exceeded: limit {} requested {}", limit, requested),
+			PipelineLayoutLimitsError::MaxPerStageDescriptorStorageBuffersLimitExceeded { limit, requested }
+				=> write!(f, "The `max_per_stage_descriptor_storage_buffers()` limit has been exceeded: limit {} requested {}", limit, requested),
+			PipelineLayoutLimitsError::MaxPerStageDescriptorSampledImagesLimitExceeded { limit, requested }
+				=> write!(f, "The `max_per_stage_descriptor_sampled_images()` limit has been exceeded: limit {} requested {}", limit, requested),
+			PipelineLayoutLimitsError::MaxPerStageDescriptorStorageImagesLimitExceeded { limit, requested }
+				=> write!(f, "The `max_per_stage_descriptor_storage_images()` limit has been exceeded: limit {} requested {}", limit, requested),
+			PipelineLayoutLimitsError::MaxPerStageDescriptorInputAttachmentsLimitExceeded { limit, requested }
+				=> write!(f, "The `max_per_stage_descriptor_input_attachments()` limit has been exceeded: limit {} requested {}", limit, requested),
+			PipelineLayoutLimitsError::MaxDescriptorSetSamplersLimitExceeded { limit, requested }
+				=> write!(f, "The `max_descriptor_set_samplers()` limit has been exceeded: limit {} requested {}", limit, requested),
+			PipelineLayoutLimitsError::MaxDescriptorSetUniformBuffersLimitExceeded { limit, requested }
+				=> write!(f, "The `max_descriptor_set_uniform_buffers()` limit has been exceeded: limit {} requested {}", limit, requested),
+			PipelineLayoutLimitsError::MaxDescriptorSetUniformBuffersDynamicLimitExceeded { limit, requested }
+				=> write!(f, "The `max_descriptor_set_uniform_buffers_dynamic()` limit has been exceeded: limit {} requested {}", limit, requested),
+			PipelineLayoutLimitsError::MaxDescriptorSetStorageBuffersLimitExceeded { limit, requested }
+				=> write!(f, "The `max_descriptor_set_storage_buffers()` limit has been exceeded: limit {} requested {}", limit, requested),
+			PipelineLayoutLimitsError::MaxDescriptorSetStorageBuffersDynamicLimitExceeded { limit, requested }
+				=> write!(f, "The `max_descriptor_set_storage_buffers_dynamic()` limit has been exceeded: limit {} requested {}", limit, requested),
+			PipelineLayoutLimitsError::MaxDescriptorSetSampledImagesLimitExceeded { limit, requested }
+				=> write!(f, "The `max_descriptor_set_sampled_images()` limit has been exceeded: limit {} requested {}", limit, requested),
+			PipelineLayoutLimitsError::MaxDescriptorSetStorageImagesLimitExceeded { limit, requested }
+				=> write!(f, "The `max_descriptor_set_storage_images()` limit has been exceeded: limit {} requested {}", limit, requested),
+			PipelineLayoutLimitsError::MaxDescriptorSetInputAttachmentsLimitExceeded { limit, requested }
+				=> write!(f, "The `max_descriptor_set_input_attachments()` limit has been exceeded: limit {} requested {}", limit, requested)
 		}
 	}
 }
-
-impl fmt::Display for PipelineLayoutLimitsError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for PipelineLayoutLimitsError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
+
 
 // Helper struct for the main function.
 #[derive(Default)]

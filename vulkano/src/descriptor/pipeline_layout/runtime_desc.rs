@@ -85,21 +85,23 @@ pub enum RuntimePipelineDescError {
 	/// Conflict between different push constants ranges.
 	PushConstantsConflict { first_offset: usize, first_size: usize, second_offset: usize }
 }
-
-impl error::Error for RuntimePipelineDescError {
-	fn description(&self) -> &str {
-		match *self {
-			RuntimePipelineDescError::PushConstantsConflict { .. } => {
-				"conflict between different push constants ranges"
-			}
+impl fmt::Display for RuntimePipelineDescError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			RuntimePipelineDescError::PushConstantsConflict {
+				first_offset,
+				first_size,
+				second_offset
+			} => write!(
+				f,
+				"Conflict between different push constants ranges: {} + {} < {}",
+				first_offset, first_size, second_offset
+			)
 		}
 	}
 }
-
-impl fmt::Display for RuntimePipelineDescError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for RuntimePipelineDescError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
 
 #[cfg(test)]

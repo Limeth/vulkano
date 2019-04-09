@@ -6,7 +6,7 @@ use crate::{
 	check_errors,
 	device::Device,
 	format::{Format, FormatTy},
-	image::ViewType,
+	image::ImageViewType,
 	OomError,
 	VulkanObject
 };
@@ -24,7 +24,7 @@ pub struct UnsafeImageView {
 impl UnsafeImageView {
 	/// See the docs of new().
 	pub unsafe fn raw(
-		image: &UnsafeImage, view_type: ViewType, mipmap_levels: Range<u32>,
+		image: &UnsafeImage, view_type: ImageViewType, mipmap_levels: Range<u32>,
 		array_layers: Range<u32>
 	) -> Result<UnsafeImageView, OomError> {
 		let vk = image.device.pointers();
@@ -44,7 +44,7 @@ impl UnsafeImageView {
 		};
 
 		let view_type = {
-			let image_view_type = ViewType::from(image.dimensions);
+			let image_view_type = ImageViewType::from(image.dimensions);
 			let layer_count = array_layers.end - array_layers.start;
 
 			if !view_type.compatible_with(image_view_type) {
@@ -58,16 +58,16 @@ impl UnsafeImageView {
 			}
 
 			match view_type {
-				ViewType::Dim1D => vk::IMAGE_VIEW_TYPE_1D,
-				ViewType::Dim1DArray => vk::IMAGE_VIEW_TYPE_1D_ARRAY,
+				ImageViewType::Dim1D => vk::IMAGE_VIEW_TYPE_1D,
+				ImageViewType::Dim1DArray => vk::IMAGE_VIEW_TYPE_1D_ARRAY,
 
-				ViewType::Dim2D => vk::IMAGE_VIEW_TYPE_2D,
-				ViewType::Dim2DArray => vk::IMAGE_VIEW_TYPE_2D_ARRAY,
+				ImageViewType::Dim2D => vk::IMAGE_VIEW_TYPE_2D,
+				ImageViewType::Dim2DArray => vk::IMAGE_VIEW_TYPE_2D_ARRAY,
 
-				ViewType::Cubemap => vk::IMAGE_VIEW_TYPE_CUBE,
-				ViewType::CubemapArray => vk::IMAGE_VIEW_TYPE_CUBE_ARRAY,
+				ImageViewType::Cubemap => vk::IMAGE_VIEW_TYPE_CUBE,
+				ImageViewType::CubemapArray => vk::IMAGE_VIEW_TYPE_CUBE_ARRAY,
 
-				ViewType::Dim3D => vk::IMAGE_VIEW_TYPE_CUBE_ARRAY
+				ImageViewType::Dim3D => vk::IMAGE_VIEW_TYPE_CUBE_ARRAY
 			}
 		};
 
@@ -123,7 +123,7 @@ impl UnsafeImageView {
 	///   of 6.
 	/// - Panics if the device or host ran out of memory.
 	pub unsafe fn new(
-		image: &UnsafeImage, ty: ViewType, mipmap_levels: Range<u32>, array_layers: Range<u32>
+		image: &UnsafeImage, ty: ImageViewType, mipmap_levels: Range<u32>, array_layers: Range<u32>
 	) -> UnsafeImageView {
 		UnsafeImageView::raw(image, ty, mipmap_levels, array_layers).unwrap()
 	}

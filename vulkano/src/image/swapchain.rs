@@ -18,7 +18,7 @@ use crate::{
 		ImageDimensions,
 		ImageInner,
 		ImageLayout,
-		ViewType
+		ImageViewType
 	},
 	swapchain::Swapchain,
 	sync::AccessError,
@@ -53,7 +53,7 @@ impl<W> SwapchainImage<W> {
 		swapchain: Arc<Swapchain<W>>, id: usize
 	) -> Result<Arc<SwapchainImage<W>>, OomError> {
 		let image = swapchain.raw_image(id).unwrap();
-		let view = UnsafeImageView::raw(&image.image, ViewType::Dim2D, 0 .. 1, 0 .. 1)?;
+		let view = UnsafeImageView::raw(&image.image, ImageViewType::Dim2D, 0 .. 1, 0 .. 1)?;
 
 		Ok(Arc::new(SwapchainImage { swapchain: swapchain.clone(), image_offset: id, view }))
 	}

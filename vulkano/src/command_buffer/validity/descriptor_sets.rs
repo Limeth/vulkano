@@ -78,32 +78,22 @@ pub enum CheckDescriptorSetsValidityError {
 		binding_num: usize
 	}
 }
-
-impl error::Error for CheckDescriptorSetsValidityError {
-	fn description(&self) -> &str {
-		match *self {
-			CheckDescriptorSetsValidityError::MissingDescriptor { .. } => {
-				"a descriptor is missing in the descriptor sets that were provided"
-			}
-			CheckDescriptorSetsValidityError::IncompatibleDescriptor { .. } => {
-				"a descriptor in the provided sets is not compatible with what is expected"
-			}
-		}
-	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			CheckDescriptorSetsValidityError::IncompatibleDescriptor { ref error, .. } => {
-				Some(error)
-			}
-			_ => None
+impl fmt::Display for CheckDescriptorSetsValidityError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			CheckDescriptorSetsValidityError::MissingDescriptor { set_num, binding_num }
+				=> write!(f, "A descriptor is missing in the descriptor sets that were provided: set = {} binding = {}", set_num, binding_num),
+			CheckDescriptorSetsValidityError::IncompatibleDescriptor { error, set_num, binding_num }
+				=> write!(f, "A descriptor in the provided sets is not compatible with what is expected: set = {} binding = {}: {}", set_num, binding_num, error),
 		}
 	}
 }
-
-impl fmt::Display for CheckDescriptorSetsValidityError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
+impl error::Error for CheckDescriptorSetsValidityError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			CheckDescriptorSetsValidityError::IncompatibleDescriptor { error, .. } => Some(error),
+			_ => None
+		}
 	}
 }
 

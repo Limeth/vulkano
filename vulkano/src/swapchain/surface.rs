@@ -537,7 +537,10 @@ impl<W> Surface<W> {
 					modes.as_mut_ptr()
 				))?;
 				modes.set_len(num as usize);
-				debug_assert!(modes.iter().find(|&&m| m == vk::PRESENT_MODE_FIFO_KHR).is_some());
+				debug_assert!(modes
+					.iter()
+					.find(|&&m| { m == vk::PRESENT_MODE_FIFO_KHR })
+					.is_some());
 				debug_assert!(modes.iter().count() > 0);
 				capabilities::supported_present_modes_from_list(modes.into_iter())
 			};

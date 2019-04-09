@@ -1042,19 +1042,21 @@ impl<P> SyncCommandBufferBuilder<P> {
 		}
 
 		self.append_command(Cmd { buffer });
-		self.prev_cmd_resource(KeyTy::Buffer,
-                               0,
-                               false,
-                               PipelineStages {
-                                   draw_indirect: true,
-                                   ..PipelineStages::none()
-                               }, // TODO: is draw_indirect correct?
-                               AccessFlagBits {
-                                   indirect_command_read: true,
-                                   ..AccessFlagBits::none()
-                               },
-                               ImageLayout::Undefined,
-                               ImageLayout::Undefined)?;
+		self.prev_cmd_resource(
+			KeyTy::Buffer,
+			0,
+			false,
+			PipelineStages {
+				draw_indirect: true,
+				..PipelineStages::none()
+			}, // TODO: is draw_indirect correct?
+			AccessFlagBits {
+				indirect_command_read: true,
+				..AccessFlagBits::none()
+			},
+			ImageLayout::Undefined,
+			ImageLayout::Undefined
+		)?;
 		Ok(())
 	}
 

@@ -76,14 +76,14 @@ where
 /// Error that can happen when validating dynamic states.
 #[derive(Debug, Copy, Clone)]
 pub enum CheckDynamicStateValidityError {
-	/// Passed a dynamic line width, while the pipeline doesn't have line width set as dynamic.
+	/// Passed a dynamic line width but the pipeline doesn't have line width set as dynamic.
 	LineWidthNotDynamic,
 	/// The pipeline has a dynamic line width, but no line width value was passed.
 	LineWidthMissing,
 	/// The `wide_lines` extension must be enabled in order to use line width values different
 	/// from 1.0.
 	LineWidthMissingExtension,
-	/// Passed dynamic viewports, while the pipeline doesn't have viewports set as dynamic.
+	/// Passed dynamic viewports but the pipeline doesn't have viewports set as dynamic.
 	ViewportsNotDynamic,
 	/// The pipeline has dynamic viewports, but no viewports were passed.
 	ViewportsMissing,
@@ -94,9 +94,9 @@ pub enum CheckDynamicStateValidityError {
 		/// Number of viewports that were passed.
 		obtained: usize
 	},
-	/// Passed dynamic scissors, while the pipeline doesn't have scissors set as dynamic.
+	/// Passed dynamic scissors but the pipeline doesn't have scissors set as dynamic.
 	ScissorsNotDynamic,
-	/// The pipeline has dynamic scissors, but no scissors were passed.
+	/// The pipeline has dynamic scissors but no scissors were passed.
 	ScissorsMissing,
 	/// The number of dynamic scissors doesn't match the expected number of scissors.
 	ScissorsCountMismatch {
@@ -106,48 +106,32 @@ pub enum CheckDynamicStateValidityError {
 		obtained: usize
 	}
 }
-
-impl error::Error for CheckDynamicStateValidityError {
-	fn description(&self) -> &str {
-		match *self {
-			CheckDynamicStateValidityError::LineWidthNotDynamic => {
-				"passed a dynamic line width, while the pipeline doesn't have line width set as \
-				 dynamic"
-			}
-			CheckDynamicStateValidityError::LineWidthMissing => {
-				"the pipeline has a dynamic line width, but no line width value was passed"
-			}
-			CheckDynamicStateValidityError::LineWidthMissingExtension => {
-				"the `wide_lines` extension must be enabled in order to use line width values \
-				 different from 1.0"
-			}
-			CheckDynamicStateValidityError::ViewportsNotDynamic => {
-				"passed dynamic viewports, while the pipeline doesn't have viewports set as \
-				 dynamic"
-			}
-			CheckDynamicStateValidityError::ViewportsMissing => {
-				"the pipeline has dynamic viewports, but no viewports were passed"
-			}
-			CheckDynamicStateValidityError::ViewportsCountMismatch { .. } => {
-				"the number of dynamic viewports doesn't match the expected number of viewports"
-			}
-			CheckDynamicStateValidityError::ScissorsNotDynamic => {
-				"passed dynamic scissors, while the pipeline doesn't have scissors set as dynamic"
-			}
-			CheckDynamicStateValidityError::ScissorsMissing => {
-				"the pipeline has dynamic scissors, but no scissors were passed"
-			}
-			CheckDynamicStateValidityError::ScissorsCountMismatch { .. } => {
-				"the number of dynamic scissors doesn't match the expected number of scissors"
-			}
+impl fmt::Display for CheckDynamicStateValidityError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			CheckDynamicStateValidityError::LineWidthNotDynamic =>
+				write!(f, "Passed a dynamic line width but the pipeline doesn't have line width set as dynamic"),
+			CheckDynamicStateValidityError::LineWidthMissing =>
+				write!(f, "The pipeline has a dynamic line width, but no line width value was passed"),
+			CheckDynamicStateValidityError::LineWidthMissingExtension =>
+				write!(f, "The `wide_lines` extension must be enabled in order to use line width values different from 1.0"),
+			CheckDynamicStateValidityError::ViewportsNotDynamic =>
+				write!(f, "Passed dynamic viewports but the pipeline doesn't have viewports set as dynamic"),
+			CheckDynamicStateValidityError::ViewportsMissing =>
+				write!(f, "The pipeline has dynamic viewports, but no viewports were passed"),
+			CheckDynamicStateValidityError::ViewportsCountMismatch { expected, obtained }  =>
+				write!(f, "The number of dynamic viewports ({}) doesn't match the expected number of viewports ({})", obtained, expected),
+			CheckDynamicStateValidityError::ScissorsNotDynamic =>
+				write!(f, "Passed dynamic scissors but the pipeline doesn't have scissors set as dynamic"),
+			CheckDynamicStateValidityError::ScissorsMissing =>
+				write!(f, "The pipeline has dynamic scissors, but no scissors were passed"),
+			CheckDynamicStateValidityError::ScissorsCountMismatch { expected, obtained }  =>
+				write!(f, "The number of dynamic scissors ({}) doesn't match the expected number of scissors ({})", obtained, expected)
 		}
 	}
 }
-
-impl fmt::Display for CheckDynamicStateValidityError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for CheckDynamicStateValidityError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
 
 // TODO: tests

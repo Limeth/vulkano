@@ -185,46 +185,43 @@ pub enum SubmitPresentError {
 	/// Not enough memory.
 	OomError(OomError),
 
-	/// The connection to the device has been lost.
+	/// The connection to the device device was lost.
 	DeviceLost,
 
-	/// The surface is no longer accessible and must be recreated.
+	/// The surface was lost.
 	SurfaceLost,
 
-	/// The surface has changed in a way that makes the swapchain unusable. You must query the
-	/// surface's new properties and recreate a new swapchain if you want to continue drawing.
+	/// The swapchain is out of date
+	///
+	/// You must query the surface's new properties and recreate
+	/// a new swapchain if you want to continue drawing.
 	OutOfDate
 }
-
-impl error::Error for SubmitPresentError {
-	fn description(&self) -> &str {
-		match *self {
-			SubmitPresentError::OomError(_) => "not enough memory",
-			SubmitPresentError::DeviceLost => "the connection to the device has been lost",
-			SubmitPresentError::SurfaceLost => "the surface of this swapchain is no longer valid",
-			SubmitPresentError::OutOfDate => "the swapchain needs to be recreated"
+impl fmt::Display for SubmitPresentError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			SubmitPresentError::OomError(e) => e.fmt(f),
+			SubmitPresentError::DeviceLost => {
+				write!(f, "The connection to the device device was lost")
+			}
+			SubmitPresentError::SurfaceLost => write!(f, "The surface was lost"),
+			SubmitPresentError::OutOfDate => write!(f, "The swapchain is out of date")
 		}
 	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			SubmitPresentError::OomError(ref err) => Some(err),
+}
+impl error::Error for SubmitPresentError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			SubmitPresentError::OomError(e) => e.source(),
 			_ => None
 		}
 	}
 }
-
-impl fmt::Display for SubmitPresentError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
-}
-
 impl From<Error> for SubmitPresentError {
 	fn from(err: Error) -> SubmitPresentError {
 		match err {
-			err @ Error::OutOfHostMemory => SubmitPresentError::OomError(OomError::from(err)),
-			err @ Error::OutOfDeviceMemory => SubmitPresentError::OomError(OomError::from(err)),
+			Error::OutOfHostMemory => SubmitPresentError::OomError(OomError::from(err)),
+			Error::OutOfDeviceMemory => SubmitPresentError::OomError(OomError::from(err)),
 			Error::DeviceLost => SubmitPresentError::DeviceLost,
 			Error::SurfaceLost => SubmitPresentError::SurfaceLost,
 			Error::OutOfDate => SubmitPresentError::OutOfDate,

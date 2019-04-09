@@ -226,32 +226,23 @@ pub enum QueryPoolCreationError {
 	/// A pipeline statistics pool was requested but the corresponding feature wasn't enabled.
 	PipelineStatisticsQueryFeatureNotEnabled
 }
-
-impl error::Error for QueryPoolCreationError {
-	fn description(&self) -> &str {
-		match *self {
-			QueryPoolCreationError::OomError(_) => "not enough memory available",
-			QueryPoolCreationError::PipelineStatisticsQueryFeatureNotEnabled => {
-				"a pipeline statistics pool was requested but the corresponding feature \
-				 wasn't enabled"
-			}
+impl fmt::Display for QueryPoolCreationError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			QueryPoolCreationError::OomError(e) => e.fmt(f),
+			QueryPoolCreationError::PipelineStatisticsQueryFeatureNotEnabled
+			=> write!(f, "A pipeline statistics pool was requested but the corresponding feature wasn't enabled")
 		}
 	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			QueryPoolCreationError::OomError(ref err) => Some(err),
+}
+impl error::Error for QueryPoolCreationError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			QueryPoolCreationError::OomError(e) => e.source(),
 			_ => None
 		}
 	}
 }
-
-impl fmt::Display for QueryPoolCreationError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
-}
-
 impl From<OomError> for QueryPoolCreationError {
 	fn from(err: OomError) -> QueryPoolCreationError { QueryPoolCreationError::OomError(err) }
 }

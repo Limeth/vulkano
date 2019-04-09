@@ -132,7 +132,11 @@ impl UnsafeCommandPool {
 			}
 
 			let vk = self.device.pointers();
-			vk.TrimCommandPoolKHR(self.device.internal_object(), self.pool, 0 /* reserved */);
+			vk.TrimCommandPoolKHR(
+				self.device.internal_object(),
+				self.pool,
+				0 // reserved
+			);
 			Ok(())
 		}
 	}
@@ -256,23 +260,14 @@ pub enum CommandPoolTrimError {
 	/// The `KHR_maintenance1` extension was not enabled.
 	Maintenance1ExtensionNotEnabled
 }
-
-impl error::Error for CommandPoolTrimError {
-	fn description(&self) -> &str {
-		match *self {
-			CommandPoolTrimError::Maintenance1ExtensionNotEnabled => {
-				"the `KHR_maintenance1` extension was not enabled"
-			}
-		}
-	}
-}
-
 impl fmt::Display for CommandPoolTrimError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "The `KHR_maintenance1` extension was not enabled")
 	}
 }
-
+impl error::Error for CommandPoolTrimError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
+}
 impl From<Error> for CommandPoolTrimError {
 	fn from(err: Error) -> CommandPoolTrimError { panic!("unexpected error: {:?}", err) }
 }

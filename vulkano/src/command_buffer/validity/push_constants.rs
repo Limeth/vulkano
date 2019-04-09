@@ -35,19 +35,15 @@ pub enum CheckPushConstantsValidityError {
 	/// The push constants are incompatible with the pipeline layout.
 	IncompatiblePushConstants
 }
-
-impl error::Error for CheckPushConstantsValidityError {
-	fn description(&self) -> &str {
-		match *self {
+impl fmt::Display for CheckPushConstantsValidityError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
 			CheckPushConstantsValidityError::IncompatiblePushConstants => {
-				"the push constants are incompatible with the pipeline layout"
+				write!(f, "The push constants are incompatible with the pipeline layout")
 			}
 		}
 	}
 }
-
-impl fmt::Display for CheckPushConstantsValidityError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for CheckPushConstantsValidityError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }

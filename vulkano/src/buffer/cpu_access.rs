@@ -447,24 +447,20 @@ pub enum ReadLockError {
 	/// The buffer is already locked for write mode by the GPU.
 	GpuWriteLocked
 }
-
-impl error::Error for ReadLockError {
-	fn description(&self) -> &str {
-		match *self {
+impl fmt::Display for ReadLockError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
 			ReadLockError::CpuWriteLocked => {
-				"the buffer is already locked for write mode by the CPU"
+				write!(f, "The buffer is already write-locked by the CPU")
 			}
 			ReadLockError::GpuWriteLocked => {
-				"the buffer is already locked for write mode by the GPU"
+				write!(f, "The buffer is already write-locked by the GPU")
 			}
 		}
 	}
 }
-
-impl fmt::Display for ReadLockError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for ReadLockError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
 
 /// Object that can be used to read or write the content of a `CpuAccessibleBuffer`.
@@ -507,20 +503,16 @@ pub enum WriteLockError {
 	/// The buffer is already locked by the GPU.
 	GpuLocked
 }
-
-impl error::Error for WriteLockError {
-	fn description(&self) -> &str {
-		match *self {
-			WriteLockError::CpuLocked => "the buffer is already locked by the CPU",
-			WriteLockError::GpuLocked => "the buffer is already locked by the GPU"
+impl fmt::Display for WriteLockError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			WriteLockError::CpuLocked => write!(f, "The buffer is already locked by the CPU"),
+			WriteLockError::GpuLocked => write!(f, "The buffer is already locked by the GPU")
 		}
 	}
 }
-
-impl fmt::Display for WriteLockError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for WriteLockError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
 
 #[cfg(test)]

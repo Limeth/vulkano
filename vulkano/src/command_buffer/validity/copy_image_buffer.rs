@@ -131,48 +131,37 @@ pub enum CheckCopyBufferImageError {
 		actual_len: usize
 	}
 }
-
-impl error::Error for CheckCopyBufferImageError {
-	fn description(&self) -> &str {
-		match *self {
+impl fmt::Display for CheckCopyBufferImageError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
 			CheckCopyBufferImageError::SourceMissingTransferUsage => {
-				"the source buffer is missing the transfer source usage"
+				write!(f, "The source buffer or image is missing the transfer source usage")
 			}
-			CheckCopyBufferImageError::DestinationMissingTransferUsage => {
-				"the destination buffer is missing the transfer destination usage"
-			}
+			CheckCopyBufferImageError::DestinationMissingTransferUsage => write!(
+				f,
+				"The destination buffer or image is missing the transfer destination usage"
+			),
 			CheckCopyBufferImageError::OverlappingRanges => {
-				"the source and destination are overlapping"
+				write!(f, "The source and destination are overlapping")
 			}
 			CheckCopyBufferImageError::UnexpectedMultisampled => {
-				"the image must not be multisampled"
+				write!(f, "The image must not be multisampled")
 			}
 			CheckCopyBufferImageError::ImageCoordinatesOutOfRange => {
-				"the image coordinates are out of range"
+				write!(f, "The image coordinates are out of range")
 			}
-			CheckCopyBufferImageError::WrongPixelType(_) => {
-				"the type of pixels in the buffer isn't compatible with the image format"
-			}
-			CheckCopyBufferImageError::BufferTooSmall { .. } => {
-				"the buffer is too small for the copy operation"
-			}
-		}
-	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			CheckCopyBufferImageError::WrongPixelType(ref err) => Some(err),
-			_ => None
+			CheckCopyBufferImageError::WrongPixelType(e) => e.fmt(f),
+			CheckCopyBufferImageError::BufferTooSmall { required_len, actual_len } => write!(
+				f,
+				"The buffer is too small ({}) for the copy operation ({})",
+				actual_len, required_len
+			)
 		}
 	}
 }
-
-impl fmt::Display for CheckCopyBufferImageError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for CheckCopyBufferImageError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
-
 impl From<IncompatiblePixelsType> for CheckCopyBufferImageError {
 	fn from(err: IncompatiblePixelsType) -> CheckCopyBufferImageError {
 		CheckCopyBufferImageError::WrongPixelType(err)

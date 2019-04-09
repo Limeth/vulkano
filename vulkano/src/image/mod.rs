@@ -379,31 +379,16 @@ impl ImageDimensions {
 	}
 
 	/// Returns true if these are array dimensions.
-	pub fn is_array(&self) -> bool {
-		match self {
-			ImageDimensions::Dim1DArray { .. }
-			| ImageDimensions::Dim2DArray { .. }
-			| ImageDimensions::Cubemap { .. }
-			| ImageDimensions::CubemapArray { .. } => true,
-			_ => false
-		}
-	}
+	pub fn is_array(&self) -> bool { ImageViewType::from(*self).is_array() }
 
 	/// Returns the number of dimensions these dimensions have.
-	pub fn dimensions(&self) -> u32 {
-		match self {
-			ImageDimensions::Dim1D { .. } | ImageDimensions::Dim1DArray { .. } => 1,
-			ImageDimensions::Dim2D { .. }
-			| ImageDimensions::Dim2DArray { .. }
-			| ImageDimensions::Cubemap { .. }
-			| ImageDimensions::CubemapArray { .. } => 2,
-			ImageDimensions::Dim3D { .. } => 3
-		}
+	pub fn dimension_type(&self) -> ImageDimensionType {
+		ImageViewType::from(*self).dimension_type()
 	}
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ViewType {
+pub enum ImageViewType {
 	Dim1D,
 	Dim1DArray,
 
@@ -415,44 +400,44 @@ pub enum ViewType {
 
 	Dim3D
 }
-impl From<ImageDimensions> for ViewType {
+impl From<ImageDimensions> for ImageViewType {
 	fn from(dims: ImageDimensions) -> Self {
 		match dims {
-			ImageDimensions::Dim1D { .. } => ViewType::Dim1D,
-			ImageDimensions::Dim1DArray { .. } => ViewType::Dim1DArray,
+			ImageDimensions::Dim1D { .. } => ImageViewType::Dim1D,
+			ImageDimensions::Dim1DArray { .. } => ImageViewType::Dim1DArray,
 
-			ImageDimensions::Dim2D { .. } => ViewType::Dim2D,
-			ImageDimensions::Dim2DArray { .. } => ViewType::Dim2DArray,
+			ImageDimensions::Dim2D { .. } => ImageViewType::Dim2D,
+			ImageDimensions::Dim2DArray { .. } => ImageViewType::Dim2DArray,
 
-			ImageDimensions::Cubemap { .. } => ViewType::Cubemap,
-			ImageDimensions::CubemapArray { .. } => ViewType::CubemapArray,
+			ImageDimensions::Cubemap { .. } => ImageViewType::Cubemap,
+			ImageDimensions::CubemapArray { .. } => ImageViewType::CubemapArray,
 
-			ImageDimensions::Dim3D { .. } => ViewType::Dim3D
+			ImageDimensions::Dim3D { .. } => ImageViewType::Dim3D
 		}
 	}
 }
-impl ViewType {
+impl ImageViewType {
 	/// Returns true if an image view of type `self` can
 	/// be created for an image with dimensions of type `other`.
-	pub fn compatible_with(&self, other: ViewType) -> bool {
+	pub fn compatible_with(&self, other: ImageViewType) -> bool {
 		if *self == other {
 			return true
 		}
 
 		match (self, other) {
-			(ViewType::Dim1D, ViewType::Dim1DArray) => true,
-			(ViewType::Dim1DArray, ViewType::Dim1DArray) => true,
+			(ImageViewType::Dim1D, ImageViewType::Dim1DArray) => true,
+			(ImageViewType::Dim1DArray, ImageViewType::Dim1DArray) => true,
 
-			(ViewType::Dim2D, ViewType::Dim2DArray)
-			| (ViewType::Dim2D, ViewType::Cubemap)
-			| (ViewType::Dim2D, ViewType::CubemapArray) => true,
-			(ViewType::Dim2DArray, ViewType::Cubemap)
-			| (ViewType::Dim1DArray, ViewType::CubemapArray) => true,
+			(ImageViewType::Dim2D, ImageViewType::Dim2DArray)
+			| (ImageViewType::Dim2D, ImageViewType::Cubemap)
+			| (ImageViewType::Dim2D, ImageViewType::CubemapArray) => true,
+			(ImageViewType::Dim2DArray, ImageViewType::Cubemap)
+			| (ImageViewType::Dim1DArray, ImageViewType::CubemapArray) => true,
 
-			(ViewType::Cubemap, ViewType::CubemapArray) => true,
-			(ViewType::CubemapArray, ViewType::CubemapArray) => true,
+			(ImageViewType::Cubemap, ImageViewType::CubemapArray) => true,
+			(ImageViewType::CubemapArray, ImageViewType::CubemapArray) => true,
 
-			(ViewType::Dim3D, ViewType::Dim3D) => true,
+			(ImageViewType::Dim3D, ImageViewType::Dim3D) => true,
 
 			_ => false
 		}
@@ -461,24 +446,50 @@ impl ViewType {
 	/// Returns true if this view type can be an array.
 	pub fn is_array(&self) -> bool {
 		match self {
-			ViewType::Dim1DArray
-			| ViewType::Dim2DArray
-			| ViewType::Cubemap
-			| ViewType::CubemapArray => true,
+			ImageViewType::Dim1DArray
+			| ImageViewType::Dim2DArray
+			| ImageViewType::Cubemap
+			| ImageViewType::CubemapArray => true,
 			_ => false
 		}
 	}
 
-	/// Returns the number of dimensions this type has.
-	pub fn dimensions(&self) -> u32 {
+	/// Returns the ImageDimensionType this type has.
+	pub fn dimension_type(&self) -> ImageDimensionType { ImageDimensionType::from(*self) }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ImageDimensionType {
+	D1,
+	D2,
+	Cube,
+	D3
+}
+impl ImageDimensionType {
+	/// Returns the number of dimensions.
+	pub fn number(&self) -> u32 {
 		match self {
-			ViewType::Dim1D | ViewType::Dim1DArray => 1,
-			ViewType::Dim2D | ViewType::Dim2DArray | ViewType::Cubemap | ViewType::CubemapArray => {
-				2
-			}
-			ViewType::Dim3D => 3
+			ImageDimensionType::D1 => 1,
+			ImageDimensionType::D2 | ImageDimensionType::Cube => 2,
+			ImageDimensionType::D3 => 3
 		}
 	}
+}
+impl From<ImageViewType> for ImageDimensionType {
+	fn from(view_type: ImageViewType) -> Self {
+		match view_type {
+			ImageViewType::Dim1D | ImageViewType::Dim1DArray => ImageDimensionType::D1,
+			ImageViewType::Dim2D | ImageViewType::Dim2DArray => ImageDimensionType::D2,
+			ImageViewType::Cubemap | ImageViewType::CubemapArray => ImageDimensionType::Cube,
+			ImageViewType::Dim3D => ImageDimensionType::D3
+		}
+	}
+}
+impl From<ImageDimensions> for ImageDimensionType {
+	fn from(dims: ImageDimensions) -> Self { ImageDimensionType::from(ImageViewType::from(dims)) }
+}
+impl Into<u32> for ImageDimensionType {
+	fn into(self) -> u32 { self.number() }
 }
 
 #[cfg(test)]

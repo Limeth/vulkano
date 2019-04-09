@@ -584,42 +584,33 @@ pub enum DeviceCreationError {
 	/// There is no memory available on the device (ie. video memory).
 	OutOfDeviceMemory
 }
-
-impl error::Error for DeviceCreationError {
-	fn description(&self) -> &str {
-		match *self {
-			DeviceCreationError::InitializationFailed => {
-				"failed to create the device for an implementation-specific reason"
-			}
-			DeviceCreationError::OutOfHostMemory => "no memory available on the host",
-			DeviceCreationError::OutOfDeviceMemory => "no memory available on the graphical device",
-			DeviceCreationError::DeviceLost => "failed to connect to the device",
-			DeviceCreationError::TooManyQueuesForFamily => {
-				"tried to create too many queues for a given family"
-			}
-			DeviceCreationError::FeatureNotPresent => {
-				"some of the requested features are unsupported by the physical device"
-			}
-			DeviceCreationError::PriorityOutOfRange => {
-				"the priority of one of the queues is out of the [0.0; 1.0] range"
-			}
-			DeviceCreationError::ExtensionNotPresent => {
-				"some of the requested device extensions are not supported by the physical device"
-			}
-			DeviceCreationError::TooManyObjects => {
-				"you have reached the limit to the number of devices that can be created from the
-                 same physical device"
-			}
+impl fmt::Display for DeviceCreationError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			DeviceCreationError::InitializationFailed
+				=> write!(f, "Failed to create the device for an implementation-specific reason"),
+			DeviceCreationError::TooManyObjects
+				=> write!(f, "You have reached the limit to the number of devices that can be created from the same physical device"),
+			DeviceCreationError::DeviceLost
+				=> write!(f, "Failed to connect to the device"),
+			DeviceCreationError::FeatureNotPresent
+				=> write!(f, "Some of the requested features are unsupported by the physical device"),
+			DeviceCreationError::ExtensionNotPresent
+				=> write!(f, "Some of the requested device extensions are not supported by the physical device"),
+			DeviceCreationError::TooManyQueuesForFamily
+				=> write!(f, "Tried to create too many queues for a given family"),
+			DeviceCreationError::PriorityOutOfRange
+				=> write!(f, "The priority of one of the queues is out of the [0.0; 1.0] range"),
+			DeviceCreationError::OutOfHostMemory
+				=> write!(f, "There is no memory available on the host (ie. the CPU, RAM, etc.)"),
+			DeviceCreationError::OutOfDeviceMemory
+				=> write!(f, "There is no memory available on the device (ie. video memory)")
 		}
 	}
 }
-
-impl fmt::Display for DeviceCreationError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for DeviceCreationError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
-
 impl From<Error> for DeviceCreationError {
 	fn from(err: Error) -> DeviceCreationError {
 		match err {

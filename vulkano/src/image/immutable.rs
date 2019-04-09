@@ -303,7 +303,7 @@ where
 		if expected_layout != self.layout && expected_layout != ImageLayout::Undefined {
 			return Err(AccessError::UnexpectedImageLayout {
 				requested: expected_layout,
-				allowed: self.layout
+				expected: self.layout
 			})
 		}
 
@@ -377,7 +377,7 @@ where
 		if expected_layout != ImageLayout::Undefined {
 			return Err(AccessError::UnexpectedImageLayout {
 				requested: expected_layout,
-				allowed: ImageLayout::Undefined
+				expected: ImageLayout::Undefined
 			})
 		}
 

@@ -51,35 +51,30 @@ pub struct CheckIndexBuffer {
 /// Error that can happen when checking whether binding an index buffer is valid.
 #[derive(Debug, Copy, Clone)]
 pub enum CheckIndexBufferError {
-	/// The "index buffer" usage must be enabled on the index buffer.
+	/// The buffer is missing the index buffer usage.
 	BufferMissingUsage,
 	/// The data or size must be 4-bytes aligned.
 	WrongAlignment,
 	/// The type of the indices is not supported by the device.
 	UnsupportIndexType
 }
-
-impl error::Error for CheckIndexBufferError {
-	fn description(&self) -> &str {
-		match *self {
+impl fmt::Display for CheckIndexBufferError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
 			CheckIndexBufferError::BufferMissingUsage => {
-				"the index buffer usage must be enabled on the index buffer"
+				write!(f, "The buffer is missing the index buffer usage")
 			}
 			CheckIndexBufferError::WrongAlignment => {
-				"the sum of offset and the address of the range of VkDeviceMemory object that is \
-				 backing buffer, must be a multiple of the type indicated by indexType"
+				write!(f, "The data or size must be 4-bytes aligned")
 			}
 			CheckIndexBufferError::UnsupportIndexType => {
-				"the type of the indices is not supported by the device"
+				write!(f, "The type of the indices is not supported by the device")
 			}
 		}
 	}
 }
-
-impl fmt::Display for CheckIndexBufferError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for CheckIndexBufferError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
 
 #[cfg(test)]

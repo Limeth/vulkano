@@ -231,39 +231,32 @@ pub enum SubmitCommandBufferError {
 	/// Not enough memory.
 	OomError(OomError),
 
-	/// The connection to the device has been lost.
+	/// The connection to the device device was lost.
 	DeviceLost
 }
-
-impl error::Error for SubmitCommandBufferError {
-	fn description(&self) -> &str {
-		match *self {
-			SubmitCommandBufferError::OomError(_) => "not enough memory",
-			SubmitCommandBufferError::DeviceLost => "the connection to the device has been lost"
+impl fmt::Display for SubmitCommandBufferError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			SubmitCommandBufferError::OomError(e) => e.fmt(f),
+			SubmitCommandBufferError::DeviceLost => {
+				write!(f, "The connection to the device device was lost")
+			}
 		}
 	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			SubmitCommandBufferError::OomError(ref err) => Some(err),
+}
+impl error::Error for SubmitCommandBufferError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			SubmitCommandBufferError::OomError(e) => e.source(),
 			_ => None
 		}
 	}
 }
-
-impl fmt::Display for SubmitCommandBufferError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
-}
-
 impl From<Error> for SubmitCommandBufferError {
 	fn from(err: Error) -> SubmitCommandBufferError {
 		match err {
-			err @ Error::OutOfHostMemory => SubmitCommandBufferError::OomError(OomError::from(err)),
-			err @ Error::OutOfDeviceMemory => {
-				SubmitCommandBufferError::OomError(OomError::from(err))
-			}
+			Error::OutOfHostMemory => SubmitCommandBufferError::OomError(OomError::from(err)),
+			Error::OutOfDeviceMemory => SubmitCommandBufferError::OomError(OomError::from(err)),
 			Error::DeviceLost => SubmitCommandBufferError::DeviceLost,
 			_ => panic!("unexpected error: {:?}", err)
 		}

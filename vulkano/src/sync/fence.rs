@@ -339,36 +339,30 @@ pub enum FenceWaitError {
 	/// Not enough memory to complete the wait.
 	OomError(OomError),
 
-	/// The specified timeout wasn't long enough.
+	/// The fence wasn't signaled in specified time.
 	Timeout,
 
-	/// The device has been lost.
+	/// The device was lost.
 	DeviceLostError
 }
+impl fmt::Display for FenceWaitError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			FenceWaitError::OomError(e) => e.fmt(f),
 
-impl error::Error for FenceWaitError {
-	fn description(&self) -> &str {
-		match *self {
-			FenceWaitError::OomError(_) => "no memory available",
-			FenceWaitError::Timeout => "the timeout has been reached",
-			FenceWaitError::DeviceLostError => "the device was lost"
+			FenceWaitError::Timeout => write!(f, "The fence wasn't signaled in specified time"),
+			FenceWaitError::DeviceLostError => write!(f, "The device was lost")
 		}
 	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			FenceWaitError::OomError(ref err) => Some(err),
+}
+impl error::Error for FenceWaitError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			FenceWaitError::OomError(e) => e.source(),
 			_ => None
 		}
 	}
 }
-
-impl fmt::Display for FenceWaitError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
-}
-
 impl From<Error> for FenceWaitError {
 	fn from(err: Error) -> FenceWaitError {
 		match err {

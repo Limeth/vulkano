@@ -452,28 +452,26 @@ pub enum DescriptorPoolAllocError {
 	/// There is no more space available in the descriptor pool.
 	OutOfPoolMemory
 }
-
-impl error::Error for DescriptorPoolAllocError {
-	fn description(&self) -> &str {
-		match *self {
-			DescriptorPoolAllocError::OutOfHostMemory => "no memory available on the host",
+impl fmt::Display for DescriptorPoolAllocError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			DescriptorPoolAllocError::OutOfHostMemory => {
+				write!(f, "There is no memory available on the host (ie. the CPU, RAM, etc.)")
+			}
 			DescriptorPoolAllocError::OutOfDeviceMemory => {
-				"no memory available on the graphical device"
+				write!(f, "There is no memory available on the device (ie. video memory)")
 			}
 			DescriptorPoolAllocError::FragmentedPool => {
-				"allocation has failed because the pool is too fragmented"
+				write!(f, "Allocation has failed because the pool is too fragmented")
 			}
 			DescriptorPoolAllocError::OutOfPoolMemory => {
-				"there is no more space available in the descriptor pool"
+				write!(f, "There is no more space available in the descriptor pool")
 			}
 		}
 	}
 }
-
-impl fmt::Display for DescriptorPoolAllocError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for DescriptorPoolAllocError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
 
 /// Iterator to the descriptor sets allocated from an unsafe descriptor pool.

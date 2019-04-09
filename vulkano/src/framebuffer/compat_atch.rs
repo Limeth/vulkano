@@ -90,8 +90,7 @@ where
 /// Error that can happen when an image is not compatible with a render pass attachment slot.
 #[derive(Copy, Clone, Debug)]
 pub enum IncompatibleRenderPassAttachmentError {
-	/// The image format expected by the render pass doesn't match the actual format of
-	/// the image.
+	/// The obtained image format doesn't match the image format expected.
 	FormatMismatch {
 		/// Format expected by the render pass.
 		expected: Format,
@@ -99,8 +98,7 @@ pub enum IncompatibleRenderPassAttachmentError {
 		obtained: Format
 	},
 
-	/// The number of samples expected by the render pass doesn't match the number of samples of
-	/// the image.
+	/// The number of image samples obtained doesn't match the number of image samples expected.
 	SamplesMismatch {
 		/// Number of samples expected by the render pass.
 		expected: u32,
@@ -114,46 +112,32 @@ pub enum IncompatibleRenderPassAttachmentError {
 	/// The image is used as a color attachment but is missing the color attachment usage.
 	MissingColorAttachmentUsage,
 
-	/// The image is used as a depth/stencil attachment but is missing the depth-stencil attachment
-	/// usage.
+	/// The image is used as a depth/stencil attachment but is missing the depth-stencil attachment usage.
 	MissingDepthStencilAttachmentUsage,
 
 	/// The image is used as an input attachment but is missing the input attachment usage.
 	MissingInputAttachmentUsage
 }
-
-impl error::Error for IncompatibleRenderPassAttachmentError {
-	fn description(&self) -> &str {
-		match *self {
-			IncompatibleRenderPassAttachmentError::FormatMismatch { .. } => {
-				"mismatch between the format expected by the render pass and the actual format"
-			}
-			IncompatibleRenderPassAttachmentError::SamplesMismatch { .. } => {
-				"mismatch between the number of samples expected by the render pass and the actual \
-				 number of samples"
-			}
-			IncompatibleRenderPassAttachmentError::NotIdentitySwizzled => {
-				"the image view does not use identity swizzling"
-			}
-			IncompatibleRenderPassAttachmentError::MissingColorAttachmentUsage => {
-				"the image is used as a color attachment but is missing the color attachment usage"
-			}
-			IncompatibleRenderPassAttachmentError::MissingDepthStencilAttachmentUsage => {
-				"the image is used as a depth/stencil attachment but is missing the depth-stencil \
-				 attachment usage"
-			}
-			IncompatibleRenderPassAttachmentError::MissingInputAttachmentUsage => {
-				"the image is used as an input attachment but is missing the input \
-				 attachment usage"
-			}
+impl fmt::Display for IncompatibleRenderPassAttachmentError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			IncompatibleRenderPassAttachmentError::FormatMismatch { expected, obtained }
+			=> write!(f, "The obtained image format ({:?}) doesn't match the image format expected ({:?})", obtained, expected),
+			IncompatibleRenderPassAttachmentError::SamplesMismatch { expected, obtained }
+			=> write!(f, "The number of image samples obtained ({}) doesn't match the number of image samples expected ({})", obtained, expected),
+			IncompatibleRenderPassAttachmentError::NotIdentitySwizzled
+			=> write!(f, "The image view has a component swizzle that is different from identity"),
+			IncompatibleRenderPassAttachmentError::MissingColorAttachmentUsage
+			=> write!(f, "The image is used as a color attachment but is missing the color attachment usage"),
+			IncompatibleRenderPassAttachmentError::MissingDepthStencilAttachmentUsage
+			=> write!(f, "The image is used as a depth/stencil attachment but is missing the depth-stencil attachment usage"),
+			IncompatibleRenderPassAttachmentError::MissingInputAttachmentUsage
+			=> write!(f, "The image is used as an input attachment but is missing the input attachment usage")
 		}
 	}
 }
-
-impl fmt::Display for IncompatibleRenderPassAttachmentError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for IncompatibleRenderPassAttachmentError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
 
 #[cfg(test)]

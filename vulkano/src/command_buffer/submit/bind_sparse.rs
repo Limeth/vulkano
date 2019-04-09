@@ -423,32 +423,27 @@ pub enum SubmitBindSparseError {
 	/// Not enough memory.
 	OomError(OomError),
 
-	/// The connection to the device has been lost.
+	/// The connection to the device device was lost.
 	DeviceLost
 }
-
-impl error::Error for SubmitBindSparseError {
-	fn description(&self) -> &str {
-		match *self {
-			SubmitBindSparseError::OomError(_) => "not enough memory",
-			SubmitBindSparseError::DeviceLost => "the connection to the device has been lost"
+impl fmt::Display for SubmitBindSparseError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			SubmitBindSparseError::OomError(e) => e.fmt(f),
+			SubmitBindSparseError::DeviceLost => {
+				write!(f, "The connection to the device device was lost")
+			}
 		}
 	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			SubmitBindSparseError::OomError(ref err) => Some(err),
+}
+impl error::Error for SubmitBindSparseError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			SubmitBindSparseError::OomError(e) => e.source(),
 			_ => None
 		}
 	}
 }
-
-impl fmt::Display for SubmitBindSparseError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
-}
-
 impl From<Error> for SubmitBindSparseError {
 	fn from(err: Error) -> SubmitBindSparseError {
 		match err {

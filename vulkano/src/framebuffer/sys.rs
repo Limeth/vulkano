@@ -470,40 +470,31 @@ pub enum RenderPassCreationError {
 	/// The maximum number of color attachments has been exceeded.
 	ColorAttachmentsLimitExceeded
 }
-
-impl error::Error for RenderPassCreationError {
-	fn description(&self) -> &str {
-		match *self {
-			RenderPassCreationError::OomError(_) => "not enough memory available",
-			RenderPassCreationError::ColorAttachmentsLimitExceeded => {
-				"the maximum number of color attachments has been exceeded"
-			}
+impl fmt::Display for RenderPassCreationError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			RenderPassCreationError::OomError(e) => e.fmt(f),
+			RenderPassCreationError::ColorAttachmentsLimitExceeded
+			=> write!(f, "The maximum number of color attachments has been exceeded")
 		}
 	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			RenderPassCreationError::OomError(ref err) => Some(err),
+}
+impl error::Error for RenderPassCreationError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			RenderPassCreationError::OomError(e) => e.source(),
 			_ => None
 		}
 	}
 }
-
-impl fmt::Display for RenderPassCreationError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
-}
-
 impl From<OomError> for RenderPassCreationError {
 	fn from(err: OomError) -> RenderPassCreationError { RenderPassCreationError::OomError(err) }
 }
-
 impl From<Error> for RenderPassCreationError {
 	fn from(err: Error) -> RenderPassCreationError {
 		match err {
-			err @ Error::OutOfHostMemory => RenderPassCreationError::OomError(OomError::from(err)),
-			err @ Error::OutOfDeviceMemory => {
+			Error::OutOfHostMemory => RenderPassCreationError::OomError(OomError::from(err)),
+			Error::OutOfDeviceMemory => {
 				RenderPassCreationError::OomError(OomError::from(err))
 			}
 			_ => panic!("unexpected error: {:?}", err)

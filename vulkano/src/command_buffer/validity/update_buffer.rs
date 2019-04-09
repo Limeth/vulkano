@@ -53,32 +53,30 @@ where
 /// Error that can happen when attempting to add an `update_buffer` command.
 #[derive(Debug, Copy, Clone)]
 pub enum CheckUpdateBufferError {
-	/// The "transfer destination" usage must be enabled on the buffer.
+	/// The buffer is missing the transfer destination usage.
 	BufferMissingUsage,
 	/// The data or size must be 4-bytes aligned.
 	WrongAlignment,
-	/// The data must not be larger than 64k bytes.
+	/// The data must not be larger than 64 kilobytes.
 	DataTooLarge
 }
-
-impl error::Error for CheckUpdateBufferError {
-	fn description(&self) -> &str {
-		match *self {
+impl fmt::Display for CheckUpdateBufferError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
 			CheckUpdateBufferError::BufferMissingUsage => {
-				"the transfer destination usage must be enabled on the buffer"
+				write!(f, "The buffer is missing the transfer destination usage")
 			}
 			CheckUpdateBufferError::WrongAlignment => {
-				"the offset or size are not aligned to 4 bytes"
+				write!(f, "The data or size must be 4-bytes aligned")
 			}
-			CheckUpdateBufferError::DataTooLarge => "data is too large"
+			CheckUpdateBufferError::DataTooLarge => {
+				write!(f, "The data must not be larger than 64 kilobytes")
+			}
 		}
 	}
 }
-
-impl fmt::Display for CheckUpdateBufferError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for CheckUpdateBufferError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
 
 #[cfg(test)]

@@ -12,7 +12,7 @@ use std::{error, fmt};
 use crate::{
 	device::Device,
 	format::{FormatTy, PossibleCompressedFormatDesc},
-	image::ImageAccess,
+	image::{ImageAccess, ImageDimensionType},
 	VulkanObject
 };
 
@@ -122,8 +122,8 @@ where
 		return Err(CheckCopyImageError::DestinationCoordinatesOutOfRange)
 	}
 
-	match source_dimensions.dimensions() {
-		1 => {
+	match source_dimensions.dimension_type() {
+		ImageDimensionType::D1 => {
 			if source_offset[1] != 0 || extent[1] != 1 {
 				return Err(CheckCopyImageError::IncompatibleRangeForImageType)
 			}
@@ -131,17 +131,16 @@ where
 				return Err(CheckCopyImageError::IncompatibleRangeForImageType)
 			}
 		}
-		2 => {
+		ImageDimensionType::D2 | ImageDimensionType::Cube => {
 			if source_offset[2] != 0 || extent[2] != 1 {
 				return Err(CheckCopyImageError::IncompatibleRangeForImageType)
 			}
 		}
-		3 => {}
-		_ => unreachable!()
+		ImageDimensionType::D3 => {}
 	}
 
-	match destination_dimensions.dimensions() {
-		1 => {
+	match destination_dimensions.dimension_type() {
+		ImageDimensionType::D1 => {
 			if destination_offset[1] != 0 || extent[1] != 1 {
 				return Err(CheckCopyImageError::IncompatibleRangeForImageType)
 			}
@@ -149,13 +148,12 @@ where
 				return Err(CheckCopyImageError::IncompatibleRangeForImageType)
 			}
 		}
-		2 => {
+		ImageDimensionType::D2 | ImageDimensionType::Cube => {
 			if destination_offset[2] != 0 || extent[2] != 1 {
 				return Err(CheckCopyImageError::IncompatibleRangeForImageType)
 			}
 		}
-		3 => {}
-		_ => unreachable!()
+		ImageDimensionType::D3 => {}
 	}
 
 	Ok(())
@@ -181,43 +179,21 @@ pub enum CheckCopyImageError {
 	/// The offsets or extent are incompatible with the image type.
 	IncompatibleRangeForImageType
 }
-
-impl error::Error for CheckCopyImageError {
-	fn description(&self) -> &str {
-		match *self {
-			CheckCopyImageError::MissingTransferSourceUsage => {
-				"the source is missing the transfer source usage"
-			}
-			CheckCopyImageError::MissingTransferDestinationUsage => {
-				"the destination is missing the transfer destination usage"
-			}
-			CheckCopyImageError::SampleCountMismatch => {
-				"the number of samples in the source and destination do not match"
-			}
-			CheckCopyImageError::DepthStencilFormatMismatch => {
-				"the format of the source and destination must be equal when copying \
-				 depth/stencil images"
-			}
-			CheckCopyImageError::SizeIncompatibleFormatsTypes { .. } => {
-				"the types of the source format and the destination format aren't size-compatible"
-			}
-			CheckCopyImageError::SourceCoordinatesOutOfRange => {
-				"the offsets, array layers and/or mipmap levels are out of range in the source \
-				 image"
-			}
-			CheckCopyImageError::DestinationCoordinatesOutOfRange => {
-				"the offsets, array layers and/or mipmap levels are out of range in the \
-				 destination image"
-			}
-			CheckCopyImageError::IncompatibleRangeForImageType => {
-				"the offsets or extent are incompatible with the image type"
-			}
+impl fmt::Display for CheckCopyImageError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			CheckCopyImageError::MissingTransferSourceUsage => write!(f, "The source is missing the transfer source usage"),
+			CheckCopyImageError::MissingTransferDestinationUsage => write!(f, "The destination is missing the transfer destination usage"),
+			CheckCopyImageError::SampleCountMismatch => write!(f, "The number of samples in the source and destination do not match"),
+			CheckCopyImageError::DepthStencilFormatMismatch => write!(f, "The format of the source and destination must be equal when blitting depth/stencil images"),
+			CheckCopyImageError::SizeIncompatibleFormatsTypes { source_format_ty, destination_format_ty }
+				=> write!(f, "The types of the source format ({:?}) and the destination format ({:?}) aren't size-compatible", source_format_ty, destination_format_ty),
+			CheckCopyImageError::SourceCoordinatesOutOfRange => write!(f, "The offsets, array layers and/or mipmap levels are out of range in the source image"),
+			CheckCopyImageError::DestinationCoordinatesOutOfRange => write!(f, "The offsets, array layers and/or mipmap levels are out of range in the destination image"),
+			CheckCopyImageError::IncompatibleRangeForImageType => write!(f, "The top-left and/or bottom-right coordinates are incompatible with the image type")
 		}
 	}
 }
-
-impl fmt::Display for CheckCopyImageError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for CheckCopyImageError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }

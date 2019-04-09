@@ -60,25 +60,23 @@ pub struct CheckVertexBuffer {
 /// Error that can happen when checking whether the vertex buffers are valid.
 #[derive(Debug, Copy, Clone)]
 pub enum CheckVertexBufferError {
-	/// The "vertex buffer" usage must be enabled on the buffer.
+	/// The buffer is missing the vertex buffer usage
 	BufferMissingUsage {
 		/// Index of the buffer that is missing usage.
 		num_buffer: usize
 	}
 }
-
-impl error::Error for CheckVertexBufferError {
-	fn description(&self) -> &str {
-		match *self {
-			CheckVertexBufferError::BufferMissingUsage { .. } => {
-				"the vertex buffer usage is missing on a vertex buffer"
-			}
+impl fmt::Display for CheckVertexBufferError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			CheckVertexBufferError::BufferMissingUsage { num_buffer } => write!(
+				f,
+				"The buffer at index {} is missing the transfer destination usage",
+				num_buffer
+			)
 		}
 	}
 }
-
-impl fmt::Display for CheckVertexBufferError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for CheckVertexBufferError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }

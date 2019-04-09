@@ -213,7 +213,7 @@ where
 		if expected_layout != ImageLayout::General && expected_layout != ImageLayout::Undefined {
 			return Err(AccessError::UnexpectedImageLayout {
 				requested: expected_layout,
-				allowed: ImageLayout::General
+				expected: ImageLayout::General
 			})
 		}
 

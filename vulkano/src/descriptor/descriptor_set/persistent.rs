@@ -17,7 +17,6 @@ use crate::{
 			DescriptorDescTy,
 			DescriptorImageDesc,
 			DescriptorImageDescArray,
-			DescriptorImageDescDimensions,
 			DescriptorType
 		},
 		descriptor_set::{
@@ -34,7 +33,7 @@ use crate::{
 	},
 	device::{Device, DeviceOwned},
 	format::Format,
-	image::ImageViewAccess,
+	image::{ImageDimensionType, ImageViewAccess},
 	sampler::Sampler,
 	OomError,
 	VulkanObject
@@ -812,7 +811,7 @@ where
 		return Err(PersistentDescriptorSetError::MissingImageUsage(MissingImageUsage::Storage))
 	}
 
-	let image_view_ty = DescriptorImageDescDimensions::from_dimensions(image_view.dimensions());
+	let image_view_ty = ImageDimensionType::from(image_view.dimensions());
 	if image_view_ty != desc.dimensions {
 		return Err(PersistentDescriptorSetError::ImageViewTypeMismatch {
 			expected: desc.dimensions,
@@ -1061,59 +1060,61 @@ pub enum PersistentDescriptorSetError {
 	/// The type of an image view doesn't match what was expected.
 	ImageViewTypeMismatch {
 		/// Expected type.
-		expected: DescriptorImageDescDimensions,
+		expected: ImageDimensionType,
 		/// Type of the image view that was passed.
-		obtained: DescriptorImageDescDimensions
+		obtained: ImageDimensionType
 	}
 }
-
-impl error::Error for PersistentDescriptorSetError {
-	fn description(&self) -> &str {
-		match *self {
-			PersistentDescriptorSetError::WrongDescriptorTy { .. } => {
-				"expected one type of resource but got another"
+impl fmt::Display for PersistentDescriptorSetError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			PersistentDescriptorSetError::WrongDescriptorTy { expected } => {
+				write!(f, "Expected one type of resource ({:?}) but got another", expected)
 			}
-			PersistentDescriptorSetError::EmptyExpected => {
-				"expected an empty descriptor but got something"
-			}
+			PersistentDescriptorSetError::EmptyExpected => write!(f, "Expected nothing"),
 			PersistentDescriptorSetError::ArrayOutOfBounds => {
-				"tried to add too many elements to an array"
+				write!(f, "Tried to add too many elements to an array")
 			}
-			PersistentDescriptorSetError::MissingArrayElements { .. } => {
-				"didn't fill all the elements of an array before leaving"
-			}
+			PersistentDescriptorSetError::MissingArrayElements { expected, obtained } => write!(
+				f,
+				"Didn't fill all the elements of an array before leaving: expected {} obtained {}",
+				expected, obtained
+			),
 			PersistentDescriptorSetError::IncompatibleImageViewSampler => {
-				"the image view isn't compatible with the sampler"
+				write!(f, "The image view isn't compatible with the sampler")
 			}
-			PersistentDescriptorSetError::MissingBufferUsage { .. } => {
-				"the buffer is missing the correct usage"
+			PersistentDescriptorSetError::MissingBufferUsage(usage) => {
+				write!(f, "The buffer is missing the {:?} usage", usage)
 			}
-			PersistentDescriptorSetError::MissingImageUsage { .. } => {
-				"the image is missing the correct usage"
+			PersistentDescriptorSetError::MissingImageUsage(usage) => {
+				write!(f, "The image is missing the {:?} usage", usage)
 			}
 			PersistentDescriptorSetError::ExpectedMultisampled => {
-				"expected a multisampled image, but got a single-sampled image"
+				write!(f, "Expected a multisampled image, but got a single-sampled image")
 			}
 			PersistentDescriptorSetError::UnexpectedMultisampled => {
-				"expected a single-sampled image, but got a multisampled image"
+				write!(f, "Expected a single-sampled image, but got a multisampled image")
 			}
-			PersistentDescriptorSetError::ArrayLayersMismatch { .. } => {
-				"the number of array layers of an image doesn't match what was expected"
-			}
-			PersistentDescriptorSetError::ImageViewFormatMismatch { .. } => {
-				"the format of an image view doesn't match what was expected"
-			}
-			PersistentDescriptorSetError::ImageViewTypeMismatch { .. } => {
-				"the type of an image view doesn't match what was expected"
-			}
+			PersistentDescriptorSetError::ArrayLayersMismatch { expected, obtained } => write!(
+				f,
+				"The number of array layers of an image ({}) doesn't match what was expected ({})",
+				obtained, expected
+			),
+			PersistentDescriptorSetError::ImageViewFormatMismatch { expected, obtained } => write!(
+				f,
+				"The format of an image view ({:?}) doesn't match what was expected ({:?})",
+				obtained, expected
+			),
+			PersistentDescriptorSetError::ImageViewTypeMismatch { expected, obtained } => write!(
+				f,
+				"The type of an image view ({:?}) doesn't match what was expected ({:?})",
+				obtained, expected
+			)
 		}
 	}
 }
-
-impl fmt::Display for PersistentDescriptorSetError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for PersistentDescriptorSetError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
 
 /// Error when building a persistent descriptor set.
@@ -1122,7 +1123,7 @@ pub enum PersistentDescriptorSetBuildError {
 	/// Out of memory.
 	OomError(OomError),
 
-	/// Didn't fill all the descriptors before building.
+	/// The number of filled descriptor bindings doesn't match the expected number.
 	MissingDescriptors {
 		/// Number of expected descriptors.
 		expected: u32,
@@ -1130,26 +1131,28 @@ pub enum PersistentDescriptorSetBuildError {
 		obtained: u32
 	}
 }
-
-impl error::Error for PersistentDescriptorSetBuildError {
-	fn description(&self) -> &str {
-		match *self {
-			PersistentDescriptorSetBuildError::MissingDescriptors { .. } => {
-				"didn't fill all the descriptors before building"
-			}
-			PersistentDescriptorSetBuildError::OomError(_) => "not enough memory available"
+impl fmt::Display for PersistentDescriptorSetBuildError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			PersistentDescriptorSetBuildError::OomError(e) => e.fmt(f),
+			PersistentDescriptorSetBuildError::MissingDescriptors { expected, obtained } => write!(
+				f,
+				"The number of filled descriptor bindings {} doesn't match the expected number {}",
+				obtained, expected
+			)
 		}
 	}
 }
-
+impl error::Error for PersistentDescriptorSetBuildError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			PersistentDescriptorSetBuildError::OomError(e) => e.source(),
+			_ => None
+		}
+	}
+}
 impl From<OomError> for PersistentDescriptorSetBuildError {
 	fn from(err: OomError) -> PersistentDescriptorSetBuildError {
 		PersistentDescriptorSetBuildError::OomError(err)
-	}
-}
-
-impl fmt::Display for PersistentDescriptorSetBuildError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
 	}
 }

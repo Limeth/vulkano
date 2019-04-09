@@ -1709,45 +1709,42 @@ pub enum AutoCommandBufferBuilderContextError {
 	/// pass.
 	IncompatibleRenderPass
 }
-
-impl error::Error for AutoCommandBufferBuilderContextError {
-	fn description(&self) -> &str {
-		match *self {
+impl fmt::Display for AutoCommandBufferBuilderContextError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
 			AutoCommandBufferBuilderContextError::ForbiddenInSecondary => {
-				"operation forbidden in a secondary command buffer"
+				write!(f, "The operation is forbidden in a secondary command buffer")
 			}
 			AutoCommandBufferBuilderContextError::ForbiddenInsideRenderPass => {
-				"operation forbidden inside of a render pass"
+				write!(f, "The operation is forbidden inside of a render pass")
 			}
 			AutoCommandBufferBuilderContextError::ForbiddenOutsideRenderPass => {
-				"operation forbidden outside of a render pass"
+				write!(f, "The operation is forbidden outside of a render pass")
 			}
 			AutoCommandBufferBuilderContextError::NotSupportedByQueueFamily => {
-				"the queue family doesn't allow this operation"
+				write!(f, "The queue family doesn't allow this operation")
 			}
-			AutoCommandBufferBuilderContextError::NumSubpassesMismatch { .. } => {
-				"tried to end a render pass with subpasses remaining, or tried to go to next \
-				 subpass with no subpass remaining"
+			AutoCommandBufferBuilderContextError::NumSubpassesMismatch { actual, current } => {
+				write!(
+				f,
+				"Number of subpasses in command buffer ({}) doesn't match the actual number ({})",
+				current, actual
+			)
 			}
 			AutoCommandBufferBuilderContextError::WrongSubpassType => {
-				"tried to execute a secondary command buffer inside a subpass that only allows \
-				 inline commands, or a draw command in a subpass that only allows secondary \
-				 command buffers"
+				write!(f, "Tried to execute a wrong type of command for the subpass")
 			}
-			AutoCommandBufferBuilderContextError::WrongSubpassIndex => {
-				"tried to use a graphics pipeline whose subpass index didn't match the current \
-				 subpass index"
-			}
-			AutoCommandBufferBuilderContextError::IncompatibleRenderPass => {
-				"tried to use a graphics pipeline whose render pass is incompatible with the \
-				 current render pass"
-			}
+			AutoCommandBufferBuilderContextError::WrongSubpassIndex => write!(
+				f,
+				"Tried to used a graphics pipeline which is not compatible with this subpass"
+			),
+			AutoCommandBufferBuilderContextError::IncompatibleRenderPass => write!(
+				f,
+				"Tried to use a graphics pipeline which is not compatible with this render pass"
+			)
 		}
 	}
 }
-
-impl fmt::Display for AutoCommandBufferBuilderContextError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for AutoCommandBufferBuilderContextError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }

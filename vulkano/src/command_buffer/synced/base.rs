@@ -147,19 +147,31 @@ pub enum SyncCommandBufferBuilderError {
 		command2_offset: usize
 	}
 }
-
-impl error::Error for SyncCommandBufferBuilderError {
-	fn description(&self) -> &str {
-		match *self {
-			SyncCommandBufferBuilderError::Conflict { .. } => "unsolvable conflict"
+impl fmt::Display for SyncCommandBufferBuilderError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			SyncCommandBufferBuilderError::Conflict {
+				command1_name,
+				command1_param,
+				command1_offset,
+				command2_name,
+				command2_param,
+				command2_offset
+			} => write!(
+				f,
+				"Unsolvable conflict: [{}] {}({}) vs [{}] {}({})",
+				command1_offset,
+				command1_name,
+				command1_param,
+				command2_offset,
+				command2_name,
+				command2_param,
+			)
 		}
 	}
 }
-
-impl fmt::Display for SyncCommandBufferBuilderError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
-	}
+impl error::Error for SyncCommandBufferBuilderError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }
 
 // List of commands stored inside a `SyncCommandBufferBuilder`.
@@ -1153,7 +1165,7 @@ impl<P> SyncCommandBuffer<P> {
 		if let Some(value) = self.resources.get(&CbKey::ImageRef(image)) {
 			if layout != ImageLayout::Undefined && value.final_layout != layout {
 				return Err(AccessCheckError::Denied(AccessError::UnexpectedImageLayout {
-					allowed: value.final_layout,
+					expected: value.final_layout,
 					requested: layout
 				}))
 			}

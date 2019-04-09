@@ -276,35 +276,24 @@ pub enum ComputePipelineCreationError {
 	/// The pipeline layout is not compatible with what the shader expects.
 	IncompatiblePipelineLayout(PipelineLayoutNotSupersetError)
 }
-
-impl error::Error for ComputePipelineCreationError {
-	fn description(&self) -> &str {
-		match *self {
-			ComputePipelineCreationError::OomError(_) => "not enough memory available",
-			ComputePipelineCreationError::PipelineLayoutCreationError(_) => {
-				"error while creating the pipeline layout object"
-			}
-			ComputePipelineCreationError::IncompatiblePipelineLayout(_) => {
-				"the pipeline layout is not compatible with what the shader expects"
-			}
-		}
-	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			ComputePipelineCreationError::OomError(ref err) => Some(err),
-			ComputePipelineCreationError::PipelineLayoutCreationError(ref err) => Some(err),
-			ComputePipelineCreationError::IncompatiblePipelineLayout(ref err) => Some(err)
-		}
-	}
-}
-
 impl fmt::Display for ComputePipelineCreationError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			ComputePipelineCreationError::OomError(e) => e.fmt(f),
+			ComputePipelineCreationError::PipelineLayoutCreationError(e) => e.fmt(f),
+			ComputePipelineCreationError::IncompatiblePipelineLayout(e) => e.fmt(f),
+		}
 	}
 }
-
+impl error::Error for ComputePipelineCreationError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			ComputePipelineCreationError::OomError(e) => e.source(),
+			ComputePipelineCreationError::PipelineLayoutCreationError(e) => e.source(),
+			ComputePipelineCreationError::IncompatiblePipelineLayout(e) => e.source()
+		}
+	}
+}
 impl From<OomError> for ComputePipelineCreationError {
 	fn from(err: OomError) -> ComputePipelineCreationError {
 		ComputePipelineCreationError::OomError(err)
@@ -322,7 +311,6 @@ impl From<PipelineLayoutNotSupersetError> for ComputePipelineCreationError {
 		ComputePipelineCreationError::IncompatiblePipelineLayout(err)
 	}
 }
-
 impl From<Error> for ComputePipelineCreationError {
 	fn from(err: Error) -> ComputePipelineCreationError {
 		match err {

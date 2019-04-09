@@ -215,35 +215,26 @@ pub enum PipelineLayoutNotSupersetError {
 	/// Two descriptors are incompatible.
 	IncompatibleDescriptors { error: DescriptorDescSupersetError, set_num: u32, descriptor: u32 }
 }
-
-impl error::Error for PipelineLayoutNotSupersetError {
-	fn description(&self) -> &str {
-		match *self {
-			PipelineLayoutNotSupersetError::DescriptorsCountMismatch { .. } => {
-				"there are more descriptors in the child than in the parent layout"
-			}
-			PipelineLayoutNotSupersetError::ExpectedEmptyDescriptor { .. } => {
-				"expected an empty descriptor, but got something instead"
-			}
-			PipelineLayoutNotSupersetError::IncompatibleDescriptors { .. } => {
-				"two descriptors are incompatible"
-			}
-		}
-	}
-
-	fn cause(&self) -> Option<&error::Error> {
-		match *self {
-			PipelineLayoutNotSupersetError::IncompatibleDescriptors { ref error, .. } => {
-				Some(error)
-			}
-			_ => None
+impl fmt::Display for PipelineLayoutNotSupersetError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			PipelineLayoutNotSupersetError::DescriptorsCountMismatch { set_num, self_num_descriptors, other_num_descriptors }
+				=> write!(f, "There are more descriptors in the child layout ({}) than in the parent layout ({}): set = {}",
+					other_num_descriptors, self_num_descriptors, set_num),
+			PipelineLayoutNotSupersetError::ExpectedEmptyDescriptor { set_num, descriptor }
+				=> write!(f, "Expected an empty descriptor: set = {} descriptor = {}", set_num, descriptor),
+			PipelineLayoutNotSupersetError::IncompatibleDescriptors { error, set_num, descriptor }
+				=> write!(f, "Expected an descriptor of one type but got another: set = {} descriptor = {}: {}",
+					set_num, descriptor, error)
 		}
 	}
 }
-
-impl fmt::Display for PipelineLayoutNotSupersetError {
-	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-		write!(fmt, "{}", error::Error::description(self))
+impl error::Error for PipelineLayoutNotSupersetError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			PipelineLayoutNotSupersetError::IncompatibleDescriptors { error, .. } => Some(error),
+			_ => None
+		}
 	}
 }
 
