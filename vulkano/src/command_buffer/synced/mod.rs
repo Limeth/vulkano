@@ -10,7 +10,9 @@
 //! Contains `SyncCommandBufferBuilder` and `SyncCommandBuffer`.
 
 pub use self::{
-	base::{SyncCommandBuffer, SyncCommandBufferBuilder, SyncCommandBufferBuilderError},
+	builder::SyncCommandBufferBuilder,
+	buffer::SyncCommandBuffer,
+	misc::SyncCommandBufferBuilderError,
 	commands::{
 		SyncCommandBufferBuilderBindDescriptorSets,
 		SyncCommandBufferBuilderBindVertexBuffer,
@@ -18,7 +20,10 @@ pub use self::{
 	}
 };
 
-mod base;
+mod buffer;
+mod builder;
+mod misc;
+
 mod commands;
 
 #[cfg(test)]

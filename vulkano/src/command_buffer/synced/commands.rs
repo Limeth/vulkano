@@ -13,12 +13,12 @@ use std::{any::Any, borrow::Cow, mem, ptr, sync::Arc};
 use crate::{
 	buffer::BufferAccess,
 	command_buffer::{
-		synced::base::{
-			Command,
-			FinalCommand,
-			KeyTy,
-			SyncCommandBufferBuilder,
-			SyncCommandBufferBuilderError
+		synced::{
+			misc::{
+				Command, FinalCommand,
+				KeyTy, SyncCommandBufferBuilderError
+			},
+			builder::SyncCommandBufferBuilder
 		},
 		sys::{
 			UnsafeCommandBufferBuilder,
