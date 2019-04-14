@@ -81,7 +81,7 @@ impl<'a> SubmitPresentBuilder<'a> {
 		&mut self, swapchain: &'a Swapchain<W>, image_num: u32,
 		present_region: Option<&'a PresentRegion>
 	) {
-		debug_assert!(image_num < swapchain.num_images());
+		debug_assert!(image_num < swapchain.num_images().get());
 
 		if swapchain.device().loaded_extensions().khr_incremental_present {
 			let vk_present_region = match present_region {

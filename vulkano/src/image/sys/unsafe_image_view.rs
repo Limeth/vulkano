@@ -45,8 +45,8 @@ impl UnsafeImageView {
 	) -> Result<UnsafeImageView, OomError> {
 		let vk = image.device.pointers();
 
-		assert!(subresource_range.array_layers_end().get() <= image.dimensions.array_layers());
-		assert!(subresource_range.mipmap_levels_end().get() <= image.mipmap_levels);
+		assert!(subresource_range.array_layers_end().get() <= image.dimensions.array_layers().get());
+		assert!(subresource_range.mipmap_levels_end().get() <= image.mipmap_levels.get());
 
 		// TODO: Views can have different formats than their underlying images, but
 		// only if certain requirements are met. We need to check those before we
@@ -126,7 +126,7 @@ impl UnsafeImageView {
 			ImageViewType::Dim1D => ImageDimensions::Dim1D { width: image.dimensions.width() },
 			ImageViewType::Dim1DArray => ImageDimensions::Dim1DArray {
 				width: image.dimensions.width(),
-				array_layers: subresource_range.array_layers.get()
+				array_layers: subresource_range.array_layers
 			},
 
 			ImageViewType::Dim2D => ImageDimensions::Dim2D {
@@ -136,13 +136,13 @@ impl UnsafeImageView {
 			ImageViewType::Dim2DArray => ImageDimensions::Dim2DArray {
 				width: image.dimensions.width(),
 				height: image.dimensions.height(),
-				array_layers: subresource_range.array_layers.get()
+				array_layers: subresource_range.array_layers
 			},
 
 			ImageViewType::Cubemap => ImageDimensions::Cubemap { size: image.dimensions.width() },
 			ImageViewType::CubemapArray => ImageDimensions::CubemapArray {
 				size: image.dimensions.width(),
-				array_layers: subresource_range.array_layers.get()
+				array_layers: subresource_range.array_layers
 			},
 
 			ImageViewType::Dim3D => ImageDimensions::Dim3D {

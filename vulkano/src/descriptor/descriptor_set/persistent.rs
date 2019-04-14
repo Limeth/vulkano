@@ -601,14 +601,13 @@ where
 					))
 				}
 
-				if multisampled && image_view.parent().samples() == 1 {
+				if multisampled && image_view.parent().samples().get() == 1 {
 					return Err(PersistentDescriptorSetError::ExpectedMultisampled)
-				} else if !multisampled && image_view.parent().samples() != 1 {
+				} else if !multisampled && image_view.parent().samples().get() != 1 {
 					return Err(PersistentDescriptorSetError::UnexpectedMultisampled)
 				}
 
-				let image_layers = image_view.dimensions().array_layers();
-
+				let image_layers = image_view.dimensions().array_layers().get();
 				match array_layers {
 					DescriptorImageDescArray::NonArrayed => {
 						if image_layers != 1 {
@@ -828,14 +827,13 @@ where
 		}
 	}
 
-	if desc.multisampled && image_view.parent().samples() == 1 {
+	if desc.multisampled && image_view.parent().samples().get() == 1 {
 		return Err(PersistentDescriptorSetError::ExpectedMultisampled)
-	} else if !desc.multisampled && image_view.parent().samples() != 1 {
+	} else if !desc.multisampled && image_view.parent().samples().get() != 1 {
 		return Err(PersistentDescriptorSetError::UnexpectedMultisampled)
 	}
 
-	let image_layers = image_view.dimensions().array_layers();
-
+	let image_layers = image_view.dimensions().array_layers().get();
 	match desc.array_layers {
 		DescriptorImageDescArray::NonArrayed => {
 			// TODO: when a non-array is expected, can we pass an image view that is in fact an

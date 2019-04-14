@@ -250,10 +250,10 @@ mod tests {
 			ImageLayoutMatrix::new_data(4, ImageLayout::Undefined, (0 .. 16).into_iter()).unwrap();
 
 		let mut iter = matrix.iter_subresource_range_mut(ImageSubresourceRange {
-			array_layers: unsafe { NonZeroU32::new_unchecked(1) },
+			array_layers: crate::NONZERO_ONE,
 			array_layers_offset: 1,
 
-			mipmap_levels: unsafe { NonZeroU32::new_unchecked(2) },
+			mipmap_levels: crate::NONZERO_ONE,
 			mipmap_levels_offset: 1
 		});
 

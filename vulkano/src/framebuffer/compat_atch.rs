@@ -38,10 +38,10 @@ where
 		})
 	}
 
-	if image.parent().samples() != attachment_desc.samples {
+	if image.parent().samples().get() != attachment_desc.samples {
 		return Err(IncompatibleRenderPassAttachmentError::SamplesMismatch {
 			expected: attachment_desc.samples,
-			obtained: image.parent().samples()
+			obtained: image.parent().samples().get()
 		})
 	}
 

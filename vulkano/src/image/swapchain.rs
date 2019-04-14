@@ -8,6 +8,7 @@
 // according to those terms.
 
 use std::sync::Arc;
+use std::num::NonZeroU32;
 
 use crate::{
 	buffer::BufferAccess,
@@ -59,10 +60,10 @@ impl<W> SwapchainImage<W> {
 			None,
 			Default::default(),
 			ImageSubresourceRange {
-				array_layers: std::num::NonZeroU32::new_unchecked(1),
+				array_layers: crate::NONZERO_ONE,
 				array_layers_offset: 0,
 
-				mipmap_levels: std::num::NonZeroU32::new_unchecked(1),
+				mipmap_levels: crate::NONZERO_ONE,
 				mipmap_levels_offset: 0
 			}
 		)?;
@@ -73,7 +74,7 @@ impl<W> SwapchainImage<W> {
 	/// Returns the dimensions of the image.
 	///
 	/// A `SwapchainImage` is always two-dimensional.
-	pub fn dimensions(&self) -> [u32; 2] { self.inner_image().dimensions.width_height() }
+	pub fn dimensions(&self) -> [NonZeroU32; 2] { self.inner_image().dimensions.width_height() }
 
 	/// Returns the swapchain this image belongs to.
 	pub fn swapchain(&self) -> &Arc<Swapchain<W>> { &self.swapchain }

@@ -95,6 +95,9 @@ pub mod sampler;
 pub mod swapchain;
 pub mod sync;
 
+/// A NonZeroU32 const 1 to reduce the amount of unsafes.
+const NONZERO_ONE: std::num::NonZeroU32 = unsafe { std::num::NonZeroU32::new_unchecked(1) };
+
 /// Alternative to the `Deref` trait. Contrary to `Deref`, must always return the same object.
 pub unsafe trait SafeDeref: Deref {}
 unsafe impl<'a, T: ?Sized> SafeDeref for &'a T {}

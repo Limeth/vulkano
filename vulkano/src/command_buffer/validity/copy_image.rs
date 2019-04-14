@@ -81,40 +81,40 @@ where
 			None => return Err(CheckCopyImageError::DestinationCoordinatesOutOfRange)
 		};
 
-	if source_base_array_layer + layer_count > source_dimensions.array_layers() {
+	if source_base_array_layer + layer_count > source_dimensions.array_layers().get() {
 		return Err(CheckCopyImageError::SourceCoordinatesOutOfRange)
 	}
 
-	if destination_base_array_layer + layer_count > destination_dimensions.array_layers() {
+	if destination_base_array_layer + layer_count > destination_dimensions.array_layers().get() {
 		return Err(CheckCopyImageError::DestinationCoordinatesOutOfRange)
 	}
 
-	if source_offset[0] < 0 || source_offset[0] as u32 + extent[0] > source_dimensions.width() {
+	if source_offset[0] < 0 || source_offset[0] as u32 + extent[0] > source_dimensions.width().get() {
 		return Err(CheckCopyImageError::SourceCoordinatesOutOfRange)
 	}
 
-	if source_offset[1] < 0 || source_offset[1] as u32 + extent[1] > source_dimensions.height() {
+	if source_offset[1] < 0 || source_offset[1] as u32 + extent[1] > source_dimensions.height().get() {
 		return Err(CheckCopyImageError::SourceCoordinatesOutOfRange)
 	}
 
-	if source_offset[2] < 0 || source_offset[2] as u32 + extent[2] > source_dimensions.depth() {
+	if source_offset[2] < 0 || source_offset[2] as u32 + extent[2] > source_dimensions.depth().get() {
 		return Err(CheckCopyImageError::SourceCoordinatesOutOfRange)
 	}
 
 	if destination_offset[0] < 0
-		|| destination_offset[0] as u32 + extent[0] > destination_dimensions.width()
+		|| destination_offset[0] as u32 + extent[0] > destination_dimensions.width().get()
 	{
 		return Err(CheckCopyImageError::DestinationCoordinatesOutOfRange)
 	}
 
 	if destination_offset[1] < 0
-		|| destination_offset[1] as u32 + extent[1] > destination_dimensions.height()
+		|| destination_offset[1] as u32 + extent[1] > destination_dimensions.height().get()
 	{
 		return Err(CheckCopyImageError::DestinationCoordinatesOutOfRange)
 	}
 
 	if destination_offset[2] < 0
-		|| destination_offset[2] as u32 + extent[2] > destination_dimensions.depth()
+		|| destination_offset[2] as u32 + extent[2] > destination_dimensions.depth().get()
 	{
 		return Err(CheckCopyImageError::DestinationCoordinatesOutOfRange)
 	}

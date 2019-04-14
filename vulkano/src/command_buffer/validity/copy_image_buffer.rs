@@ -63,7 +63,7 @@ where
 		}
 	}
 
-	if image.parent().samples() != 1 {
+	if image.parent().samples().get() != 1 {
 		return Err(CheckCopyBufferImageError::UnexpectedMultisampled)
 	}
 
@@ -72,19 +72,19 @@ where
 		None => return Err(CheckCopyBufferImageError::ImageCoordinatesOutOfRange)
 	};
 
-	if image_first_layer + image_num_layers > image_dimensions.array_layers() {
+	if image_first_layer + image_num_layers > image_dimensions.array_layers().get() {
 		return Err(CheckCopyBufferImageError::ImageCoordinatesOutOfRange)
 	}
 
-	if image_offset[0] + image_size[0] > image_dimensions.width() {
+	if image_offset[0] + image_size[0] > image_dimensions.width().get() {
 		return Err(CheckCopyBufferImageError::ImageCoordinatesOutOfRange)
 	}
 
-	if image_offset[1] + image_size[1] > image_dimensions.height() {
+	if image_offset[1] + image_size[1] > image_dimensions.height().get() {
 		return Err(CheckCopyBufferImageError::ImageCoordinatesOutOfRange)
 	}
 
-	if image_offset[2] + image_size[2] > image_dimensions.depth() {
+	if image_offset[2] + image_size[2] > image_dimensions.depth().get() {
 		return Err(CheckCopyBufferImageError::ImageCoordinatesOutOfRange)
 	}
 

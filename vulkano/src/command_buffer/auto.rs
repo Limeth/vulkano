@@ -824,7 +824,11 @@ impl<P> AutoCommandBufferBuilder<P> {
 		self.ensure_outside_render_pass()?;
 
 		let dims = destination.dimensions().width_height_depth();
-		self.copy_buffer_to_image_dimensions(source, destination, [0, 0, 0], dims, 0, 1, 0)
+		self.copy_buffer_to_image_dimensions(
+			source, destination,
+			[0, 0, 0], [dims[0].get(), dims[1].get(), dims[2].get()],
+			0, 1, 0
+		)
 	}
 
 	/// Adds a command that copies from a buffer to an image.
@@ -901,7 +905,11 @@ impl<P> AutoCommandBufferBuilder<P> {
 		self.ensure_outside_render_pass()?;
 
 		let dims = source.dimensions().width_height_depth();
-		self.copy_image_to_buffer_dimensions(source, destination, [0, 0, 0], dims, 0, 1, 0)
+		self.copy_image_to_buffer_dimensions(
+			source, destination,
+			[0, 0, 0], [dims[0].get(), dims[1].get(), dims[2].get()],
+			0, 1, 0
+		)
 	}
 
 	/// Adds a command that copies from an image to a buffer.

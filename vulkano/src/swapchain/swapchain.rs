@@ -17,7 +17,8 @@ use std::{
 		Arc,
 		Mutex
 	},
-	time::Duration
+	time::Duration,
+	num::NonZeroU32
 };
 
 use vk_sys as vk;
@@ -198,11 +199,11 @@ pub struct Swapchain<W> {
 	// Parameters passed to the constructor.
 	// Some of these parameters are redundant because they are also stored by images themselves.
 	// TODO: Not sure if to do anything about it?
-	num_images: u32,
+	num_images: NonZeroU32,
 	format: Format,
 	color_space: ColorSpace,
-	dimensions: [u32; 2],
-	layers: u32,
+	dimensions: [NonZeroU32; 2],
+	layers: NonZeroU32,
 	usage: ImageUsage,
 	sharing: SharingMode,
 	transform: SurfaceTransform,
@@ -232,8 +233,8 @@ impl<W> Swapchain<W> {
 	/// - Panics if `usage` is empty.
 	// TODO: isn't it unsafe to take the surface through an Arc when it comes to vulkano-win?
 	pub fn new<F: FormatDesc, S: Into<SharingMode>>(
-		device: Arc<Device>, surface: Arc<Surface<W>>, sharing: S, dimensions: [u32; 2],
-		layers: u32, num_images: u32, format: F, color_space: ColorSpace, usage: ImageUsage,
+		device: Arc<Device>, surface: Arc<Surface<W>>, sharing: S, dimensions: [NonZeroU32; 2],
+		layers: NonZeroU32, num_images: NonZeroU32, format: F, color_space: ColorSpace, usage: ImageUsage,
 		transform: SurfaceTransform, alpha: CompositeAlpha, mode: PresentMode, clipped: bool,
 		old_swapchain: Option<&Swapchain<W>>
 	) -> Result<(Arc<Swapchain<W>>, Vec<Arc<SwapchainImage<W>>>), SwapchainCreationError> {
@@ -243,30 +244,30 @@ impl<W> Swapchain<W> {
 		let capabilities = surface.capabilities(device.physical_device())?;
 		let format = format.format();
 
-		if num_images < capabilities.min_image_count {
+		if num_images.get() < capabilities.min_image_count {
 			return Err(SwapchainCreationError::UnsupportedMinImagesCount)
 		}
 		if let Some(c) = capabilities.max_image_count {
-			if num_images > c {
+			if num_images.get() > c {
 				return Err(SwapchainCreationError::UnsupportedMaxImagesCount)
 			}
 		}
 		if !capabilities.supported_formats.iter().any(|&(f, c)| f == format && c == color_space) {
 			return Err(SwapchainCreationError::UnsupportedFormat)
 		}
-		if dimensions[0] < capabilities.min_image_extent[0] {
+		if dimensions[0].get() < capabilities.min_image_extent[0] {
 			return Err(SwapchainCreationError::UnsupportedDimensions)
 		}
-		if dimensions[0] > capabilities.max_image_extent[0] {
+		if dimensions[0].get() > capabilities.max_image_extent[0] {
 			return Err(SwapchainCreationError::UnsupportedDimensions)
 		}
-		if dimensions[1] < capabilities.min_image_extent[1] {
+		if dimensions[1].get() < capabilities.min_image_extent[1] {
 			return Err(SwapchainCreationError::UnsupportedDimensions)
 		}
-		if dimensions[1] > capabilities.max_image_extent[1] {
+		if dimensions[1].get() > capabilities.max_image_extent[1] {
 			return Err(SwapchainCreationError::UnsupportedDimensions)
 		}
-		if layers < 1 || layers > capabilities.max_image_array_layers {
+		if layers.get() > capabilities.max_image_array_layers {
 			return Err(SwapchainCreationError::UnsupportedArrayLayers)
 		}
 		if (usage.to_usage_bits() & capabilities.supported_usage_flags.to_usage_bits())
@@ -340,11 +341,11 @@ impl<W> Swapchain<W> {
 				pNext: ptr::null(),
 				flags: 0, // reserved
 				surface: surface.internal_object(),
-				minImageCount: num_images,
+				minImageCount: num_images.get(),
 				imageFormat: format as u32,
 				imageColorSpace: color_space as u32,
-				imageExtent: vk::Extent2D { width: dimensions[0], height: dimensions[1] },
-				imageArrayLayers: layers,
+				imageExtent: vk::Extent2D { width: dimensions[0].get(), height: dimensions[1].get() },
+				imageArrayLayers: layers.get(),
 				imageUsage: usage.to_usage_bits(),
 				imageSharingMode: sh_mode,
 				queueFamilyIndexCount: sh_count,
@@ -393,7 +394,7 @@ impl<W> Swapchain<W> {
 		let images = image_handles
 			.into_iter()
 			.map(|image| unsafe {
-				let dims = if layers == 1 {
+				let dims = if layers.get() == 1 {
 					ImageDimensions::Dim2D { width: dimensions[0], height: dimensions[1] }
 				} else {
 					ImageDimensions::Dim2DArray {
@@ -409,8 +410,8 @@ impl<W> Swapchain<W> {
 					usage.to_usage_bits(),
 					format,
 					dims,
-					1,
-					1
+					crate::NONZERO_ONE,
+					crate::NONZERO_ONE
 				);
 
 				ImageEntry { image: img, undefined_layout: AtomicBool::new(true) }
@@ -449,7 +450,7 @@ impl<W> Swapchain<W> {
 
 	/// Recreates the swapchain with new dimensions.
 	pub fn recreate_with_dimension(
-		&self, dimensions: [u32; 2]
+		&self, dimensions: [NonZeroU32; 2]
 	) -> Result<(Arc<Swapchain<W>>, Vec<Arc<SwapchainImage<W>>>), SwapchainCreationError> {
 		Swapchain::new(
 			self.device.clone(),
@@ -477,7 +478,7 @@ impl<W> Swapchain<W> {
 	/// Returns the number of images of the swapchain.
 	///
 	/// See the documentation of `Swapchain::new`.
-	pub fn num_images(&self) -> u32 { self.images.len() as u32 }
+	pub fn num_images(&self) -> NonZeroU32 { unsafe { NonZeroU32::new_unchecked(self.images.len() as u32) } }
 
 	/// Returns the format of the images of the swapchain.
 	///
@@ -492,12 +493,12 @@ impl<W> Swapchain<W> {
 	/// Returns the dimensions of the images of the swapchain.
 	///
 	/// See the documentation of `Swapchain::new`.
-	pub fn dimensions(&self) -> [u32; 2] { self.dimensions }
+	pub fn dimensions(&self) -> [NonZeroU32; 2] { self.dimensions }
 
 	/// Returns the number of layers of the images of the swapchain.
-	///
+	/// 
 	/// See the documentation of `Swapchain::new`.
-	pub fn layers(&self) -> u32 { self.layers }
+	pub fn layers(&self) -> NonZeroU32 { self.layers }
 
 	/// Returns the transform that was passed when creating the swapchain.
 	///

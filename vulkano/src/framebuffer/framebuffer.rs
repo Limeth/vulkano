@@ -169,21 +169,22 @@ where
 		};
 
 		let img_dims = attachment.dimensions();
-		debug_assert_eq!(img_dims.depth(), 1);
+		debug_assert_eq!(img_dims.depth().get(), 1);
 
 		let dimensions = match self.dimensions {
 			FramebufferBuildeImageDimensions::AutoIdentical(None) => {
-				let dims = [img_dims.width(), img_dims.height(), img_dims.array_layers()];
-				FramebufferBuildeImageDimensions::AutoIdentical(Some(dims))
+				FramebufferBuildeImageDimensions::AutoIdentical(Some(
+					[img_dims.width().get(), img_dims.height().get(), img_dims.array_layers().get()]
+				))
 			}
 			FramebufferBuildeImageDimensions::AutoIdentical(Some(current)) => {
-				if img_dims.width() != current[0]
-					|| img_dims.height() != current[1]
-					|| img_dims.array_layers() != current[2]
+				if img_dims.width().get() != current[0]
+					|| img_dims.height().get() != current[1]
+					|| img_dims.array_layers().get() != current[2]
 				{
 					return Err(FramebufferCreationError::AttachmenImageDimensionsIncompatible {
 						expected: current,
-						obtained: [img_dims.width(), img_dims.height(), img_dims.array_layers()]
+						obtained: [img_dims.width().get(), img_dims.height().get(), img_dims.array_layers().get()]
 					})
 				}
 
@@ -191,33 +192,33 @@ where
 			}
 			FramebufferBuildeImageDimensions::AutoSmaller(None) => {
 				let dims = [img_dims.width(), img_dims.height(), img_dims.array_layers()];
-				FramebufferBuildeImageDimensions::AutoSmaller(Some(dims))
+				FramebufferBuildeImageDimensions::AutoSmaller(Some(
+					[img_dims.width().get(), img_dims.height().get(), img_dims.array_layers().get()]
+				))
 			}
 			FramebufferBuildeImageDimensions::AutoSmaller(Some(current)) => {
 				let new_dims = [
-					cmp::min(current[0], img_dims.width()),
-					cmp::min(current[1], img_dims.height()),
-					cmp::min(current[2], img_dims.array_layers())
+					cmp::min(current[0], img_dims.width().get()),
+					cmp::min(current[1], img_dims.height().get()),
+					cmp::min(current[2], img_dims.array_layers().get())
 				];
 
 				FramebufferBuildeImageDimensions::AutoSmaller(Some(new_dims))
 			}
 			FramebufferBuildeImageDimensions::Specific(current) => {
-				if img_dims.width() < current[0]
-					|| img_dims.height() < current[1]
-					|| img_dims.array_layers() < current[2]
+				if img_dims.width().get() < current[0]
+					|| img_dims.height().get() < current[1]
+					|| img_dims.array_layers().get() < current[2]
 				{
 					return Err(FramebufferCreationError::AttachmenImageDimensionsIncompatible {
 						expected: current,
-						obtained: [img_dims.width(), img_dims.height(), img_dims.array_layers()]
+						obtained: [img_dims.width().get(), img_dims.height().get(), img_dims.array_layers().get()]
 					})
 				}
 
-				FramebufferBuildeImageDimensions::Specific([
-					img_dims.width(),
-					img_dims.height(),
-					img_dims.array_layers()
-				])
+				FramebufferBuildeImageDimensions::Specific(
+					[img_dims.width().get(), img_dims.height().get(), img_dims.array_layers().get()]
+				)
 			}
 		};
 

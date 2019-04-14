@@ -54,7 +54,7 @@ where
 		return Err(CheckBlitImageError::DestinationFormatNotSupported)
 	}
 
-	if source.parent().samples() != 1 || destination.parent().samples() != 1 {
+	if source.parent().samples().get() != 1 || destination.parent().samples().get() != 1 {
 		return Err(CheckBlitImageError::UnexpectedMultisampled)
 	}
 
@@ -93,70 +93,70 @@ where
 			None => return Err(CheckBlitImageError::DestinationCoordinatesOutOfRange)
 		};
 
-	if source_base_array_layer + layer_count > source_dimensions.array_layers() {
+	if source_base_array_layer + layer_count > source_dimensions.array_layers().get() {
 		return Err(CheckBlitImageError::SourceCoordinatesOutOfRange)
 	}
 
-	if destination_base_array_layer + layer_count > destination_dimensions.array_layers() {
+	if destination_base_array_layer + layer_count > destination_dimensions.array_layers().get() {
 		return Err(CheckBlitImageError::DestinationCoordinatesOutOfRange)
 	}
 
-	if source_top_left[0] < 0 || source_top_left[0] > source_dimensions.width() as i32 {
+	if source_top_left[0] < 0 || source_top_left[0] > source_dimensions.width().get() as i32 {
 		return Err(CheckBlitImageError::SourceCoordinatesOutOfRange)
 	}
 
-	if source_top_left[1] < 0 || source_top_left[1] > source_dimensions.height() as i32 {
+	if source_top_left[1] < 0 || source_top_left[1] > source_dimensions.height().get() as i32 {
 		return Err(CheckBlitImageError::SourceCoordinatesOutOfRange)
 	}
 
-	if source_top_left[2] < 0 || source_top_left[2] > source_dimensions.depth() as i32 {
+	if source_top_left[2] < 0 || source_top_left[2] > source_dimensions.depth().get() as i32 {
 		return Err(CheckBlitImageError::SourceCoordinatesOutOfRange)
 	}
 
-	if source_bottom_right[0] < 0 || source_bottom_right[0] > source_dimensions.width() as i32 {
+	if source_bottom_right[0] < 0 || source_bottom_right[0] > source_dimensions.width().get() as i32 {
 		return Err(CheckBlitImageError::SourceCoordinatesOutOfRange)
 	}
 
-	if source_bottom_right[1] < 0 || source_bottom_right[1] > source_dimensions.height() as i32 {
+	if source_bottom_right[1] < 0 || source_bottom_right[1] > source_dimensions.height().get() as i32 {
 		return Err(CheckBlitImageError::SourceCoordinatesOutOfRange)
 	}
 
-	if source_bottom_right[2] < 0 || source_bottom_right[2] > source_dimensions.depth() as i32 {
+	if source_bottom_right[2] < 0 || source_bottom_right[2] > source_dimensions.depth().get() as i32 {
 		return Err(CheckBlitImageError::SourceCoordinatesOutOfRange)
 	}
 
 	if destination_top_left[0] < 0
-		|| destination_top_left[0] > destination_dimensions.width() as i32
+		|| destination_top_left[0] > destination_dimensions.width().get() as i32
 	{
 		return Err(CheckBlitImageError::DestinationCoordinatesOutOfRange)
 	}
 
 	if destination_top_left[1] < 0
-		|| destination_top_left[1] > destination_dimensions.height() as i32
+		|| destination_top_left[1] > destination_dimensions.height().get() as i32
 	{
 		return Err(CheckBlitImageError::DestinationCoordinatesOutOfRange)
 	}
 
 	if destination_top_left[2] < 0
-		|| destination_top_left[2] > destination_dimensions.depth() as i32
+		|| destination_top_left[2] > destination_dimensions.depth().get() as i32
 	{
 		return Err(CheckBlitImageError::DestinationCoordinatesOutOfRange)
 	}
 
 	if destination_bottom_right[0] < 0
-		|| destination_bottom_right[0] > destination_dimensions.width() as i32
+		|| destination_bottom_right[0] > destination_dimensions.width().get() as i32
 	{
 		return Err(CheckBlitImageError::DestinationCoordinatesOutOfRange)
 	}
 
 	if destination_bottom_right[1] < 0
-		|| destination_bottom_right[1] > destination_dimensions.height() as i32
+		|| destination_bottom_right[1] > destination_dimensions.height().get() as i32
 	{
 		return Err(CheckBlitImageError::DestinationCoordinatesOutOfRange)
 	}
 
 	if destination_bottom_right[2] < 0
-		|| destination_bottom_right[2] > destination_dimensions.depth() as i32
+		|| destination_bottom_right[2] > destination_dimensions.depth().get() as i32
 	{
 		return Err(CheckBlitImageError::DestinationCoordinatesOutOfRange)
 	}

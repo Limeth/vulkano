@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::num::NonZeroU32;
 
 use crate::{
 	buffer::BufferAccess,
@@ -47,9 +48,9 @@ pub unsafe trait ImageAccess {
 	/// Returns the dimensions of the image.
 	fn dimensions(&self) -> ImageDimensions { self.inner().dimensions }
 	/// Returns the number of mipmap levels of this image.
-	fn mipmap_levels(&self) -> u32 { self.inner().mipmap_levels }
+	fn mipmap_levels(&self) -> NonZeroU32 { self.inner().mipmap_levels }
 	/// Returns the number of samples of this image.
-	fn samples(&self) -> u32 { self.inner().samples }
+	fn samples(&self) -> NonZeroU32 { self.inner().samples }
 
 
 	/// Returns true if the image can be used as a source for blits.

@@ -45,18 +45,18 @@ impl<I: ImageAccess> ImageView<I> {
 		}
 
 		let image_array_layers = image_dimensions.array_layers();
-		if subresource_range.array_layers_end().get() > image_array_layers {
+		if subresource_range.array_layers_end().get() > image_array_layers.get() {
 			return Err(ImageViewCreationError::ArrayLayersOutOfRange {
 				requested: subresource_range.array_layers_range(),
-				image_layers: image_array_layers
+				image_layers: image_array_layers.get()
 			})
 		}
 
 		let image_mipmap_levels = image.mipmap_levels();
-		if subresource_range.mipmap_levels_end().get() > image_mipmap_levels {
+		if subresource_range.mipmap_levels_end().get() > image_mipmap_levels.get() {
 			return Err(ImageViewCreationError::MipmapLevelsOutOfRange {
 				requested: subresource_range.mipmap_levels_range(),
-				image_levels: image_mipmap_levels
+				image_levels: image_mipmap_levels.get()
 			})
 		}
 

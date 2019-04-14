@@ -662,7 +662,7 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 				|| !source.format().ty().is_depth_and_or_stencil()
 		);
 
-		debug_assert_eq!(source.parent().samples(), 1);
+		debug_assert_eq!(source.parent().samples().get(), 1);
 		debug_assert!(source.parent().supports_blit_source());
 		debug_assert!(source.inner().usage_transfer_source());
 		debug_assert!(
@@ -670,7 +670,7 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 				|| source_layout == ImageLayout::TransferSrcOptimal
 		);
 
-		debug_assert_eq!(destination.parent().samples(), 1);
+		debug_assert_eq!(destination.parent().samples().get(), 1);
 		debug_assert!(destination.parent().supports_blit_destination());
 		debug_assert!(destination.inner().usage_transfer_destination());
 		debug_assert!(
@@ -912,7 +912,7 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 		debug_assert!(source.offset < source.buffer.size());
 		debug_assert!(source.buffer.usage_transfer_source());
 
-		debug_assert_eq!(destination.parent().samples(), 1);
+		debug_assert_eq!(destination.parent().samples().get(), 1);
 		debug_assert!(destination.inner().usage_transfer_destination());
 		debug_assert!(
 			destination_layout == ImageLayout::General
@@ -981,7 +981,7 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 		D: ?Sized + BufferAccess,
 		R: Iterator<Item = UnsafeCommandBufferBuilderBufferImageCopy>
 	{
-		debug_assert_eq!(source.parent().samples(), 1);
+		debug_assert_eq!(source.parent().samples().get(), 1);
 		debug_assert!(source.inner().usage_transfer_source());
 		debug_assert!(
 			source_layout == ImageLayout::General

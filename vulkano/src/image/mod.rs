@@ -50,6 +50,8 @@ use std::{cmp, num::NonZeroU32, ops::Range};
 
 use vk_sys as vk;
 
+use crate::instance::Limits;
+
 mod layout;
 mod usage;
 
@@ -168,105 +170,111 @@ impl Default for ComponentSwizzle {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ImageDimensions {
-	Dim1D { width: u32 },
-	Dim1DArray { width: u32, array_layers: u32 },
+	Dim1D { width: NonZeroU32 },
+	Dim1DArray { width: NonZeroU32, array_layers: NonZeroU32 },
 
-	Dim2D { width: u32, height: u32 },
-	Dim2DArray { width: u32, height: u32, array_layers: u32 },
+	Dim2D { width: NonZeroU32, height: NonZeroU32 },
+	Dim2DArray { width: NonZeroU32, height: NonZeroU32, array_layers: NonZeroU32 },
 
-	Cubemap { size: u32 },
-	CubemapArray { size: u32, array_layers: u32 },
+	Cubemap { size: NonZeroU32 },
+	CubemapArray { size: NonZeroU32, array_layers: NonZeroU32 },
 
-	Dim3D { width: u32, height: u32, depth: u32 }
+	Dim3D { width: NonZeroU32, height: NonZeroU32, depth: NonZeroU32 }
 }
 impl ImageDimensions {
-	pub fn width(&self) -> u32 {
-		match *self {
-			ImageDimensions::Dim1D { width } => width,
-			ImageDimensions::Dim1DArray { width, .. } => width,
+	pub fn width(&self) -> NonZeroU32 {
+		match self {
+			ImageDimensions::Dim1D { width } => *width,
+			ImageDimensions::Dim1DArray { width, .. } => *width,
 
-			ImageDimensions::Dim2D { width, .. } => width,
-			ImageDimensions::Dim2DArray { width, .. } => width,
+			ImageDimensions::Dim2D { width, .. } => *width,
+			ImageDimensions::Dim2DArray { width, .. } => *width,
 
-			ImageDimensions::Cubemap { size } => size,
-			ImageDimensions::CubemapArray { size, .. } => size,
+			ImageDimensions::Cubemap { size } => *size,
+			ImageDimensions::CubemapArray { size, .. } => *size,
 
-			ImageDimensions::Dim3D { width, .. } => width
+			ImageDimensions::Dim3D { width, .. } => *width
 		}
 	}
 
-	pub fn height(&self) -> u32 {
-		match *self {
-			ImageDimensions::Dim1D { .. } => 1,
-			ImageDimensions::Dim1DArray { .. } => 1,
+	pub fn height(&self) -> NonZeroU32 {
+		match self {
+			ImageDimensions::Dim1D { .. } => crate::NONZERO_ONE,
+			ImageDimensions::Dim1DArray { .. } => crate::NONZERO_ONE,
 
-			ImageDimensions::Dim2D { height, .. } => height,
-			ImageDimensions::Dim2DArray { height, .. } => height,
+			ImageDimensions::Dim2D { height, .. } => *height,
+			ImageDimensions::Dim2DArray { height, .. } => *height,
 
-			ImageDimensions::Cubemap { size } => size,
-			ImageDimensions::CubemapArray { size, .. } => size,
+			ImageDimensions::Cubemap { size } => *size,
+			ImageDimensions::CubemapArray { size, .. } => *size,
 
-			ImageDimensions::Dim3D { height, .. } => height
+			ImageDimensions::Dim3D { height, .. } => *height
 		}
 	}
 
-	pub fn depth(&self) -> u32 {
-		match *self {
-			ImageDimensions::Dim1D { .. } => 1,
-			ImageDimensions::Dim1DArray { .. } => 1,
+	pub fn depth(&self) -> NonZeroU32 {
+		match self {
+			ImageDimensions::Dim1D { .. } => crate::NONZERO_ONE,
+			ImageDimensions::Dim1DArray { .. } => crate::NONZERO_ONE,
 
-			ImageDimensions::Dim2D { .. } => 1,
-			ImageDimensions::Dim2DArray { .. } => 1,
+			ImageDimensions::Dim2D { .. } => crate::NONZERO_ONE,
+			ImageDimensions::Dim2DArray { .. } => crate::NONZERO_ONE,
 
-			ImageDimensions::Cubemap { .. } => 1,
-			ImageDimensions::CubemapArray { .. } => 1,
+			ImageDimensions::Cubemap { .. } => crate::NONZERO_ONE,
+			ImageDimensions::CubemapArray { .. } => crate::NONZERO_ONE,
 
-			ImageDimensions::Dim3D { depth, .. } => depth
+			ImageDimensions::Dim3D { depth, .. } => *depth
 		}
 	}
 
-	pub fn width_height(&self) -> [u32; 2] { [self.width(), self.height()] }
+	/// Internally stored as NonZeroU32.
+	pub fn width_height(&self) -> [NonZeroU32; 2] { [self.width(), self.height()] }
 
-	pub fn width_height_depth(&self) -> [u32; 3] { [self.width(), self.height(), self.depth()] }
+	/// Internally stored as NonZeroU32.
+	pub fn width_height_depth(&self) -> [NonZeroU32; 3] { [self.width(), self.height(), self.depth()] }
 
-	pub fn array_layers(&self) -> u32 {
-		match *self {
-			ImageDimensions::Dim1D { .. } => 1,
-			ImageDimensions::Dim1DArray { array_layers, .. } => array_layers,
+	pub fn array_layers(&self) -> NonZeroU32 {
+		match self {
+			ImageDimensions::Dim1D { .. } => crate::NONZERO_ONE,
+			ImageDimensions::Dim1DArray { array_layers, .. } => *array_layers,
 
-			ImageDimensions::Dim2D { .. } => 1,
-			ImageDimensions::Dim2DArray { array_layers, .. } => array_layers,
+			ImageDimensions::Dim2D { .. } => crate::NONZERO_ONE,
+			ImageDimensions::Dim2DArray { array_layers, .. } => *array_layers,
 
-			ImageDimensions::Cubemap { .. } => 1,
-			ImageDimensions::CubemapArray { array_layers, .. } => array_layers,
+			ImageDimensions::Cubemap { .. } => crate::NONZERO_ONE,
+			ImageDimensions::CubemapArray { array_layers, .. } => *array_layers,
 
-			ImageDimensions::Dim3D { .. } => 1
+			ImageDimensions::Dim3D { .. } => crate::NONZERO_ONE
 		}
 	}
 
-	pub fn array_layers_with_cube(&self) -> u32 {
-		match *self {
-			ImageDimensions::Dim1D { .. } => 1,
-			ImageDimensions::Dim1DArray { array_layers, .. } => array_layers,
+	pub fn array_layers_with_cube(&self) -> NonZeroU32 {
+		match self {
+			ImageDimensions::Dim1D { .. } => crate::NONZERO_ONE,
+			ImageDimensions::Dim1DArray { array_layers, .. } => *array_layers,
 
-			ImageDimensions::Dim2D { .. } => 1,
-			ImageDimensions::Dim2DArray { array_layers, .. } => array_layers,
+			ImageDimensions::Dim2D { .. } => crate::NONZERO_ONE,
+			ImageDimensions::Dim2DArray { array_layers, .. } => *array_layers,
 
-			ImageDimensions::Cubemap { .. } => 6,
-			ImageDimensions::CubemapArray { array_layers, .. } => array_layers * 6,
+			ImageDimensions::Cubemap { .. } => unsafe { NonZeroU32::new_unchecked(6) },
+			ImageDimensions::CubemapArray { array_layers, .. } => unsafe { NonZeroU32::new_unchecked(array_layers.get() * 6) },
 
-			ImageDimensions::Dim3D { .. } => 1
+			ImageDimensions::Dim3D { .. } => crate::NONZERO_ONE
 		}
 	}
 
 	/// Returns the total number of texels for an image of these dimensions.
-	pub fn num_texels(&self) -> u32 {
-		self.width() * self.height() * self.depth() * self.array_layers_with_cube()
+	pub fn num_texels(&self) -> NonZeroU32 {
+		unsafe {
+			NonZeroU32::new_unchecked(
+				self.width().get() * self.height().get() * self.depth().get() * self.array_layers_with_cube().get()
+			)
+		}
 	}
 
 	/// Returns the maximum number of mipmaps for these image dimensions.
 	///
-	/// The returned value is always at least superior or equal to 1.
+	/// The returned value is always at greater than or equal to 1.
 	///
 	/// # Example
 	///
@@ -282,14 +290,14 @@ impl ImageDimensions {
 	///
 	/// assert_eq!(dims.max_mipmaps(), 7);
 	/// ```
-	///
-	/// # Panic
-	///
-	/// May panic if the dimensions are 0.
-	pub fn max_mipmaps(&self) -> u32 {
-		let max_dim = cmp::max(cmp::max(self.width(), self.height()), self.depth());
+	pub fn max_mipmaps(&self) -> NonZeroU32 {
+		let max_dim = cmp::max(cmp::max(self.width().get(), self.height().get()), self.depth().get());
 		let num_zeroes = 32 - (max_dim - 1).leading_zeros();
-		num_zeroes + 1
+		unsafe {
+			NonZeroU32::new_unchecked(
+				num_zeroes + 1
+			)
+		}
 	}
 
 	/// Returns the dimensions of the `level`th mipmap level. If `level` is 0, then the dimensions
@@ -348,63 +356,58 @@ impl ImageDimensions {
 		if level == 0 {
 			return Some(*self)
 		}
-		if level >= self.max_mipmaps() {
+		if level >= self.max_mipmaps().get() {
 			return None
 		}
 
+		let mlvl = |n: u32| {
+			unsafe {
+				NonZeroU32::new_unchecked(
+					(((n - 1) >> level) + 1).next_power_of_two()
+				)
+			}
+		};
+
 		Some(match *self {
 			ImageDimensions::Dim1D { width } => {
-				debug_assert_ne!(width, 0);
-				ImageDimensions::Dim1D { width: (((width - 1) >> level) + 1).next_power_of_two() }
+				ImageDimensions::Dim1D { width: mlvl(width.get()) }
 			}
 			ImageDimensions::Dim1DArray { width, array_layers } => {
-				debug_assert_ne!(width, 0);
 				ImageDimensions::Dim1DArray {
-					width: (((width - 1) >> level) + 1).next_power_of_two(),
+					width: mlvl(width.get()),
 					array_layers
 				}
 			}
 
 			ImageDimensions::Dim2D { width, height } => {
-				debug_assert_ne!(width, 0);
-				debug_assert_ne!(height, 0);
-
 				ImageDimensions::Dim2D {
-					width: (((width - 1) >> level) + 1).next_power_of_two(),
-					height: (((height - 1) >> level) + 1).next_power_of_two()
+					width: mlvl(width.get()),
+					height: mlvl(height.get())
 				}
 			}
 			ImageDimensions::Dim2DArray { width, height, array_layers } => {
-				debug_assert_ne!(width, 0);
-				debug_assert_ne!(height, 0);
 				ImageDimensions::Dim2DArray {
-					width: (((width - 1) >> level) + 1).next_power_of_two(),
-					height: (((height - 1) >> level) + 1).next_power_of_two(),
+					width: mlvl(width.get()),
+					height: mlvl(height.get()),
 					array_layers
 				}
 			}
 
 			ImageDimensions::Cubemap { size } => {
-				debug_assert_ne!(size, 0);
-				ImageDimensions::Cubemap { size: (((size - 1) >> level) + 1).next_power_of_two() }
+				ImageDimensions::Cubemap { size: mlvl(size.get()) }
 			}
 			ImageDimensions::CubemapArray { size, array_layers } => {
-				debug_assert_ne!(size, 0);
 				ImageDimensions::CubemapArray {
-					size: (((size - 1) >> level) + 1).next_power_of_two(),
+					size: mlvl(size.get()),
 					array_layers
 				}
 			}
 
 			ImageDimensions::Dim3D { width, height, depth } => {
-				debug_assert_ne!(width, 0);
-				debug_assert_ne!(height, 0);
-				debug_assert_ne!(depth, 0);
-
 				ImageDimensions::Dim3D {
-					width: (((width - 1) >> level) + 1).next_power_of_two(),
-					height: (((height - 1) >> level) + 1).next_power_of_two(),
-					depth: (((depth - 1) >> level) + 1).next_power_of_two()
+					width: mlvl(width.get()),
+					height: mlvl(height.get()),
+					depth: mlvl(depth.get())
 				}
 			}
 		})
@@ -416,6 +419,40 @@ impl ImageDimensions {
 	/// Returns the number of dimensions these dimensions have.
 	pub fn dimension_type(&self) -> ImageDimensionType {
 		ImageViewType::from(*self).dimension_type()
+	}
+
+	/// Returns true if these dimensions are not over
+	/// the device limits.
+	pub fn check_limits(&self, limits: Limits) -> bool {
+		match self {
+			ImageDimensions::Dim1D { width } => width.get() <= limits.max_image_dimension_1d(),
+			ImageDimensions::Dim1DArray { width, array_layers } => {
+				width.get() <= limits.max_image_dimension_1d()
+					&& array_layers.get() <= limits.max_image_array_layers()
+			}
+
+			ImageDimensions::Dim2D { width, height } => {
+				width.get() <= limits.max_image_dimension_2d()
+					&& height.get() <= limits.max_image_dimension_2d()
+			}
+			ImageDimensions::Dim2DArray { width, height, array_layers } => {
+				width.get() <= limits.max_image_dimension_2d()
+					&& height.get() <= limits.max_image_dimension_2d()
+					&& array_layers.get() <= limits.max_image_array_layers()
+			}
+
+			ImageDimensions::Cubemap { size } => size.get() <= limits.max_image_dimension_cube(),
+			ImageDimensions::CubemapArray { size, array_layers } => {
+				size.get() <= limits.max_image_dimension_cube()
+					&& array_layers.get() * 6 <= limits.max_image_array_layers()
+			}
+
+			ImageDimensions::Dim3D { width, height, depth } => {
+				width.get() <= limits.max_image_dimension_3d()
+					&& height.get() <= limits.max_image_dimension_3d()
+					&& depth.get() <= limits.max_image_dimension_3d()
+			}
+		}
 	}
 }
 
