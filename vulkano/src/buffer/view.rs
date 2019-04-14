@@ -303,13 +303,15 @@ impl From<Error> for BufferViewCreationError {
 
 #[cfg(test)]
 mod tests {
-	use crate::buffer::{
-		immutable::ImmutableBuffer,
-		view::BufferViewCreationError,
-		BufferUsage,
-		BufferView
+	use crate::{
+		buffer::{
+			immutable::ImmutableBuffer,
+			view::BufferViewCreationError,
+			BufferUsage,
+			BufferView
+		},
+		format
 	};
-	use format;
 
 	#[test]
 	fn create_uniform() {

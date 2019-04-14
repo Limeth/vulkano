@@ -11,14 +11,14 @@
 
 /// Creates an instance or returns if initialization fails.
 macro_rules! instance {
-    () => ({
-        use crate::instance;
+	() => {{
+		use crate::instance;
 
-        match instance::Instance::new(None, &instance::InstanceExtensions::none(), None) {
-            Ok(i) => i,
-            Err(_) => return
-        }
-    })
+		match instance::Instance::new(None, &instance::InstanceExtensions::none(), None) {
+			Ok(i) => i,
+			Err(_) => return
+			}
+		}};
 }
 
 /// Creates a device and a queue for graphics operations.
@@ -67,33 +67,29 @@ macro_rules! gfx_dev_and_queue {
 }
 
 macro_rules! assert_should_panic {
-    ($msg:expr, $code:block) => ({
-        let res = ::std::panic::catch_unwind(|| {
-            $code
-        });
+	($msg:expr, $code:block) => {{
+		let res = ::std::panic::catch_unwind(|| $code);
 
-        match res {
-            Ok(_) => panic!("Test expected to panic but didn't"),
-            Err(err) => {
-                if let Some(msg) = err.downcast_ref::<String>() {
-                    assert!(msg.contains($msg));
-                } else if let Some(&msg) = err.downcast_ref::<&str>() {
-                    assert!(msg.contains($msg));
-                } else {
-                    panic!("Couldn't decipher the panic message of the test")
-                }
-            }
-        }
-    });
+		match res {
+			Ok(_) => panic!("Test expected to panic but didn't"),
+			Err(err) => {
+				if let Some(msg) = err.downcast_ref::<String>() {
+					assert!(msg.contains($msg));
+				} else if let Some(&msg) = err.downcast_ref::<&str>() {
+					assert!(msg.contains($msg));
+				} else {
+					panic!("Couldn't decipher the panic message of the test")
+				}
+				}
+			}
+		}};
 
-    ($code:block) => ({
-        let res = ::std::panic::catch_unwind(|| {
-            $code
-        });
+	($code:block) => {{
+		let res = ::std::panic::catch_unwind(|| $code);
 
-        match res {
-            Ok(_) => panic!("Test expected to panic but didn't"),
-            Err(_) => {}
-        }
-    });
+		match res {
+			Ok(_) => panic!("Test expected to panic but didn't"),
+			Err(_) => {}
+			}
+		}};
 }

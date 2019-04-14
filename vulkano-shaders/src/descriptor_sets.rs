@@ -259,10 +259,10 @@ fn descriptor_infos(
 							false => quote!{ DescriptorDescTy::Image }
 						};
 						let dim = match *dim {
-							Dim::Dim1D => quote!{ DescriptorImageDescDimensions::OneDimensional },
-							Dim::Dim2D => quote!{ DescriptorImageDescDimensions::TwoDimensional },
-							Dim::Dim3D => quote!{ DescriptorImageDescDimensions::ThreeDimensional },
-							Dim::DimCube => quote!{ DescriptorImageDescDimensions::Cube },
+							Dim::Dim1D => quote!{ ImageDimensionsType::OneDimensional },
+							Dim::Dim2D => quote!{ ImageDimensionsType::TwoDimensional },
+							Dim::Dim3D => quote!{ ImageDimensionsType::ThreeDimensional },
+							Dim::DimCube => quote!{ ImageDimensionsType::Cube },
 							Dim::DimRect => panic!("Vulkan doesn't support rectangle textures"),
 							_ => unreachable!()
 						};

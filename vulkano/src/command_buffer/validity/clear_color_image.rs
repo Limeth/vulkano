@@ -9,7 +9,7 @@
 
 use std::{error, fmt};
 
-use crate::{device::Device, image::ImageAccess, VulkanObject};
+use crate::{device::Device, image::ImageViewAccess, VulkanObject};
 
 /// Checks whether a clear color image command is valid.
 ///
@@ -21,19 +21,19 @@ pub fn check_clear_color_image<I>(
 	num_mipmaps: u32
 ) -> Result<(), CheckClearColorImageError>
 where
-	I: ?Sized + ImageAccess
+	I: ?Sized + ImageViewAccess
 {
-	assert_eq!(image.inner().image.device().internal_object(), device.internal_object());
+	assert_eq!(image.parent().device().internal_object(), device.internal_object());
 
-	if !image.inner().image.usage_transfer_destination() {
+	if !image.inner().usage_transfer_destination() {
 		return Err(CheckClearColorImageError::MissingTransferUsage)
 	}
 
-	if first_layer + num_layers > image.dimensions().array_layers() {
+	if first_layer + num_layers > image.subresource_range().array_layers.get() {
 		return Err(CheckClearColorImageError::OutOfRange)
 	}
 
-	if first_mipmap + num_mipmaps > image.mipmap_levels() {
+	if first_mipmap + num_mipmaps > image.subresource_range().mipmap_levels.get() {
 		return Err(CheckClearColorImageError::OutOfRange)
 	}
 

@@ -12,8 +12,8 @@ use crate::format::ClearValue;
 mod image_access;
 mod image_view_access;
 
-pub use image_access::{ImageAccess, ImageAccessFromUndefinedLayout, ImageInner};
-pub use image_view_access::{AttachmentImageView, ImageViewAccess};
+pub use image_access::ImageAccess;
+pub use image_view_access::ImageViewAccess;
 
 /// Extension trait for images. Checks whether the value `T` can be used as a clear value for the
 /// given image.

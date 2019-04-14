@@ -71,8 +71,8 @@ use std::{
 pub use half;
 use vk_sys as vk;
 
-// #[macro_use]
-// mod tests;
+#[macro_use]
+mod tests;
 
 #[macro_use]
 mod extensions;

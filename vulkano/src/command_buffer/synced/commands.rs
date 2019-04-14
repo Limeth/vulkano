@@ -14,11 +14,8 @@ use crate::{
 	buffer::BufferAccess,
 	command_buffer::{
 		synced::{
-			misc::{
-				Command, FinalCommand,
-				KeyTy, SyncCommandBufferBuilderError
-			},
-			builder::SyncCommandBufferBuilder
+			builder::SyncCommandBufferBuilder,
+			misc::{Command, FinalCommand, KeyTy, SyncCommandBufferBuilderError}
 		},
 		sys::{
 			UnsafeCommandBufferBuilder,
@@ -38,7 +35,7 @@ use crate::{
 	},
 	format::ClearValue,
 	framebuffer::{FramebufferAbstract, SubpassContents},
-	image::{ImageAccess, ImageLayout},
+	image::{ImageLayout, ImageViewAccess},
 	pipeline::{
 		input_assembly::IndexType,
 		viewport::{Scissor, Viewport},
@@ -90,8 +87,8 @@ impl<P> SyncCommandBufferBuilder<P> {
 				{
 					fn name(&self) -> &'static str { "vkCmdBeginRenderPass" }
 
-					fn image(&self, num: usize) -> &ImageAccess {
-						self.0.attached_image_view(num).unwrap().parent()
+					fn image(&self, num: usize) -> &dyn ImageViewAccess {
+						self.0.attached_image_view(num).unwrap()
 					}
 
 					fn image_name(&self, num: usize) -> Cow<'static, str> {
@@ -101,8 +98,8 @@ impl<P> SyncCommandBufferBuilder<P> {
 				Box::new(Fin(self.framebuffer))
 			}
 
-			fn image(&self, num: usize) -> &ImageAccess {
-				self.framebuffer.attached_image_view(num).unwrap().parent()
+			fn image(&self, num: usize) -> &dyn ImageViewAccess {
+				self.framebuffer.attached_image_view(num).unwrap()
 			}
 
 			fn image_name(&self, num: usize) -> Cow<'static, str> {
@@ -301,8 +298,8 @@ impl<P> SyncCommandBufferBuilder<P> {
 		destination_layout: ImageLayout, regions: R
 	) -> Result<(), SyncCommandBufferBuilderError>
 	where
-		S: ImageAccess + Send + Sync + 'static,
-		D: ImageAccess + Send + Sync + 'static,
+		S: ImageViewAccess + Send + Sync + 'static,
+		D: ImageViewAccess + Send + Sync + 'static,
 		R: Iterator<Item = UnsafeCommandBufferBuilderImageCopy> + Send + Sync + 'static
 	{
 		struct Cmd<S, D, R> {
@@ -315,8 +312,8 @@ impl<P> SyncCommandBufferBuilder<P> {
 
 		impl<P, S, D, R> Command<P> for Cmd<S, D, R>
 		where
-			S: ImageAccess + Send + Sync + 'static,
-			D: ImageAccess + Send + Sync + 'static,
+			S: ImageViewAccess + Send + Sync + 'static,
+			D: ImageViewAccess + Send + Sync + 'static,
 			R: Iterator<Item = UnsafeCommandBufferBuilderImageCopy>
 		{
 			fn name(&self) -> &'static str { "vkCmdCopyImage" }
@@ -335,12 +332,12 @@ impl<P> SyncCommandBufferBuilder<P> {
 				struct Fin<S, D>(S, D);
 				impl<S, D> FinalCommand for Fin<S, D>
 				where
-					S: ImageAccess + Send + Sync + 'static,
-					D: ImageAccess + Send + Sync + 'static
+					S: ImageViewAccess + Send + Sync + 'static,
+					D: ImageViewAccess + Send + Sync + 'static
 				{
 					fn name(&self) -> &'static str { "vkCmdCopyImage" }
 
-					fn image(&self, num: usize) -> &ImageAccess {
+					fn image(&self, num: usize) -> &dyn ImageViewAccess {
 						if num == 0 {
 							&self.0
 						} else if num == 1 {
@@ -366,7 +363,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 				Box::new(Fin(self.source.take().unwrap(), self.destination.take().unwrap()))
 			}
 
-			fn image(&self, num: usize) -> &ImageAccess {
+			fn image(&self, num: usize) -> &dyn ImageViewAccess {
 				if num == 0 {
 					self.source.as_ref().unwrap()
 				} else if num == 1 {
@@ -424,8 +421,8 @@ impl<P> SyncCommandBufferBuilder<P> {
 		destination_layout: ImageLayout, regions: R, filter: Filter
 	) -> Result<(), SyncCommandBufferBuilderError>
 	where
-		S: ImageAccess + Send + Sync + 'static,
-		D: ImageAccess + Send + Sync + 'static,
+		S: ImageViewAccess + Send + Sync + 'static,
+		D: ImageViewAccess + Send + Sync + 'static,
 		R: Iterator<Item = UnsafeCommandBufferBuilderImageBlit> + Send + Sync + 'static
 	{
 		struct Cmd<S, D, R> {
@@ -439,8 +436,8 @@ impl<P> SyncCommandBufferBuilder<P> {
 
 		impl<P, S, D, R> Command<P> for Cmd<S, D, R>
 		where
-			S: ImageAccess + Send + Sync + 'static,
-			D: ImageAccess + Send + Sync + 'static,
+			S: ImageViewAccess + Send + Sync + 'static,
+			D: ImageViewAccess + Send + Sync + 'static,
 			R: Iterator<Item = UnsafeCommandBufferBuilderImageBlit>
 		{
 			fn name(&self) -> &'static str { "vkCmdBlitImage" }
@@ -460,12 +457,12 @@ impl<P> SyncCommandBufferBuilder<P> {
 				struct Fin<S, D>(S, D);
 				impl<S, D> FinalCommand for Fin<S, D>
 				where
-					S: ImageAccess + Send + Sync + 'static,
-					D: ImageAccess + Send + Sync + 'static
+					S: ImageViewAccess + Send + Sync + 'static,
+					D: ImageViewAccess + Send + Sync + 'static
 				{
 					fn name(&self) -> &'static str { "vkCmdBlitImage" }
 
-					fn image(&self, num: usize) -> &ImageAccess {
+					fn image(&self, num: usize) -> &dyn ImageViewAccess {
 						if num == 0 {
 							&self.0
 						} else if num == 1 {
@@ -491,7 +488,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 				Box::new(Fin(self.source.take().unwrap(), self.destination.take().unwrap()))
 			}
 
-			fn image(&self, num: usize) -> &ImageAccess {
+			fn image(&self, num: usize) -> &dyn ImageViewAccess {
 				if num == 0 {
 					self.source.as_ref().unwrap()
 				} else if num == 1 {
@@ -549,7 +546,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 		&mut self, image: I, layout: ImageLayout, color: ClearValue, regions: R
 	) -> Result<(), SyncCommandBufferBuilderError>
 	where
-		I: ImageAccess + Send + Sync + 'static,
+		I: ImageViewAccess + Send + Sync + 'static,
 		R: Iterator<Item = UnsafeCommandBufferBuilderColorImageClear> + Send + Sync + 'static
 	{
 		struct Cmd<I, R> {
@@ -561,7 +558,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 
 		impl<P, I, R> Command<P> for Cmd<I, R>
 		where
-			I: ImageAccess + Send + Sync + 'static,
+			I: ImageViewAccess + Send + Sync + 'static,
 			R: Iterator<Item = UnsafeCommandBufferBuilderColorImageClear> + Send + Sync + 'static
 		{
 			fn name(&self) -> &'static str { "vkCmdClearColorImage" }
@@ -579,11 +576,11 @@ impl<P> SyncCommandBufferBuilder<P> {
 				struct Fin<I>(I);
 				impl<I> FinalCommand for Fin<I>
 				where
-					I: ImageAccess + Send + Sync + 'static
+					I: ImageViewAccess + Send + Sync + 'static
 				{
 					fn name(&self) -> &'static str { "vkCmdClearColorImage" }
 
-					fn image(&self, num: usize) -> &ImageAccess {
+					fn image(&self, num: usize) -> &dyn ImageViewAccess {
 						assert_eq!(num, 0);
 						&self.0
 					}
@@ -598,7 +595,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 				Box::new(Fin(self.image.take().unwrap()))
 			}
 
-			fn image(&self, num: usize) -> &ImageAccess {
+			fn image(&self, num: usize) -> &dyn ImageViewAccess {
 				assert_eq!(num, 0);
 				self.image.as_ref().unwrap()
 			}
@@ -738,7 +735,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 	) -> Result<(), SyncCommandBufferBuilderError>
 	where
 		S: BufferAccess + Send + Sync + 'static,
-		D: ImageAccess + Send + Sync + 'static,
+		D: ImageViewAccess + Send + Sync + 'static,
 		R: Iterator<Item = UnsafeCommandBufferBuilderBufferImageCopy> + Send + Sync + 'static
 	{
 		struct Cmd<S, D, R> {
@@ -751,7 +748,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 		impl<P, S, D, R> Command<P> for Cmd<S, D, R>
 		where
 			S: BufferAccess + Send + Sync + 'static,
-			D: ImageAccess + Send + Sync + 'static,
+			D: ImageViewAccess + Send + Sync + 'static,
 			R: Iterator<Item = UnsafeCommandBufferBuilderBufferImageCopy>
 		{
 			fn name(&self) -> &'static str { "vkCmdCopyBufferToImage" }
@@ -770,7 +767,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 				impl<S, D> FinalCommand for Fin<S, D>
 				where
 					S: BufferAccess + Send + Sync + 'static,
-					D: ImageAccess + Send + Sync + 'static
+					D: ImageViewAccess + Send + Sync + 'static
 				{
 					fn name(&self) -> &'static str { "vkCmdCopyBufferToImage" }
 
@@ -784,7 +781,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 						"source".into()
 					}
 
-					fn image(&self, num: usize) -> &ImageAccess {
+					fn image(&self, num: usize) -> &dyn ImageViewAccess {
 						assert_eq!(num, 0);
 						&self.1
 					}
@@ -810,7 +807,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 				"source".into()
 			}
 
-			fn image(&self, num: usize) -> &ImageAccess {
+			fn image(&self, num: usize) -> &dyn ImageViewAccess {
 				assert_eq!(num, 0);
 				self.destination.as_ref().unwrap()
 			}
@@ -856,7 +853,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 		&mut self, source: S, source_layout: ImageLayout, destination: D, regions: R
 	) -> Result<(), SyncCommandBufferBuilderError>
 	where
-		S: ImageAccess + Send + Sync + 'static,
+		S: ImageViewAccess + Send + Sync + 'static,
 		D: BufferAccess + Send + Sync + 'static,
 		R: Iterator<Item = UnsafeCommandBufferBuilderBufferImageCopy> + Send + Sync + 'static
 	{
@@ -869,7 +866,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 
 		impl<P, S, D, R> Command<P> for Cmd<S, D, R>
 		where
-			S: ImageAccess + Send + Sync + 'static,
+			S: ImageViewAccess + Send + Sync + 'static,
 			D: BufferAccess + Send + Sync + 'static,
 			R: Iterator<Item = UnsafeCommandBufferBuilderBufferImageCopy>
 		{
@@ -888,7 +885,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 				struct Fin<S, D>(S, D);
 				impl<S, D> FinalCommand for Fin<S, D>
 				where
-					S: ImageAccess + Send + Sync + 'static,
+					S: ImageViewAccess + Send + Sync + 'static,
 					D: BufferAccess + Send + Sync + 'static
 				{
 					fn name(&self) -> &'static str { "vkCmdCopyImageToBuffer" }
@@ -903,7 +900,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 						"destination".into()
 					}
 
-					fn image(&self, num: usize) -> &ImageAccess {
+					fn image(&self, num: usize) -> &dyn ImageViewAccess {
 						assert_eq!(num, 0);
 						&self.0
 					}
@@ -929,7 +926,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 				"destination".into()
 			}
 
-			fn image(&self, num: usize) -> &ImageAccess {
+			fn image(&self, num: usize) -> &dyn ImageViewAccess {
 				assert_eq!(num, 0);
 				self.source.as_ref().unwrap()
 			}
@@ -1771,10 +1768,10 @@ impl<'b, P> SyncCommandBufferBuilderBindDescriptorSets<'b, P> {
 						panic!()
 					}
 
-					fn image(&self, mut num: usize) -> &ImageAccess {
+					fn image(&self, mut num: usize) -> &dyn ImageViewAccess {
 						for set in self.0.iter() {
 							if let Some(img) = set.image(num) {
-								return img.0.parent()
+								return img.0
 							}
 							num -= set.num_images();
 						}
@@ -1819,10 +1816,10 @@ impl<'b, P> SyncCommandBufferBuilderBindDescriptorSets<'b, P> {
 				panic!()
 			}
 
-			fn image(&self, mut num: usize) -> &ImageAccess {
+			fn image(&self, mut num: usize) -> &dyn ImageViewAccess {
 				for set in self.inner.iter() {
 					if let Some(img) = set.image(num) {
-						return img.0.parent()
+						return img.0
 					}
 					num -= set.num_images();
 				}

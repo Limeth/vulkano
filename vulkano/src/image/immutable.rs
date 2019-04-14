@@ -27,7 +27,6 @@ use crate::{
 		sys::{ImageCreationError, UnsafeImage, UnsafeImageView},
 		traits::{ImageAccess, ImageContent, ImageViewAccess},
 		ImageDimensions,
-		ImageInner,
 		ImageLayout,
 		ImageUsage,
 		MipmapsCount
@@ -165,7 +164,7 @@ impl<F> ImmutableImage<F> {
 		}
 
 		let view = unsafe {
-			UnsafeImageView::raw(
+			UnsafeImageView::new(
 				&image,
 				dimensions.into(),
 				0 .. image.mipmap_levels(),

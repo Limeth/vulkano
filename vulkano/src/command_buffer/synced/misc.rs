@@ -8,13 +8,9 @@ use std::{
 
 use crate::{
 	buffer::BufferAccess,
-	command_buffer::{
-		sys::{
-			UnsafeCommandBufferBuilder,
-		},
-	},
-	image::{ImageAccess, ImageLayout},
-	sync::{ AccessFlagBits, PipelineStages},
+	command_buffer::sys::UnsafeCommandBufferBuilder,
+	image::{ImageLayout, ImageViewAccess},
+	sync::{AccessFlagBits, PipelineStages}
 };
 
 // Usage of a resource in a finished command buffer.
@@ -46,7 +42,7 @@ pub trait FinalCommand {
 	fn buffer(&self, _num: usize) -> &BufferAccess { panic!() }
 
 	// Gives access to the `num`th image used by the command.
-	fn image(&self, _num: usize) -> &ImageAccess { panic!() }
+	fn image(&self, _num: usize) -> &dyn ImageViewAccess { panic!() }
 
 	// Returns a user-friendly name for the `num`th buffer used by the command, for error
 	// reporting purposes.
@@ -88,7 +84,7 @@ pub(super) enum CbKey<'a> {
 
 	// Temporary key that holds a reference to an image. Should never be stored in the list of
 	// resources of `SyncCommandBuffer`.
-	ImageRef(&'a ImageAccess)
+	ImageRef(&'a ImageViewAccess)
 }
 
 // The `CbKey::Command` variants implements `Send` and `Sync`, but the other two variants don't
@@ -128,7 +124,7 @@ impl<'a> CbKey<'a> {
 	}
 
 	fn conflicts_image(
-		&self, commands_lock: Option<&Vec<Box<FinalCommand + Send + Sync>>>, img: &ImageAccess
+		&self, commands_lock: Option<&Vec<Box<FinalCommand + Send + Sync>>>, img: &ImageViewAccess
 	) -> bool {
 		match *self {
 			CbKey::Command { ref commands, command_id, resource_ty, resource_index } => {
@@ -275,7 +271,7 @@ pub trait Command<P> {
 	fn buffer(&self, _num: usize) -> &BufferAccess { panic!() }
 
 	// Gives access to the `num`th image used by the command.
-	fn image(&self, _num: usize) -> &ImageAccess { panic!() }
+	fn image(&self, _num: usize) -> &dyn ImageViewAccess { panic!() }
 
 	// Returns a user-friendly name for the `num`th buffer used by the command, for error
 	// reporting purposes.
@@ -332,12 +328,12 @@ impl<P> BuilderKey<P> {
 			}
 			KeyTy::Image => {
 				let c = &commands_lock.commands[self.command_id];
-				c.image(self.resource_index).conflicts_buffer(buf)
+				c.image(self.resource_index).parent().conflicts_buffer(buf)
 			}
 		}
 	}
 
-	fn conflicts_image(&self, commands_lock: &Commands<P>, img: &ImageAccess) -> bool {
+	fn conflicts_image(&self, commands_lock: &Commands<P>, img: &ImageViewAccess) -> bool {
 		// TODO: put the conflicts_* methods directly on the Command trait to avoid an indirect call?
 		match self.resource_ty {
 			KeyTy::Buffer => {
@@ -383,7 +379,7 @@ impl<P> Hash for BuilderKey<P> {
 			}
 			KeyTy::Image => {
 				let c = &commands_lock.commands[self.command_id];
-				c.image(self.resource_index).conflict_key().hash(state)
+				c.image(self.resource_index).parent().conflict_key().hash(state)
 			}
 		}
 	}

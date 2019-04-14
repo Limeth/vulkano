@@ -18,12 +18,12 @@ build = "build.rs"
 
 [dependencies]
 fnv = "1.0.6"
-smallvec = "0.6.0"
+smallvec = "0.6"
 
 lazy_static = "1"
 half = "1"
 
 crossbeam = "0.7"
-shared_library = "0.1.7"
+shared_library = "0.1"
 
 vk-sys = { version = "0.4.0", path = "../vk-sys" }

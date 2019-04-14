@@ -13,7 +13,7 @@ use crate::{
 	buffer::TypedBufferAccess,
 	device::{Device, DeviceOwned},
 	format::{AcceptsPixels, Format, IncompatiblePixelsType},
-	image::ImageAccess,
+	image::ImageViewAccess,
 	VulkanObject
 };
 
@@ -36,27 +36,25 @@ pub fn check_copy_buffer_image<B, I, P>(
 	image_size: [u32; 3], image_first_layer: u32, image_num_layers: u32, image_mipmap: u32
 ) -> Result<(), CheckCopyBufferImageError>
 where
-	I: ?Sized + ImageAccess,
+	I: ?Sized + ImageViewAccess,
 	B: ?Sized + TypedBufferAccess<Content = [P]>,
 	Format: AcceptsPixels<P> // TODO: use a trait on the image itself instead
 {
 	let buffer_inner = buffer.inner();
-	let image_inner = image.inner();
-
 	assert_eq!(buffer_inner.buffer.device().internal_object(), device.internal_object());
-	assert_eq!(image_inner.image.device().internal_object(), device.internal_object());
+	assert_eq!(image.parent().device().internal_object(), device.internal_object());
 
 	match ty {
 		CheckCopyBufferImageTy::BufferToImage => {
 			if !buffer_inner.buffer.usage_transfer_source() {
 				return Err(CheckCopyBufferImageError::SourceMissingTransferUsage)
 			}
-			if !image_inner.image.usage_transfer_destination() {
+			if !image.inner().usage_transfer_destination() {
 				return Err(CheckCopyBufferImageError::DestinationMissingTransferUsage)
 			}
 		}
 		CheckCopyBufferImageTy::ImageToBuffer => {
-			if !image_inner.image.usage_transfer_source() {
+			if !image.inner().usage_transfer_source() {
 				return Err(CheckCopyBufferImageError::SourceMissingTransferUsage)
 			}
 			if !buffer_inner.buffer.usage_transfer_destination() {
@@ -65,7 +63,7 @@ where
 		}
 	}
 
-	if image.samples() != 1 {
+	if image.parent().samples() != 1 {
 		return Err(CheckCopyBufferImageError::UnexpectedMultisampled)
 	}
 

@@ -1,22 +1,15 @@
 use fnv::FnvHashMap;
-use std::{
-	sync::{Arc, Mutex}
-};
+use std::sync::{Arc, Mutex};
 
 use crate::{
 	buffer::BufferAccess,
-	command_buffer::{
-		sys::{
-			UnsafeCommandBuffer,
-		},
-		CommandBufferExecError
-	},
+	command_buffer::{sys::UnsafeCommandBuffer, CommandBufferExecError},
 	device::{Device, DeviceOwned, Queue},
-	image::{ImageAccess, ImageLayout},
+	image::{ImageLayout, ImageViewAccess},
 	sync::{AccessCheckError, AccessError, AccessFlagBits, GpuFuture, PipelineStages}
 };
 
-use super::misc::{ CbKey, ResourceFinalState, FinalCommand, KeyTy };
+use super::misc::{CbKey, FinalCommand, KeyTy, ResourceFinalState};
 
 /// Command buffer built from a `SyncCommandBufferBuilder` that provides utilities to handle
 /// synchronization.
@@ -116,7 +109,7 @@ impl<P> SyncCommandBuffer<P> {
 						Err(err) => err
 					};
 
-					match (img.try_gpu_lock(entry.exclusive, entry.initial_layout), prev_err) {
+					match (img.initiate_gpu_lock(entry.exclusive, entry.initial_layout), prev_err) {
 						(Ok(_), _) => (),
 						(Err(err), AccessCheckError::Unknown)
 						| (_, AccessCheckError::Denied(err)) => {
@@ -158,7 +151,7 @@ impl<P> SyncCommandBuffer<P> {
 						let cmd = &commands_lock[command_id];
 						let img = cmd.image(resource_index);
 						unsafe {
-							img.unlock(None);
+							img.decrease_gpu_lock(None);
 						}
 					}
 				}
@@ -202,7 +195,7 @@ impl<P> SyncCommandBuffer<P> {
 					} else {
 						None
 					};
-					img.unlock(trans);
+					img.decrease_gpu_lock(trans);
 				}
 			}
 		}
@@ -231,14 +224,14 @@ impl<P> SyncCommandBuffer<P> {
 	///
 	/// > **Note**: Suitable when implementing the `CommandBuffer` trait.
 	pub fn check_image_access(
-		&self, image: &ImageAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
+		&self, image: &dyn ImageViewAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
 	) -> Result<Option<(PipelineStages, AccessFlagBits)>, AccessCheckError> {
 		// TODO: check the queue family
 
 		if let Some(value) = self.resources.get(&CbKey::ImageRef(image)) {
 			if layout != ImageLayout::Undefined && value.final_layout != layout {
-				return Err(AccessCheckError::Denied(AccessError::UnexpectedImageLayout {
-					expected: value.final_layout,
+				return Err(AccessCheckError::Denied(AccessError::ImageLayoutMismatch {
+					actual: value.final_layout,
 					requested: layout
 				}))
 			}

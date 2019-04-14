@@ -8,22 +8,19 @@ use std::{
 use crate::{
 	command_buffer::{
 		pool::{CommandPool, CommandPoolAlloc, CommandPoolBuilderAlloc},
-		sys::{
-			Flags,
-			Kind,
-			UnsafeCommandBufferBuilder,
-			UnsafeCommandBufferBuilderPipelineBarrier
-		},
+		sys::{Flags, Kind, UnsafeCommandBufferBuilder, UnsafeCommandBufferBuilderPipelineBarrier}
 	},
 	device::{Device, DeviceOwned},
 	framebuffer::{FramebufferAbstract, RenderPassAbstract},
-	image::{ImageLayout},
-	sync::{ AccessFlagBits, PipelineStages},
+	image::ImageLayout,
+	sync::{AccessFlagBits, PipelineStages},
 	OomError
 };
 
-use super::misc::{ BuilderKey, ResourceState, Commands, Command, KeyTy, SyncCommandBufferBuilderError };
-use super::buffer::SyncCommandBuffer;
+use super::{
+	buffer::SyncCommandBuffer,
+	misc::{BuilderKey, Command, Commands, KeyTy, ResourceState, SyncCommandBufferBuilderError}
+};
 
 /// Wrapper around `UnsafeCommandBufferBuilder` that handles synchronization for you.
 ///
@@ -336,8 +333,6 @@ impl<P> SyncCommandBufferBuilder<P> {
 								let b = &mut self.pending_barrier;
 								b.add_image_memory_barrier(
 									img,
-									0 .. img.mipmap_levels(),
-									0 .. img.dimensions().array_layers(),
 									entry.stages,
 									entry.access,
 									stages,
@@ -385,11 +380,13 @@ impl<P> SyncCommandBufferBuilder<P> {
 				{
 					let commands_lock = self.commands.lock().unwrap();
 					let img = commands_lock.commands[latest_command_id].image(resource_index);
-					let initial_layout_requirement = img.initial_layout_requirement();
+					let current_layout = img.current_layout().expect(
+						"Cannot process an image view which has multiple different layouts"
+					);
 
-					if initial_layout_requirement != start_layout {
+					if current_layout != start_layout {
 						actually_exclusive = true;
-						actual_start_layout = initial_layout_requirement;
+						actual_start_layout = current_layout;
 
 						// Note that we transition from `bottom_of_pipe`, which means that we
 						// wait for all the previous commands to be entirely finished. This is
@@ -405,15 +402,13 @@ impl<P> SyncCommandBufferBuilder<P> {
 							let b = &mut self.pending_barrier;
 							b.add_image_memory_barrier(
 								img,
-								0 .. img.mipmap_levels(),
-								0 .. img.dimensions().array_layers(),
 								PipelineStages { bottom_of_pipe: true, ..PipelineStages::none() },
 								AccessFlagBits::none(),
 								stages,
 								access,
 								true,
 								None,
-								initial_layout_requirement,
+								current_layout,
 								start_layout
 							);
 						}
@@ -466,15 +461,15 @@ impl<P> SyncCommandBufferBuilder<P> {
 					}
 
 					let img = commands_lock.commands[key.command_id].image(key.resource_index);
-					let requested_layout = img.final_layout_requirement();
-					if requested_layout == state.current_layout {
+					let requested_layout = img.required_layout();
+					if requested_layout == ImageLayout::Undefined
+						|| requested_layout == state.current_layout
+					{
 						continue
 					}
 
 					barrier.add_image_memory_barrier(
 						img,
-						0 .. img.mipmap_levels(),
-						0 .. img.dimensions().array_layers(),
 						state.stages,
 						state.access,
 						PipelineStages { top_of_pipe: true, ..PipelineStages::none() },

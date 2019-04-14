@@ -235,7 +235,7 @@ pub fn reflect(name: &str, spirv: &[u32], dump: bool) -> Result<TokenStream, Err
 		#[allow(unused_imports)]
 		use vulkano::descriptor::descriptor::DescriptorImageDesc;
 		#[allow(unused_imports)]
-		use vulkano::descriptor::descriptor::DescriptorImageDescDimensions;
+		use vulkano::image::ImageDimensionType;
 		#[allow(unused_imports)]
 		use vulkano::descriptor::descriptor::DescriptorImageDescArray;
 		#[allow(unused_imports)]

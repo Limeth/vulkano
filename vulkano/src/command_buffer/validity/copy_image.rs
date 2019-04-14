@@ -12,7 +12,7 @@ use std::{error, fmt};
 use crate::{
 	device::Device,
 	format::{FormatTy, PossibleCompressedFormatDesc},
-	image::{ImageAccess, ImageDimensionType},
+	image::{ImageDimensionType, ImageViewAccess},
 	VulkanObject
 };
 
@@ -30,24 +30,21 @@ pub fn check_copy_image<S, D>(
 	layer_count: u32
 ) -> Result<(), CheckCopyImageError>
 where
-	S: ?Sized + ImageAccess,
-	D: ?Sized + ImageAccess
+	S: ?Sized + ImageViewAccess,
+	D: ?Sized + ImageViewAccess
 {
-	let source_inner = source.inner();
-	let destination_inner = destination.inner();
+	assert_eq!(source.parent().device().internal_object(), device.internal_object());
+	assert_eq!(destination.parent().device().internal_object(), device.internal_object());
 
-	assert_eq!(source_inner.image.device().internal_object(), device.internal_object());
-	assert_eq!(destination_inner.image.device().internal_object(), device.internal_object());
-
-	if !source_inner.image.usage_transfer_source() {
+	if !source.inner().usage_transfer_source() {
 		return Err(CheckCopyImageError::MissingTransferSourceUsage)
 	}
 
-	if !destination_inner.image.usage_transfer_destination() {
+	if !destination.inner().usage_transfer_destination() {
 		return Err(CheckCopyImageError::MissingTransferDestinationUsage)
 	}
 
-	if source.samples() != destination.samples() {
+	if source.parent().samples() != destination.parent().samples() {
 		return Err(CheckCopyImageError::SampleCountMismatch)
 	}
 

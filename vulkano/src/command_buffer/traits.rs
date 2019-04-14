@@ -25,7 +25,7 @@ use crate::{
 		sys::UnsafeCommandBuffer
 	},
 	device::{Device, DeviceOwned, Queue},
-	image::{ImageAccess, ImageLayout},
+	image::{ImageLayout, ImageViewAccess},
 	sync::{
 		now,
 		AccessCheckError,
@@ -146,7 +146,7 @@ pub unsafe trait CommandBuffer: DeviceOwned {
 	) -> Result<Option<(PipelineStages, AccessFlagBits)>, AccessCheckError>;
 
 	fn check_image_access(
-		&self, image: &ImageAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
+		&self, image: &dyn ImageViewAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
 	) -> Result<Option<(PipelineStages, AccessFlagBits)>, AccessCheckError>;
 
 	// FIXME: lots of other methods
@@ -174,7 +174,7 @@ where
 	}
 
 	fn check_image_access(
-		&self, image: &ImageAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
+		&self, image: &dyn ImageViewAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
 	) -> Result<Option<(PipelineStages, AccessFlagBits)>, AccessCheckError> {
 		(**self).check_image_access(image, layout, exclusive, queue)
 	}
@@ -197,7 +197,6 @@ where
 	submitted: Mutex<bool>,
 	finished: AtomicBool
 }
-
 unsafe impl<F, Cb> GpuFuture for CommandBufferExecFuture<F, Cb>
 where
 	F: GpuFuture,
@@ -280,7 +279,7 @@ where
 	}
 
 	fn check_image_access(
-		&self, image: &ImageAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
+		&self, image: &dyn ImageViewAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
 	) -> Result<Option<(PipelineStages, AccessFlagBits)>, AccessCheckError> {
 		match self.command_buffer.check_image_access(image, layout, exclusive, queue) {
 			Ok(v) => Ok(v),
@@ -291,7 +290,6 @@ where
 		}
 	}
 }
-
 unsafe impl<F, Cb> DeviceOwned for CommandBufferExecFuture<F, Cb>
 where
 	F: GpuFuture,
@@ -299,7 +297,6 @@ where
 {
 	fn device(&self) -> &Arc<Device> { self.command_buffer.device() }
 }
-
 impl<F, Cb> Drop for CommandBufferExecFuture<F, Cb>
 where
 	F: GpuFuture,
@@ -316,6 +313,16 @@ where
 				self.previous.signal_finished();
 			}
 		}
+	}
+}
+impl<F: GpuFuture, Cb: CommandBuffer> fmt::Debug for CommandBufferExecFuture<F, Cb> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		// TODO: CommandBuffer debug
+		write!(f,
+			"CommandBufferExecFuture {{ previous: {:?}, command_buffer: CommandBuffer, queue: {:?}, \
+			submitted: {:?}, finished: {:?} }}",
+			self.previous, self.queue, self.submitted, self.finished
+		)
 	}
 }
 

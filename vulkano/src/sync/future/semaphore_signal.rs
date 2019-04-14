@@ -21,7 +21,7 @@ use crate::{
 		SubmitSemaphoresWaitBuilder
 	},
 	device::{Device, DeviceOwned, Queue},
-	image::{ImageAccess, ImageLayout},
+	image::{ImageLayout, ImageViewAccess},
 	sync::{AccessCheckError, AccessFlagBits, FlushError, GpuFuture, PipelineStages, Semaphore}
 };
 
@@ -45,6 +45,7 @@ where
 /// Represents a semaphore being signaled after a previous event.
 #[must_use = "Dropping this object will immediately block the thread until the GPU has finished \
               processing the submission"]
+#[derive(Debug)]
 pub struct SemaphoreSignalFuture<F>
 where
 	F: GpuFuture
@@ -57,7 +58,6 @@ where
 	wait_submitted: Mutex<bool>,
 	finished: AtomicBool
 }
-
 unsafe impl<F> GpuFuture for SemaphoreSignalFuture<F>
 where
 	F: GpuFuture
@@ -136,19 +136,17 @@ where
 	}
 
 	fn check_image_access(
-		&self, image: &ImageAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
+		&self, image: &dyn ImageViewAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
 	) -> Result<Option<(PipelineStages, AccessFlagBits)>, AccessCheckError> {
 		self.previous.check_image_access(image, layout, exclusive, queue).map(|_| None)
 	}
 }
-
 unsafe impl<F> DeviceOwned for SemaphoreSignalFuture<F>
 where
 	F: GpuFuture
 {
 	fn device(&self) -> &Arc<Device> { self.semaphore.device() }
 }
-
 impl<F> Drop for SemaphoreSignalFuture<F>
 where
 	F: GpuFuture

@@ -23,7 +23,7 @@ use crate::{
 		CommandBufferExecFuture
 	},
 	device::{DeviceOwned, Queue},
-	image::{ImageAccess, ImageLayout},
+	image::{ImageLayout, ImageViewAccess},
 	swapchain::{self, PresentFuture, PresentRegion, Swapchain},
 	sync::{AccessFlagBits, FenceWaitError, PipelineStages},
 	OomError
@@ -45,13 +45,16 @@ mod semaphore_signal;
 ///
 /// See the documentation of the `sync` module for explanations about futures.
 // TODO: consider switching all methods to take `&mut self` for optimization purposes
-pub unsafe trait GpuFuture: DeviceOwned {
+pub unsafe trait GpuFuture: DeviceOwned + fmt::Debug {
 	/// If possible, checks whether the submission has finished. If so, gives up ownership of the
 	/// resources used by these submissions.
 	///
-	/// It is highly recommended to call `cleanup_finished` from time to time. Doing so will
-	/// prevent memory usage from increasing over time, and will also destroy the locks on
-	/// resources used by the GPU.
+	/// It is highly recommended to call `cleanup_finished` from time to time (every frame even).
+	/// Doing so will prevent memory usage from increasing over time, and will also destroy the
+	/// locks on resources used by the GPU.
+	///
+	/// If the locks aren't destroyed, you will be prevented from using buffers and images that
+	/// were previously locked.
 	fn cleanup_finished(&mut self);
 
 	/// Builds a submission that, if submitted, makes sure that the event represented by this
@@ -133,7 +136,7 @@ pub unsafe trait GpuFuture: DeviceOwned {
 	/// > **Note**: Keep in mind that changing the layout of an image also requires exclusive
 	/// > access.
 	fn check_image_access(
-		&self, image: &ImageAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
+		&self, image: &dyn ImageViewAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
 	) -> Result<Option<(PipelineStages, AccessFlagBits)>, AccessCheckError>;
 
 	/// Joins this future with another one, representing the moment when both events have happened.
@@ -285,7 +288,7 @@ where
 	}
 
 	fn check_image_access(
-		&self, image: &ImageAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
+		&self, image: &dyn ImageViewAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
 	) -> Result<Option<(PipelineStages, AccessFlagBits)>, AccessCheckError> {
 		(**self).check_image_access(image, layout, exclusive, queue)
 	}
@@ -294,20 +297,19 @@ where
 /// Access to a resource was denied.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AccessError {
-	/// Exclusive access is denied.
-	ExclusiveDenied,
-
-	/// The resource is already in use, and there is no tracking of concurrent usages.
+	/// The resource is already in use and there is no tracking of concurrent usages.
 	AlreadyInUse,
 
-	/// The image layout was unexpected.
-	UnexpectedImageLayout { expected: ImageLayout, requested: ImageLayout },
+	/// The resource is already locked in exclusive mode.
+	AlreadyInUseExclusive,
 
-	/// The image was in uninitialized or preinitialized layout.
-	ImageNotInitialized {
-		/// The layout that was requested for the image.
-		requested: ImageLayout
-	},
+	/// The exclusive access was denied either because there it is forbidden or because
+	/// there is already another lock.
+	ExclusiveDenied,
+
+	/// The image layout that was requested does not match the layout of one or
+	/// more subresources it overlaps.
+	ImageLayoutMismatch { requested: ImageLayout, actual: ImageLayout },
 
 	/// Buffer was not initialized.
 	BufferNotInitialized,
@@ -318,17 +320,18 @@ pub enum AccessError {
 impl fmt::Display for AccessError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
-			AccessError::ExclusiveDenied => write!(f, "Exclusive access was denied"),
-			AccessError::AlreadyInUse => write!(f, "The resource is already in use"),
+			AccessError::AlreadyInUse => write!(f, "The resource is already in use and there is no tracking of concurrent usages"),
+			AccessError::AlreadyInUseExclusive => write!(f, "The resource is already locked in exclusive mode"),
+			AccessError::ExclusiveDenied
+			=> write!(f, "The exclusive access was denied either because there it is forbidden or because there is already another lock"),
 
-			AccessError::UnexpectedImageLayout { expected, requested } => {
-				write!(f, "The image layout ({:?}) was unexpected ({:?})", requested, expected)
+			AccessError::ImageLayoutMismatch { actual, requested } => {
+				write!(
+					f,
+					"The image layout that was requested ({:?}) does not match the layout of one or more subresources it overlaps ({:?})",
+					requested, actual
+				)
 			}
-			AccessError::ImageNotInitialized { requested } => write!(
-				f,
-				"The image was in uninitialized or preinitialized layout, requested: {:?}",
-				requested
-			),
 
 			AccessError::BufferNotInitialized => write!(f, "Buffer was not initialized"),
 			AccessError::SwapchainImageAcquireOnly => {

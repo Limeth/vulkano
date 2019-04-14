@@ -28,7 +28,7 @@ use crate::{
 		BufferUsage
 	},
 	device::{Device, DeviceOwned, Queue},
-	image::ImageAccess,
+	image::ImageViewAccess,
 	memory::{
 		pool::{
 			AllocFromRequirementsFilter,
@@ -603,11 +603,11 @@ where
 
 	fn size(&self) -> usize { self.requested_len * mem::size_of::<T>() }
 
-	fn conflicts_buffer(&self, other: &BufferAccess) -> bool {
+	fn conflicts_buffer(&self, other: &dyn BufferAccess) -> bool {
 		self.conflict_key() == other.conflict_key() // TODO:
 	}
 
-	fn conflicts_image(&self, other: &ImageAccess) -> bool { false }
+	fn conflicts_image(&self, other: &dyn ImageViewAccess) -> bool { false }
 
 	fn conflict_key(&self) -> (u64, usize) {
 		(
@@ -712,11 +712,11 @@ where
 
 	fn size(&self) -> usize { self.chunk.size() }
 
-	fn conflicts_buffer(&self, other: &BufferAccess) -> bool {
+	fn conflicts_buffer(&self, other: &dyn BufferAccess) -> bool {
 		self.conflict_key() == other.conflict_key() // TODO:
 	}
 
-	fn conflicts_image(&self, other: &ImageAccess) -> bool { false }
+	fn conflicts_image(&self, other: &dyn ImageViewAccess) -> bool { false }
 
 	fn conflict_key(&self) -> (u64, usize) { self.chunk.conflict_key() }
 

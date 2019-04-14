@@ -42,7 +42,7 @@ use crate::{
 		CommandBufferExecFuture
 	},
 	device::{Device, DeviceOwned, Queue},
-	image::ImageAccess,
+	image::ImageViewAccess,
 	instance::QueueFamily,
 	memory::{
 		pool::{
@@ -322,11 +322,11 @@ unsafe impl<T: ?Sized, A> BufferAccess for ImmutableBuffer<T, A> {
 
 	fn size(&self) -> usize { self.inner.size() }
 
-	fn conflicts_buffer(&self, other: &BufferAccess) -> bool {
+	fn conflicts_buffer(&self, other: &dyn BufferAccess) -> bool {
 		self.conflict_key() == other.conflict_key() // TODO:
 	}
 
-	fn conflicts_image(&self, other: &ImageAccess) -> bool { false }
+	fn conflicts_image(&self, other: &dyn ImageViewAccess) -> bool { false }
 
 	fn conflict_key(&self) -> (u64, usize) { (self.inner.key(), 0) }
 
@@ -370,11 +370,11 @@ unsafe impl<T: ?Sized, A> BufferAccess for ImmutableBufferInitialization<T, A> {
 
 	fn size(&self) -> usize { self.buffer.size() }
 
-	fn conflicts_buffer(&self, other: &BufferAccess) -> bool {
+	fn conflicts_buffer(&self, other: &dyn BufferAccess) -> bool {
 		self.conflict_key() == other.conflict_key() // TODO:
 	}
 
-	fn conflicts_image(&self, other: &ImageAccess) -> bool { false }
+	fn conflicts_image(&self, other: &dyn ImageViewAccess) -> bool { false }
 
 	fn conflict_key(&self) -> (u64, usize) { (self.buffer.inner.key(), 0) }
 

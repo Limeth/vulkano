@@ -12,7 +12,7 @@ use std::{error, fmt};
 use crate::{
 	device::Device,
 	format::FormatTy,
-	image::{ImageAccess, ImageDimensionType},
+	image::{ImageDimensionType, ImageViewAccess},
 	sampler::Filter,
 	VulkanObject
 };
@@ -32,32 +32,29 @@ pub fn check_blit_image<S, D>(
 	filter: Filter
 ) -> Result<(), CheckBlitImageError>
 where
-	S: ?Sized + ImageAccess,
-	D: ?Sized + ImageAccess
+	S: ?Sized + ImageViewAccess,
+	D: ?Sized + ImageViewAccess
 {
-	let source_inner = source.inner();
-	let destination_inner = destination.inner();
+	assert_eq!(source.parent().device().internal_object(), device.internal_object());
+	assert_eq!(destination.parent().device().internal_object(), device.internal_object());
 
-	assert_eq!(source_inner.image.device().internal_object(), device.internal_object());
-	assert_eq!(destination_inner.image.device().internal_object(), device.internal_object());
-
-	if !source_inner.image.usage_transfer_source() {
+	if !source.inner().usage_transfer_source() {
 		return Err(CheckBlitImageError::MissingTransferSourceUsage)
 	}
 
-	if !destination_inner.image.usage_transfer_destination() {
+	if !destination.inner().usage_transfer_destination() {
 		return Err(CheckBlitImageError::MissingTransferDestinationUsage)
 	}
 
-	if !source_inner.image.supports_blit_source() {
+	if !source.parent().inner().supports_blit_source() {
 		return Err(CheckBlitImageError::SourceFormatNotSupported)
 	}
 
-	if !destination_inner.image.supports_blit_destination() {
+	if !destination.parent().inner().supports_blit_destination() {
 		return Err(CheckBlitImageError::DestinationFormatNotSupported)
 	}
 
-	if source.samples() != 1 || destination.samples() != 1 {
+	if source.parent().samples() != 1 || destination.parent().samples() != 1 {
 		return Err(CheckBlitImageError::UnexpectedMultisampled)
 	}
 

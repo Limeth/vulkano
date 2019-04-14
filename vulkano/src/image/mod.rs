@@ -46,25 +46,32 @@
 //! To be written.
 //!
 
-use std::cmp;
+use std::{cmp, num::NonZeroU32, ops::Range};
 
-mod attachment;
-mod immutable;
+use vk_sys as vk;
+
 mod layout;
-mod storage;
-mod swapchain;
-pub mod sys;
-pub mod traits;
 mod usage;
 
-pub use attachment::AttachmentImage;
-pub use immutable::ImmutableImage;
-pub use storage::StorageImage;
+// mod attachment;
+// mod immutable;
+// mod storage;
+mod swapchain;
+
+mod view;
+
+pub mod sync;
+pub mod sys;
+pub mod traits;
+
+// pub use attachment::AttachmentImage;
+// pub use immutable::ImmutableImage;
+// pub use storage::StorageImage;
 pub use swapchain::SwapchainImage;
 
 pub use layout::ImageLayout;
 pub use sys::ImageCreationError;
-pub use traits::{ImageAccess, ImageInner, ImageViewAccess};
+pub use traits::{ImageAccess, ImageViewAccess};
 
 pub use usage::ImageUsage;
 
@@ -111,24 +118,49 @@ pub struct Swizzle {
 	/// Fourth component.
 	pub a: ComponentSwizzle
 }
+impl Swizzle {
+	/// Returns true if this is an identity swizzle.
+	pub fn identity(&self) -> bool {
+		if self.r == ComponentSwizzle::Identity
+			&& self.g == ComponentSwizzle::Identity
+			&& self.b == ComponentSwizzle::Identity
+			&& self.a == ComponentSwizzle::Identity
+		{
+			true
+		} else {
+			false
+		}
+	}
+}
+impl Into<vk::ComponentMapping> for Swizzle {
+	fn into(self) -> vk::ComponentMapping {
+		vk::ComponentMapping {
+			r: self.r as u32,
+			g: self.g as u32,
+			b: self.b as u32,
+			a: self.a as u32
+		}
+	}
+}
 
 /// Describes the value that an individual component must return when being accessed.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[repr(u32)]
 pub enum ComponentSwizzle {
 	/// Returns the value that this component should normally have.
-	Identity,
+	Identity = vk::COMPONENT_SWIZZLE_IDENTITY,
 	/// Always return zero.
-	Zero,
+	Zero = vk::COMPONENT_SWIZZLE_ZERO,
 	/// Always return one.
-	One,
+	One = vk::COMPONENT_SWIZZLE_ONE,
 	/// Returns the value of the first component.
-	Red,
+	Red = vk::COMPONENT_SWIZZLE_R,
 	/// Returns the value of the second component.
-	Green,
+	Green = vk::COMPONENT_SWIZZLE_G,
 	/// Returns the value of the third component.
-	Blue,
+	Blue = vk::COMPONENT_SWIZZLE_B,
 	/// Returns the value of the fourth component.
-	Alpha
+	Alpha = vk::COMPONENT_SWIZZLE_A
 }
 impl Default for ComponentSwizzle {
 	fn default() -> ComponentSwizzle { ComponentSwizzle::Identity }
@@ -492,127 +524,103 @@ impl Into<u32> for ImageDimensionType {
 	fn into(self) -> u32 { self.number() }
 }
 
+// TODO: Aspects flags? Do we need them here? vk_sys doesn't even define most of them.
+// For that small subset, it's probably not worth it.
+/// Describes an image subresource (mipmap levels and array layers) range.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)] // derive Hash because `SubresourceImageResourceLocker`
+pub struct ImageSubresourceRange {
+	/// Number of array layers.
+	pub array_layers: NonZeroU32,
+	/// Offset of the first array layer.
+	pub array_layers_offset: u32,
+
+	/// Number of mipmaps levels.
+	pub mipmap_levels: NonZeroU32,
+	/// Offset of the first mipmap level.
+	pub mipmap_levels_offset: u32
+}
+impl ImageSubresourceRange {
+	pub fn array_layers_end(&self) -> NonZeroU32 {
+		unsafe {
+			// Safe because NonZeroU32 + anything non-negative > 0
+			NonZeroU32::new_unchecked(self.array_layers_offset + self.array_layers.get())
+		}
+	}
+
+	pub fn mipmap_levels_end(&self) -> NonZeroU32 {
+		unsafe {
+			// Safe because NonZeroU32 + anything non-negative > 0
+			NonZeroU32::new_unchecked(self.mipmap_levels_offset + self.mipmap_levels.get())
+		}
+	}
+
+	/// Returns a `Range<u32>` of the subresource array layers.
+	pub fn array_layers_range(&self) -> Range<u32> {
+		self.array_layers_offset .. self.array_layers_end().get()
+	}
+
+	/// Returns a `Range<u32>` of the subresource mipmap levels.
+	pub fn mipmap_levels_range(&self) -> Range<u32> {
+		self.mipmap_levels_offset .. self.mipmap_levels_end().get()
+	}
+
+	/// Returns true if the two `ImageSubresourceRange` overlap with each other.
+	///
+	/// This means that they share at least one common mipmap level at one common array layer.
+	pub fn overlaps_with(&self, other: &ImageSubresourceRange) -> bool {
+		fn range_overlaps(a: Range<u32>, b: Range<u32>) -> bool {
+			!(a.end <= b.start || a.start >= b.end)
+		}
+
+		range_overlaps(self.array_layers_range(), other.array_layers_range())
+			&& range_overlaps(self.mipmap_levels_range(), other.mipmap_levels_range())
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use crate::image::ImageDimensions;
 
 	#[test]
 	fn max_mipmaps() {
-		let dims = ImageDimensions::Dim2D {
-			width: 2,
-			height: 1,
-			cubemap_compatible: false,
-			array_layers: 1
-		};
+		let dims = ImageDimensions::Dim2D { width: 2, height: 1 };
 		assert_eq!(dims.max_mipmaps(), 2);
 
-		let dims = ImageDimensions::Dim2D {
-			width: 2,
-			height: 3,
-			cubemap_compatible: false,
-			array_layers: 1
-		};
+		let dims = ImageDimensions::Dim2D { width: 2, height: 3 };
 		assert_eq!(dims.max_mipmaps(), 3);
 
-		let dims = ImageDimensions::Dim2D {
-			width: 512,
-			height: 512,
-			cubemap_compatible: false,
-			array_layers: 1
-		};
+		let dims = ImageDimensions::Dim2D { width: 512, height: 512 };
 		assert_eq!(dims.max_mipmaps(), 10);
 	}
 
 	#[test]
 	fn mipmap_dimensions() {
-		let dims = ImageDimensions::Dim2D {
-			width: 283,
-			height: 175,
-			cubemap_compatible: false,
-			array_layers: 1
-		};
+		let dims = ImageDimensions::Dim2D { width: 283, height: 175 };
 		assert_eq!(dims.mipmap_dimensions(0), Some(dims));
 		assert_eq!(
 			dims.mipmap_dimensions(1),
-			Some(ImageDimensions::Dim2D {
-				width: 256,
-				height: 128,
-				cubemap_compatible: false,
-				array_layers: 1
-			})
+			Some(ImageDimensions::Dim2D { width: 256, height: 128 })
 		);
 		assert_eq!(
 			dims.mipmap_dimensions(2),
-			Some(ImageDimensions::Dim2D {
-				width: 128,
-				height: 64,
-				cubemap_compatible: false,
-				array_layers: 1
-			})
+			Some(ImageDimensions::Dim2D { width: 128, height: 64 })
 		);
 		assert_eq!(
 			dims.mipmap_dimensions(3),
-			Some(ImageDimensions::Dim2D {
-				width: 64,
-				height: 32,
-				cubemap_compatible: false,
-				array_layers: 1
-			})
+			Some(ImageDimensions::Dim2D { width: 64, height: 32 })
 		);
 		assert_eq!(
 			dims.mipmap_dimensions(4),
-			Some(ImageDimensions::Dim2D {
-				width: 32,
-				height: 16,
-				cubemap_compatible: false,
-				array_layers: 1
-			})
+			Some(ImageDimensions::Dim2D { width: 32, height: 16 })
 		);
 		assert_eq!(
 			dims.mipmap_dimensions(5),
-			Some(ImageDimensions::Dim2D {
-				width: 16,
-				height: 8,
-				cubemap_compatible: false,
-				array_layers: 1
-			})
+			Some(ImageDimensions::Dim2D { width: 16, height: 8 })
 		);
-		assert_eq!(
-			dims.mipmap_dimensions(6),
-			Some(ImageDimensions::Dim2D {
-				width: 8,
-				height: 4,
-				cubemap_compatible: false,
-				array_layers: 1
-			})
-		);
-		assert_eq!(
-			dims.mipmap_dimensions(7),
-			Some(ImageDimensions::Dim2D {
-				width: 4,
-				height: 2,
-				cubemap_compatible: false,
-				array_layers: 1
-			})
-		);
-		assert_eq!(
-			dims.mipmap_dimensions(8),
-			Some(ImageDimensions::Dim2D {
-				width: 2,
-				height: 1,
-				cubemap_compatible: false,
-				array_layers: 1
-			})
-		);
-		assert_eq!(
-			dims.mipmap_dimensions(9),
-			Some(ImageDimensions::Dim2D {
-				width: 1,
-				height: 1,
-				cubemap_compatible: false,
-				array_layers: 1
-			})
-		);
+		assert_eq!(dims.mipmap_dimensions(6), Some(ImageDimensions::Dim2D { width: 8, height: 4 }));
+		assert_eq!(dims.mipmap_dimensions(7), Some(ImageDimensions::Dim2D { width: 4, height: 2 }));
+		assert_eq!(dims.mipmap_dimensions(8), Some(ImageDimensions::Dim2D { width: 2, height: 1 }));
+		assert_eq!(dims.mipmap_dimensions(9), Some(ImageDimensions::Dim2D { width: 1, height: 1 }));
 		assert_eq!(dims.mipmap_dimensions(10), None);
 	}
 }

@@ -12,7 +12,7 @@ use std::iter;
 use crate::{
 	buffer::{BufferUsage, CpuAccessibleBuffer},
 	command_buffer::{
-		synced::base::{SyncCommandBufferBuilder, SyncCommandBufferBuilderError},
+		synced::{SyncCommandBufferBuilder, SyncCommandBufferBuilderError},
 		sys::{Flags, Kind}
 	},
 	device::Device

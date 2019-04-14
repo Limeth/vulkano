@@ -324,7 +324,7 @@ pub struct DescriptorImageDesc {
 	/// `sampled` usage can be attached to the descriptor.
 	pub sampled: bool,
 	/// The kind of image: one-dimensional, two-dimensional, cube or three-dimensional.
-	pub dimensions: ImageDimensionType,
+	pub dimensions_type: ImageDimensionType,
 	/// The format of the image, or `None` if the format is unknown. If `Some`, only images with
 	/// exactly that format can be attached.
 	pub format: Option<Format>,
@@ -340,10 +340,10 @@ impl DescriptorImageDesc {
 	pub fn is_superset_of(
 		&self, other: &DescriptorImageDesc
 	) -> Result<(), DescriptorDescSupersetError> {
-		if self.dimensions != other.dimensions {
+		if self.dimensions_type != other.dimensions_type {
 			return Err(DescriptorDescSupersetError::ImageDimensionsMismatch {
-				obtained: self.dimensions,
-				expected: other.dimensions
+				obtained: self.dimensions_type,
+				expected: other.dimensions_type
 			})
 		}
 

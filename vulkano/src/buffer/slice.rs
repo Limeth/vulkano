@@ -12,7 +12,7 @@ use std::{marker::PhantomData, mem, ops::Range, sync::Arc};
 use crate::{
 	buffer::traits::{BufferAccess, BufferInner, TypedBufferAccess},
 	device::{Device, DeviceOwned, Queue},
-	image::ImageAccess,
+	image::ImageViewAccess,
 	sync::AccessError
 };
 
@@ -195,11 +195,13 @@ where
 
 	fn size(&self) -> usize { self.size }
 
-	fn conflicts_buffer(&self, other: &BufferAccess) -> bool {
+	fn conflicts_buffer(&self, other: &dyn BufferAccess) -> bool {
 		self.resource.conflicts_buffer(other)
 	}
 
-	fn conflicts_image(&self, other: &ImageAccess) -> bool { self.resource.conflicts_image(other) }
+	fn conflicts_image(&self, other: &dyn ImageViewAccess) -> bool {
+		self.resource.conflicts_image(other)
+	}
 
 	fn conflict_key(&self) -> (u64, usize) { self.resource.conflict_key() }
 

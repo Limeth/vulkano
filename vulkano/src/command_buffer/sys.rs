@@ -8,7 +8,7 @@
 // according to those terms.
 
 use smallvec::SmallVec;
-use std::{ffi::CStr, fmt, mem, ops::Range, ptr, sync::Arc};
+use std::{ffi::CStr, fmt, mem, ptr, sync::Arc};
 
 use crate::{
 	buffer::{BufferAccess, BufferInner},
@@ -33,7 +33,7 @@ use crate::{
 		Subpass,
 		SubpassContents
 	},
-	image::{ImageAccess, ImageLayout},
+	image::{ImageLayout, ImageViewAccess},
 	instance::QueueFamily,
 	pipeline::{
 		input_assembly::IndexType,
@@ -531,8 +531,8 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 		&mut self, source: &S, source_layout: ImageLayout, destination: &D,
 		destination_layout: ImageLayout, regions: R
 	) where
-		S: ?Sized + ImageAccess,
-		D: ?Sized + ImageAccess,
+		S: ?Sized + ImageViewAccess,
+		D: ?Sized + ImageViewAccess,
 		R: Iterator<Item = UnsafeCommandBufferBuilderImageCopy>
 	{
 		// TODO: The correct check here is that the uncompressed element size of the source is
@@ -549,16 +549,14 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 				|| source.format() == destination.format()
 		);
 
-		debug_assert_eq!(source.samples(), destination.samples());
-		let source = source.inner();
-		debug_assert!(source.image.usage_transfer_source());
+		debug_assert_eq!(source.parent().samples(), destination.parent().samples());
+		debug_assert!(source.inner().usage_transfer_source());
 		debug_assert!(
 			source_layout == ImageLayout::General
 				|| source_layout == ImageLayout::TransferSrcOptimal
 		);
 
-		let destination = destination.inner();
-		debug_assert!(destination.image.usage_transfer_destination());
+		debug_assert!(destination.inner().usage_transfer_destination());
 		debug_assert!(
 			destination_layout == ImageLayout::General
 				|| destination_layout == ImageLayout::TransferDstOptimal
@@ -568,14 +566,20 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 			.filter_map(|copy| {
 				// TODO: not everything is checked here
 				debug_assert!(
-					copy.source_base_array_layer + copy.layer_count <= source.num_layers as u32
+					copy.source_base_array_layer + copy.layer_count
+						<= source.subresource_range().array_layers.get()
 				);
 				debug_assert!(
 					copy.destination_base_array_layer + copy.layer_count
-						<= destination.num_layers as u32
+						<= destination.subresource_range().array_layers.get()
 				);
-				debug_assert!(copy.source_mip_level < destination.num_mipmap_levels as u32);
-				debug_assert!(copy.destination_mip_level < destination.num_mipmap_levels as u32);
+				debug_assert!(
+					copy.source_mip_level < destination.subresource_range().mipmap_levels.get()
+				);
+				debug_assert!(
+					copy.destination_mip_level
+						< destination.subresource_range().mipmap_levels.get()
+				);
 
 				if copy.layer_count == 0 {
 					return None
@@ -585,7 +589,8 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 					srcSubresource: vk::ImageSubresourceLayers {
 						aspectMask: copy.aspect.to_vk_bits(),
 						mipLevel: copy.source_mip_level,
-						baseArrayLayer: copy.source_base_array_layer + source.first_layer as u32,
+						baseArrayLayer: copy.source_base_array_layer
+							+ source.subresource_range().array_layers_offset,
 						layerCount: copy.layer_count
 					},
 					srcOffset: vk::Offset3D {
@@ -597,7 +602,7 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 						aspectMask: copy.aspect.to_vk_bits(),
 						mipLevel: copy.destination_mip_level,
 						baseArrayLayer: copy.destination_base_array_layer
-							+ destination.first_layer as u32,
+							+ destination.subresource_range().array_layers_offset,
 						layerCount: copy.layer_count
 					},
 					dstOffset: vk::Offset3D {
@@ -622,9 +627,9 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 		let cmd = self.internal_object();
 		vk.CmdCopyImage(
 			cmd,
-			source.image.internal_object(),
+			source.parent().inner().internal_object(),
 			source_layout as u32,
-			destination.image.internal_object(),
+			destination.parent().inner().internal_object(),
 			destination_layout as u32,
 			regions.len() as u32,
 			regions.as_ptr()
@@ -639,8 +644,8 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 		&mut self, source: &S, source_layout: ImageLayout, destination: &D,
 		destination_layout: ImageLayout, regions: R, filter: Filter
 	) where
-		S: ?Sized + ImageAccess,
-		D: ?Sized + ImageAccess,
+		S: ?Sized + ImageViewAccess,
+		D: ?Sized + ImageViewAccess,
 		R: Iterator<Item = UnsafeCommandBufferBuilderImageBlit>
 	{
 		debug_assert!(filter == Filter::Nearest || !source.format().ty().is_depth_and_or_stencil());
@@ -657,19 +662,17 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 				|| !source.format().ty().is_depth_and_or_stencil()
 		);
 
-		debug_assert_eq!(source.samples(), 1);
-		let source = source.inner();
-		debug_assert!(source.image.supports_blit_source());
-		debug_assert!(source.image.usage_transfer_source());
+		debug_assert_eq!(source.parent().samples(), 1);
+		debug_assert!(source.parent().supports_blit_source());
+		debug_assert!(source.inner().usage_transfer_source());
 		debug_assert!(
 			source_layout == ImageLayout::General
 				|| source_layout == ImageLayout::TransferSrcOptimal
 		);
 
-		debug_assert_eq!(destination.samples(), 1);
-		let destination = destination.inner();
-		debug_assert!(destination.image.supports_blit_destination());
-		debug_assert!(destination.image.usage_transfer_destination());
+		debug_assert_eq!(destination.parent().samples(), 1);
+		debug_assert!(destination.parent().supports_blit_destination());
+		debug_assert!(destination.inner().usage_transfer_destination());
 		debug_assert!(
 			destination_layout == ImageLayout::General
 				|| destination_layout == ImageLayout::TransferDstOptimal
@@ -679,14 +682,20 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 			.filter_map(|blit| {
 				// TODO: not everything is checked here
 				debug_assert!(
-					blit.source_base_array_layer + blit.layer_count <= source.num_layers as u32
+					blit.source_base_array_layer + blit.layer_count
+						<= source.subresource_range().array_layers.get()
 				);
 				debug_assert!(
 					blit.destination_base_array_layer + blit.layer_count
-						<= destination.num_layers as u32
+						<= destination.subresource_range().array_layers.get()
 				);
-				debug_assert!(blit.source_mip_level < destination.num_mipmap_levels as u32);
-				debug_assert!(blit.destination_mip_level < destination.num_mipmap_levels as u32);
+				debug_assert!(
+					blit.source_mip_level < destination.subresource_range().mipmap_levels.get()
+				);
+				debug_assert!(
+					blit.destination_mip_level
+						< destination.subresource_range().mipmap_levels.get()
+				);
 
 				if blit.layer_count == 0 {
 					return None
@@ -696,7 +705,8 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 					srcSubresource: vk::ImageSubresourceLayers {
 						aspectMask: blit.aspect.to_vk_bits(),
 						mipLevel: blit.source_mip_level,
-						baseArrayLayer: blit.source_base_array_layer + source.first_layer as u32,
+						baseArrayLayer: blit.source_base_array_layer
+							+ source.subresource_range().array_layers_offset,
 						layerCount: blit.layer_count
 					},
 					srcOffsets: [
@@ -715,7 +725,7 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 						aspectMask: blit.aspect.to_vk_bits(),
 						mipLevel: blit.destination_mip_level,
 						baseArrayLayer: blit.destination_base_array_layer
-							+ destination.first_layer as u32,
+							+ destination.subresource_range().array_layers_offset,
 						layerCount: blit.layer_count
 					},
 					dstOffsets: [
@@ -742,9 +752,9 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 		let cmd = self.internal_object();
 		vk.CmdBlitImage(
 			cmd,
-			source.image.internal_object(),
+			source.parent().inner().internal_object(),
 			source_layout as u32,
-			destination.image.internal_object(),
+			destination.parent().inner().internal_object(),
 			destination_layout as u32,
 			regions.len() as u32,
 			regions.as_ptr(),
@@ -782,7 +792,7 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 	pub unsafe fn clear_color_image<I, R>(
 		&mut self, image: &I, layout: ImageLayout, color: ClearValue, regions: R
 	) where
-		I: ?Sized + ImageAccess,
+		I: ?Sized + ImageViewAccess,
 		R: Iterator<Item = UnsafeCommandBufferBuilderColorImageClear>
 	{
 		debug_assert!(
@@ -791,8 +801,7 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 				|| image.format().ty() == FormatTy::Sint
 		);
 
-		let image = image.inner();
-		debug_assert!(image.image.usage_transfer_destination());
+		debug_assert!(image.inner().usage_transfer_destination());
 		debug_assert!(layout == ImageLayout::General || layout == ImageLayout::TransferDstOptimal);
 
 		let color = match color {
@@ -805,10 +814,12 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 		let regions: SmallVec<[_; 8]> = regions
 			.filter_map(|region| {
 				debug_assert!(
-					region.layer_count + region.base_array_layer <= image.num_layers as u32
+					region.layer_count + region.base_array_layer
+						<= image.subresource_range().array_layers.get()
 				);
 				debug_assert!(
-					region.level_count + region.base_mip_level <= image.num_mipmap_levels as u32
+					region.level_count + region.base_mip_level
+						<= image.subresource_range().mipmap_levels.get()
 				);
 
 				if region.layer_count == 0 || region.level_count == 0 {
@@ -817,9 +828,11 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 
 				Some(vk::ImageSubresourceRange {
 					aspectMask: vk::IMAGE_ASPECT_COLOR_BIT,
-					baseMipLevel: region.base_mip_level + image.first_mipmap_level as u32,
+					baseMipLevel: region.base_mip_level
+						+ image.subresource_range().mipmap_levels_offset,
 					levelCount: region.level_count,
-					baseArrayLayer: region.base_array_layer + image.first_layer as u32,
+					baseArrayLayer: region.base_array_layer
+						+ image.subresource_range().array_layers_offset,
 					layerCount: region.layer_count
 				})
 			})
@@ -833,7 +846,7 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 		let cmd = self.internal_object();
 		vk.CmdClearColorImage(
 			cmd,
-			image.image.internal_object(),
+			image.parent().inner().internal_object(),
 			layout as u32,
 			&color,
 			regions.len() as u32,
@@ -892,16 +905,15 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 		&mut self, source: &S, destination: &D, destination_layout: ImageLayout, regions: R
 	) where
 		S: ?Sized + BufferAccess,
-		D: ?Sized + ImageAccess,
+		D: ?Sized + ImageViewAccess,
 		R: Iterator<Item = UnsafeCommandBufferBuilderBufferImageCopy>
 	{
 		let source = source.inner();
 		debug_assert!(source.offset < source.buffer.size());
 		debug_assert!(source.buffer.usage_transfer_source());
 
-		debug_assert_eq!(destination.samples(), 1);
-		let destination = destination.inner();
-		debug_assert!(destination.image.usage_transfer_destination());
+		debug_assert_eq!(destination.parent().samples(), 1);
+		debug_assert!(destination.inner().usage_transfer_destination());
 		debug_assert!(
 			destination_layout == ImageLayout::General
 				|| destination_layout == ImageLayout::TransferDstOptimal
@@ -909,8 +921,12 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 
 		let regions: SmallVec<[_; 8]> = regions
 			.map(|copy| {
-				debug_assert!(copy.image_layer_count <= destination.num_layers as u32);
-				debug_assert!(copy.image_mip_level < destination.num_mipmap_levels as u32);
+				debug_assert!(
+					copy.image_layer_count <= destination.subresource_range().array_layers.get()
+				);
+				debug_assert!(
+					copy.image_mip_level < destination.subresource_range().mipmap_levels.get()
+				);
 
 				vk::BufferImageCopy {
 					bufferOffset: (source.offset + copy.buffer_offset) as vk::DeviceSize,
@@ -918,9 +934,10 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 					bufferImageHeight: copy.buffer_image_height,
 					imageSubresource: vk::ImageSubresourceLayers {
 						aspectMask: copy.image_aspect.to_vk_bits(),
-						mipLevel: copy.image_mip_level + destination.first_mipmap_level as u32,
+						mipLevel: copy.image_mip_level
+							+ destination.subresource_range().mipmap_levels_offset,
 						baseArrayLayer: copy.image_base_array_layer
-							+ destination.first_layer as u32,
+							+ destination.subresource_range().array_layers_offset,
 						layerCount: copy.image_layer_count
 					},
 					imageOffset: vk::Offset3D {
@@ -946,7 +963,7 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 		vk.CmdCopyBufferToImage(
 			cmd,
 			source.buffer.internal_object(),
-			destination.image.internal_object(),
+			destination.parent().inner().internal_object(),
 			destination_layout as u32,
 			regions.len() as u32,
 			regions.as_ptr()
@@ -960,13 +977,12 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 	pub unsafe fn copy_image_to_buffer<S, D, R>(
 		&mut self, source: &S, source_layout: ImageLayout, destination: &D, regions: R
 	) where
-		S: ?Sized + ImageAccess,
+		S: ?Sized + ImageViewAccess,
 		D: ?Sized + BufferAccess,
 		R: Iterator<Item = UnsafeCommandBufferBuilderBufferImageCopy>
 	{
-		debug_assert_eq!(source.samples(), 1);
-		let source = source.inner();
-		debug_assert!(source.image.usage_transfer_source());
+		debug_assert_eq!(source.parent().samples(), 1);
+		debug_assert!(source.inner().usage_transfer_source());
 		debug_assert!(
 			source_layout == ImageLayout::General
 				|| source_layout == ImageLayout::TransferSrcOptimal
@@ -978,8 +994,12 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 
 		let regions: SmallVec<[_; 8]> = regions
 			.map(|copy| {
-				debug_assert!(copy.image_layer_count <= source.num_layers as u32);
-				debug_assert!(copy.image_mip_level < source.num_mipmap_levels as u32);
+				debug_assert!(
+					copy.image_layer_count <= source.subresource_range().array_layers.get()
+				);
+				debug_assert!(
+					copy.image_mip_level < source.subresource_range().mipmap_levels.get()
+				);
 
 				vk::BufferImageCopy {
 					bufferOffset: (destination.offset + copy.buffer_offset) as vk::DeviceSize,
@@ -987,8 +1007,10 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 					bufferImageHeight: copy.buffer_image_height,
 					imageSubresource: vk::ImageSubresourceLayers {
 						aspectMask: copy.image_aspect.to_vk_bits(),
-						mipLevel: copy.image_mip_level + source.first_mipmap_level as u32,
-						baseArrayLayer: copy.image_base_array_layer + source.first_layer as u32,
+						mipLevel: copy.image_mip_level
+							+ source.subresource_range().mipmap_levels_offset,
+						baseArrayLayer: copy.image_base_array_layer
+							+ source.subresource_range().array_layers_offset,
 						layerCount: copy.image_layer_count
 					},
 					imageOffset: vk::Offset3D {
@@ -1013,7 +1035,7 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 		let cmd = self.internal_object();
 		vk.CmdCopyImageToBuffer(
 			cmd,
-			source.image.internal_object(),
+			source.parent().inner().internal_object(),
 			source_layout as u32,
 			destination.buffer.internal_object(),
 			regions.len() as u32,
@@ -1824,12 +1846,11 @@ impl UnsafeCommandBufferBuilderPipelineBarrier {
 	/// - Image layouts transfers must be correct.
 	/// - Access flags must be compatible with the image usage flags passed at image creation.
 	pub unsafe fn add_image_memory_barrier<I>(
-		&mut self, image: &I, mipmaps: Range<u32>, layers: Range<u32>,
-		source_stage: PipelineStages, source_access: AccessFlagBits,
+		&mut self, image_view: &I, source_stage: PipelineStages, source_access: AccessFlagBits,
 		destination_stage: PipelineStages, destination_access: AccessFlagBits, by_region: bool,
 		queue_transfer: Option<(u32, u32)>, current_layout: ImageLayout, new_layout: ImageLayout
 	) where
-		I: ?Sized + ImageAccess
+		I: ?Sized + ImageViewAccess
 	{
 		debug_assert!(source_access.is_compatible_with(&source_stage));
 		debug_assert!(destination_access.is_compatible_with(&destination_stage));
@@ -1839,30 +1860,26 @@ impl UnsafeCommandBufferBuilderPipelineBarrier {
 		debug_assert_ne!(new_layout, ImageLayout::Undefined);
 		debug_assert_ne!(new_layout, ImageLayout::Preinitialized);
 
-		debug_assert!(mipmaps.start < mipmaps.end);
-		debug_assert!(mipmaps.end <= image.mipmap_levels());
-		debug_assert!(layers.start < layers.end);
-		debug_assert!(layers.end <= image.dimensions().array_layers());
-
 		let (src_queue, dest_queue) = if let Some((src_queue, dest_queue)) = queue_transfer {
 			(src_queue, dest_queue)
 		} else {
 			(vk::QUEUE_FAMILY_IGNORED, vk::QUEUE_FAMILY_IGNORED)
 		};
 
-		let aspect_mask = if image.has_color() {
-			vk::IMAGE_ASPECT_COLOR_BIT
-		} else if image.has_depth() && image.has_stencil() {
-			vk::IMAGE_ASPECT_DEPTH_BIT | vk::IMAGE_ASPECT_STENCIL_BIT
-		} else if image.has_depth() {
-			vk::IMAGE_ASPECT_DEPTH_BIT
-		} else if image.has_stencil() {
-			vk::IMAGE_ASPECT_STENCIL_BIT
-		} else {
-			unreachable!()
+		let aspect_mask = {
+			if image_view.has_color() {
+				vk::IMAGE_ASPECT_COLOR_BIT
+			} else if image_view.has_depth() {
+				if image_view.has_stencil() {
+					vk::IMAGE_ASPECT_DEPTH_BIT | vk::IMAGE_ASPECT_STENCIL_BIT
+				} else {
+					vk::IMAGE_ASPECT_DEPTH_BIT
+				}
+			} else {
+				// Definitely has at least one of the flags, so stencil it is
+				vk::IMAGE_ASPECT_STENCIL_BIT
+			}
 		};
-
-		let image = image.inner();
 
 		self.image_barriers.push(vk::ImageMemoryBarrier {
 			sType: vk::STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1873,13 +1890,15 @@ impl UnsafeCommandBufferBuilderPipelineBarrier {
 			newLayout: new_layout as u32,
 			srcQueueFamilyIndex: src_queue,
 			dstQueueFamilyIndex: dest_queue,
-			image: image.image.internal_object(),
+			image: image_view.parent().inner().internal_object(),
 			subresourceRange: vk::ImageSubresourceRange {
 				aspectMask: aspect_mask,
-				baseMipLevel: mipmaps.start + image.first_mipmap_level as u32,
-				levelCount: mipmaps.end - mipmaps.start,
-				baseArrayLayer: layers.start + image.first_layer as u32,
-				layerCount: layers.end - layers.start
+
+				baseMipLevel: image_view.subresource_range().mipmap_levels_offset,
+				levelCount: image_view.subresource_range().mipmap_levels.get(),
+
+				baseArrayLayer: image_view.subresource_range().array_layers_offset,
+				layerCount: image_view.subresource_range().array_layers.get()
 			}
 		});
 	}

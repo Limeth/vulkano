@@ -28,17 +28,18 @@ use crate::{
 /// - The usage must be manually enforced.
 /// - The image layout must be manually enforced and transitioned.
 pub struct UnsafeImage {
-	pub(super) image: vk::Image,
-	pub(super) device: Arc<Device>,
-	pub(super) usage: vk::ImageUsageFlagBits,
-	pub(super) format: Format,
+	pub(in crate::image) device: Arc<Device>,
 
-	pub(super) dimensions: ImageDimensions,
-	pub(super) samples: u32,
-	pub(super) mipmaps: u32,
+	image: vk::Image,
+	pub(in crate::image) usage: vk::ImageUsageFlagBits,
 
+	pub(in crate::image) format: Format,
 	// Features that are supported for this particular format.
 	format_features: vk::FormatFeatureFlagBits,
+
+	pub(in crate::image) dimensions: ImageDimensions,
+	pub(in crate::image) samples: u32,
+	pub(in crate::image) mipmap_levels: u32,
 
 	// `vkDestroyImage` is called only if `needs_destruction` is true.
 	needs_destruction: bool
@@ -80,7 +81,7 @@ impl UnsafeImage {
 	}
 
 	// Non-templated version to avoid inlining and improve compile times.
-	// Does it really?
+	// TODO: Does it really?
 	unsafe fn new_impl(
 		device: Arc<Device>, usage: ImageUsage, format: Format, dimensions: ImageDimensions,
 		num_samples: u32, mipmaps: MipmapsCount,
@@ -170,7 +171,7 @@ impl UnsafeImage {
 		let mut capabilities_error = None;
 
 		// Compute the number of mipmaps.
-		let mipmaps = match mipmaps.into() {
+		let mipmap_levels = match mipmaps.into() {
 			MipmapsCount::Specific(num) => {
 				let max_mipmaps = dimensions.max_mipmaps();
 				debug_assert!(max_mipmaps >= 1);
@@ -391,7 +392,7 @@ impl UnsafeImage {
 			if extent.width > output.maxExtent.width
 				|| extent.height > output.maxExtent.height
 				|| extent.depth > output.maxExtent.depth
-				|| mipmaps > output.maxMipLevels
+				|| mipmap_levels > output.maxMipLevels
 				|| array_layers > output.maxArrayLayers
 				|| (num_samples & output.sampleCounts) == 0
 			{
@@ -408,7 +409,7 @@ impl UnsafeImage {
 				imageType: ty,
 				format: format as u32,
 				extent,
-				mipLevels: mipmaps,
+				mipLevels: mipmap_levels,
 				arrayLayers: array_layers,
 				samples: num_samples,
 				tiling: if linear_tiling {
@@ -487,7 +488,7 @@ impl UnsafeImage {
 			format,
 			dimensions,
 			samples: num_samples,
-			mipmaps,
+			mipmap_levels,
 			format_features,
 			needs_destruction: true
 		};
@@ -500,7 +501,7 @@ impl UnsafeImage {
 	/// This function is for example used at the swapchain's initialization.
 	pub unsafe fn from_raw(
 		device: Arc<Device>, handle: u64, usage: u32, format: Format, dimensions: ImageDimensions,
-		samples: u32, mipmaps: u32
+		samples: u32, mipmap_levels: u32
 	) -> UnsafeImage {
 		let vk_i = device.instance().pointers();
 		let physical_device = device.physical_device().internal_object();
@@ -517,7 +518,7 @@ impl UnsafeImage {
 			format,
 			dimensions,
 			samples,
-			mipmaps,
+			mipmap_levels,
 			format_features: output.optimalTilingFeatures,
 			needs_destruction: false // TODO: pass as parameter
 		}
@@ -543,16 +544,6 @@ impl UnsafeImage {
 		))?;
 		Ok(())
 	}
-
-	pub fn device(&self) -> &Arc<Device> { &self.device }
-
-	pub fn format(&self) -> Format { self.format }
-
-	pub fn mipmap_levels(&self) -> u32 { self.mipmaps }
-
-	pub fn dimensions(&self) -> ImageDimensions { self.dimensions }
-
-	pub fn samples(&self) -> u32 { self.samples }
 
 	/// Returns a key unique to each `UnsafeImage`. Can be used for the `conflicts_key` method.
 	pub fn key(&self) -> u64 { self.image }
@@ -614,7 +605,7 @@ impl UnsafeImage {
 	unsafe fn linear_layout_impl(&self, mip_level: u32, aspect: u32) -> LinearLayout {
 		let vk = self.device.pointers();
 
-		assert!(mip_level < self.mipmaps);
+		assert!(mip_level < self.mipmap_levels);
 
 		let subresource =
 			vk::ImageSubresource { aspectMask: aspect, mipLevel: mip_level, arrayLayer: 0 };
@@ -758,7 +749,6 @@ impl error::Error for ImageCreationError {
 		}
 	}
 }
-
 impl From<OomError> for ImageCreationError {
 	fn from(err: OomError) -> ImageCreationError {
 		ImageCreationError::AllocError(DeviceMemoryAllocError::OomError(err))

@@ -563,7 +563,7 @@ where
 	{
 		assert_eq!(
 			self.builder.layout.device().internal_object(),
-			image_view.parent().inner().image.device().internal_object()
+			image_view.parent().device().internal_object()
 		);
 
 		if self.array_element as u32 >= self.desc.array_count {
@@ -595,15 +595,15 @@ where
 				}
 			}
 			DescriptorDescTy::InputAttachment { multisampled, array_layers } => {
-				if !image_view.parent().inner().image.usage_input_attachment() {
+				if !image_view.parent().inner().usage_input_attachment() {
 					return Err(PersistentDescriptorSetError::MissingImageUsage(
 						MissingImageUsage::InputAttachment
 					))
 				}
 
-				if multisampled && image_view.samples() == 1 {
+				if multisampled && image_view.parent().samples() == 1 {
 					return Err(PersistentDescriptorSetError::ExpectedMultisampled)
-				} else if !multisampled && image_view.samples() != 1 {
+				} else if !multisampled && image_view.parent().samples() != 1 {
 					return Err(PersistentDescriptorSetError::UnexpectedMultisampled)
 				}
 
@@ -683,7 +683,7 @@ where
 	{
 		assert_eq!(
 			self.builder.layout.device().internal_object(),
-			image_view.parent().inner().image.device().internal_object()
+			image_view.parent().device().internal_object()
 		);
 		assert_eq!(
 			self.builder.layout.device().internal_object(),
@@ -805,16 +805,16 @@ fn image_match_desc<I>(
 where
 	I: ?Sized + ImageViewAccess
 {
-	if desc.sampled && !image_view.parent().inner().image.usage_sampled() {
+	if desc.sampled && !image_view.parent().inner().usage_sampled() {
 		return Err(PersistentDescriptorSetError::MissingImageUsage(MissingImageUsage::Sampled))
-	} else if !desc.sampled && !image_view.parent().inner().image.usage_storage() {
+	} else if !desc.sampled && !image_view.parent().inner().usage_storage() {
 		return Err(PersistentDescriptorSetError::MissingImageUsage(MissingImageUsage::Storage))
 	}
 
 	let image_view_ty = ImageDimensionType::from(image_view.dimensions());
-	if image_view_ty != desc.dimensions {
+	if image_view_ty != desc.dimensions_type {
 		return Err(PersistentDescriptorSetError::ImageViewTypeMismatch {
-			expected: desc.dimensions,
+			expected: desc.dimensions_type,
 			obtained: image_view_ty
 		})
 	}
@@ -828,9 +828,9 @@ where
 		}
 	}
 
-	if desc.multisampled && image_view.samples() == 1 {
+	if desc.multisampled && image_view.parent().samples() == 1 {
 		return Err(PersistentDescriptorSetError::ExpectedMultisampled)
-	} else if !desc.multisampled && image_view.samples() != 1 {
+	} else if !desc.multisampled && image_view.parent().samples() != 1 {
 		return Err(PersistentDescriptorSetError::UnexpectedMultisampled)
 	}
 

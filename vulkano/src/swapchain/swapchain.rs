@@ -30,11 +30,10 @@ use crate::{
 	format::{Format, FormatDesc},
 	image::{
 		sys::UnsafeImage,
-		ImageAccess,
 		ImageDimensions,
-		ImageInner,
 		ImageLayout,
 		ImageUsage,
+		ImageViewAccess,
 		SwapchainImage
 	},
 	swapchain::{
@@ -197,6 +196,8 @@ pub struct Swapchain<W> {
 	stale: Mutex<bool>,
 
 	// Parameters passed to the constructor.
+	// Some of these parameters are redundant because they are also stored by images themselves.
+	// TODO: Not sure if to do anything about it?
 	num_images: u32,
 	format: Format,
 	color_space: ColorSpace,
@@ -468,15 +469,9 @@ impl<W> Swapchain<W> {
 		)
 	}
 
-	/// Returns of the images that belong to this swapchain.
-	pub fn raw_image(&self, offset: usize) -> Option<ImageInner> {
-		self.images.get(offset).map(|i| ImageInner {
-			image: &i.image,
-			first_layer: 0,
-			num_layers: self.layers as usize,
-			first_mipmap_level: 0,
-			num_mipmap_levels: 1
-		})
+	/// Returns the inner image of this swapchain at index.
+	pub fn raw_image(&self, index: usize) -> Option<&UnsafeImage> {
+		self.images.get(index).map(|e| &e.image)
 	}
 
 	/// Returns the number of images of the swapchain.
@@ -725,24 +720,25 @@ unsafe impl<W> GpuFuture for SwapchainAcquireFuture<W> {
 	}
 
 	fn check_image_access(
-		&self, image: &ImageAccess, layout: ImageLayout, _: bool, _: &Queue
+		&self, image: &dyn ImageViewAccess, layout: ImageLayout, _: bool, _: &Queue
 	) -> Result<Option<(PipelineStages, AccessFlagBits)>, AccessCheckError> {
 		let swapchain_image = self.swapchain.raw_image(self.image_id).unwrap();
-		if swapchain_image.image.internal_object() != image.inner().image.internal_object() {
+		if swapchain_image.internal_object() != image.parent().inner().internal_object() {
 			return Err(AccessCheckError::Unknown)
 		}
 
 		if self.swapchain.images[self.image_id].undefined_layout.load(Ordering::Relaxed)
 			&& layout != ImageLayout::Undefined
 		{
-			return Err(AccessCheckError::Denied(AccessError::ImageNotInitialized {
+			return Err(AccessCheckError::Denied(AccessError::ImageLayoutMismatch {
+				actual: ImageLayout::Undefined,
 				requested: layout
 			}))
 		}
 
 		if layout != ImageLayout::Undefined && layout != ImageLayout::PresentSrc {
-			return Err(AccessCheckError::Denied(AccessError::UnexpectedImageLayout {
-				expected: ImageLayout::PresentSrc,
+			return Err(AccessCheckError::Denied(AccessError::ImageLayoutMismatch {
+				actual: ImageLayout::PresentSrc,
 				requested: layout
 			}))
 		}
@@ -772,6 +768,17 @@ impl<W> Drop for SwapchainAcquireFuture<W> {
 
 		// TODO: if this future is destroyed without being presented, then eventually acquiring
 		// a new image will block forever ; difficulty: hard
+	}
+}
+impl<W> fmt::Debug for SwapchainAcquireFuture<W> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		// TODO: Swapchain debug
+		write!(
+			f,
+			"SwapchainAcquireFuture {{ swapchain: Arc<Swapchain>, image_id: {}, \
+			 semaphore: {:?}, fence: {:?}, finished: {:?} }}",
+			self.image_id, self.semaphore, self.fence, self.finished
+		)
 	}
 }
 
@@ -961,10 +968,10 @@ unsafe impl<P: GpuFuture, W> GpuFuture for PresentFuture<P, W> {
 	}
 
 	fn check_image_access(
-		&self, image: &ImageAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
+		&self, image: &dyn ImageViewAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
 	) -> Result<Option<(PipelineStages, AccessFlagBits)>, AccessCheckError> {
 		let swapchain_image = self.swapchain.raw_image(self.image_id).unwrap();
-		if swapchain_image.image.internal_object() == image.inner().image.internal_object() {
+		if swapchain_image.internal_object() == image.inner().internal_object() {
 			// This future presents the swapchain image, which "unlocks" it. Therefore any attempt
 			// to use this swapchain image afterwards shouldn't get granted automatic access.
 			// Instead any attempt to access the image afterwards should get an authorization from
@@ -995,6 +1002,17 @@ impl<P: GpuFuture, W> Drop for PresentFuture<P, W> {
 				}
 			}
 		}
+	}
+}
+impl<P: GpuFuture, W> fmt::Debug for PresentFuture<P, W> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		// TODO: Swapchain debug
+		write!(
+			f,
+			"PresentFuture {{ previous: {:?}, queue: {:?}, swapchain: Arc<Swapchain>, \
+			 image_id: {}, preset_region: {:?}, flushed: {:?}, finished: {:?} }}",
+			self.previous, self.queue, self.image_id, self.present_region, self.flushed, self
+		)
 	}
 }
 

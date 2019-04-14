@@ -1,4 +1,4 @@
-use std::{fmt, mem, ops::Range, ptr, sync::Arc};
+use std::{fmt, mem, ptr, sync::Arc};
 
 use vk_sys as vk;
 
@@ -6,7 +6,7 @@ use crate::{
 	check_errors,
 	device::Device,
 	format::{Format, FormatTy},
-	image::ImageViewType,
+	image::{ImageDimensions, ImageSubresourceRange, ImageViewType, Swizzle},
 	OomError,
 	VulkanObject
 };
@@ -14,27 +14,46 @@ use crate::{
 use super::UnsafeImage;
 
 pub struct UnsafeImageView {
-	view: vk::ImageView,
 	device: Arc<Device>,
+
+	view: vk::ImageView,
+	pub(in crate::image) format: Format,
+
+	pub(in crate::image) dimensions: ImageDimensions,
+	pub(in crate::image) subresource_range: ImageSubresourceRange,
+
 	usage: vk::ImageUsageFlagBits,
-	identity_swizzle: bool,
-	format: Format
+	pub(in crate::image) swizzle: Swizzle
 }
 
 impl UnsafeImageView {
-	/// See the docs of new().
-	pub unsafe fn raw(
-		image: &UnsafeImage, view_type: ImageViewType, mipmap_levels: Range<u32>,
-		array_layers: Range<u32>
+	/// Creates a new view from an image.
+	///
+	/// Note that you must create the view with identity swizzling if you want to use this view
+	/// as a framebuffer attachment.
+	///
+	/// # Panic
+	///
+	/// - Panics if `mipmap_levels` or `array_layers` is out of range of the image.
+	/// - Panics if the view types doesn't match the dimensions of the image (for example a 2D
+	///   view from a 3D image).
+	/// - Panics if trying to create a cubemap with a number of array layers different from 6.
+	/// - Panics if trying to create a cubemap array with a number of array layers not a multiple of 6.
+	pub unsafe fn new(
+		image: &UnsafeImage, view_type: ImageViewType, format: Option<Format>, swizzle: Swizzle,
+		subresource_range: ImageSubresourceRange
 	) -> Result<UnsafeImageView, OomError> {
 		let vk = image.device.pointers();
 
-		assert!(mipmap_levels.end > mipmap_levels.start);
-		assert!(mipmap_levels.end <= image.mipmaps);
-		assert!(array_layers.end > array_layers.start);
-		assert!(array_layers.end <= image.dimensions.array_layers());
+		assert!(subresource_range.array_layers_end().get() <= image.dimensions.array_layers());
+		assert!(subresource_range.mipmap_levels_end().get() <= image.mipmap_levels);
 
-		let aspect_mask = match image.format.ty() {
+		// TODO: Views can have different formats than their underlying images, but
+		// only if certain requirements are met. We need to check those before we
+		// allow creating views with different formats.
+		let view_format = image.format;
+
+		let aspect_mask = match view_format.ty() {
 			FormatTy::Float | FormatTy::Uint | FormatTy::Sint | FormatTy::Compressed => {
 				vk::IMAGE_ASPECT_COLOR_BIT
 			}
@@ -43,9 +62,8 @@ impl UnsafeImageView {
 			FormatTy::DepthStencil => vk::IMAGE_ASPECT_DEPTH_BIT | vk::IMAGE_ASPECT_STENCIL_BIT
 		};
 
-		let view_type = {
+		let view_type_flag = {
 			let image_view_type = ImageViewType::from(image.dimensions);
-			let layer_count = array_layers.end - array_layers.start;
 
 			if !view_type.compatible_with(image_view_type) {
 				panic!(
@@ -53,8 +71,13 @@ impl UnsafeImageView {
 					view_type, image_view_type
 				);
 			}
-			if layer_count > 1 && (!view_type.is_array() || !image_view_type.is_array()) {
-				panic!("Cannot create an array image view with type {:?} and {} layers into an image of type {:?}", view_type, layer_count, image_view_type);
+			if subresource_range.array_layers.get() > 1
+				&& (!view_type.is_array() || !image_view_type.is_array())
+			{
+				panic!(
+					"Cannot create an array image view with type {:?} and {} layers into an image of type {:?}",
+					view_type,  subresource_range.array_layers, image_view_type
+				);
 			}
 
 			match view_type {
@@ -77,15 +100,15 @@ impl UnsafeImageView {
 				pNext: ptr::null(),
 				flags: 0, // reserved
 				image: image.internal_object(),
-				viewType: view_type,
-				format: image.format as u32,
-				components: vk::ComponentMapping { r: 0, g: 0, b: 0, a: 0 }, // FIXME:
+				viewType: view_type_flag,
+				format: view_format as u32,
+				components: swizzle.into(),
 				subresourceRange: vk::ImageSubresourceRange {
 					aspectMask: aspect_mask,
-					baseMipLevel: mipmap_levels.start,
-					levelCount: mipmap_levels.end - mipmap_levels.start,
-					baseArrayLayer: array_layers.start,
-					layerCount: array_layers.end - array_layers.start
+					baseArrayLayer: subresource_range.array_layers_offset,
+					layerCount: subresource_range.array_layers.get(),
+					baseMipLevel: subresource_range.mipmap_levels_offset,
+					levelCount: subresource_range.mipmap_levels.get()
 				}
 			};
 
@@ -99,36 +122,48 @@ impl UnsafeImageView {
 			output
 		};
 
+		let dimensions = match view_type {
+			ImageViewType::Dim1D => ImageDimensions::Dim1D { width: image.dimensions.width() },
+			ImageViewType::Dim1DArray => ImageDimensions::Dim1DArray {
+				width: image.dimensions.width(),
+				array_layers: subresource_range.array_layers.get()
+			},
+
+			ImageViewType::Dim2D => ImageDimensions::Dim2D {
+				width: image.dimensions.width(),
+				height: image.dimensions.height()
+			},
+			ImageViewType::Dim2DArray => ImageDimensions::Dim2DArray {
+				width: image.dimensions.width(),
+				height: image.dimensions.height(),
+				array_layers: subresource_range.array_layers.get()
+			},
+
+			ImageViewType::Cubemap => ImageDimensions::Cubemap { size: image.dimensions.width() },
+			ImageViewType::CubemapArray => ImageDimensions::CubemapArray {
+				size: image.dimensions.width(),
+				array_layers: subresource_range.array_layers.get()
+			},
+
+			ImageViewType::Dim3D => ImageDimensions::Dim3D {
+				width: image.dimensions.width(),
+				height: image.dimensions.height(),
+				depth: image.dimensions.depth()
+			}
+		};
+
 		Ok(UnsafeImageView {
-			view,
 			device: image.device.clone(),
+			view,
+			format: view_format,
+
+			dimensions,
+			subresource_range,
+
 			usage: image.usage,
-			identity_swizzle: true, // FIXME:
-			format: image.format
+			swizzle
 		})
 	}
-
-	/// Creates a new view from an image.
-	///
-	/// Note that you must create the view with identity swizzling if you want to use this view
-	/// as a framebuffer attachment.
-	///
-	/// # Panic
-	///
-	/// - Panics if `mipmap_levels` or `array_layers` is out of range of the image.
-	/// - Panics if the view types doesn't match the dimensions of the image (for example a 2D
-	///   view from a 3D image).
-	/// - Panics if trying to create a cubemap with a number of array layers different from 6.
-	/// - Panics if trying to create a cubemap array with a number of array layers not a multiple
-	///   of 6.
-	/// - Panics if the device or host ran out of memory.
-	pub unsafe fn new(
-		image: &UnsafeImage, ty: ImageViewType, mipmap_levels: Range<u32>, array_layers: Range<u32>
-	) -> UnsafeImageView {
-		UnsafeImageView::raw(image, ty, mipmap_levels, array_layers).unwrap()
-	}
-
-	pub fn format(&self) -> Format { self.format }
 
 	pub fn usage_transfer_source(&self) -> bool {
 		(self.usage & vk::IMAGE_USAGE_TRANSFER_SRC_BIT) != 0

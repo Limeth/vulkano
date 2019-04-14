@@ -13,7 +13,7 @@ use crate::{
 	buffer::BufferAccess,
 	command_buffer::submit::SubmitAnyBuilder,
 	device::{Device, DeviceOwned, Queue},
-	image::{ImageAccess, ImageLayout},
+	image::{ImageLayout, ImageViewAccess},
 	sync::{AccessCheckError, AccessFlagBits, FlushError, GpuFuture, PipelineStages}
 };
 
@@ -21,10 +21,10 @@ use crate::{
 pub fn now(device: Arc<Device>) -> NowFuture { NowFuture { device } }
 
 /// A dummy future that represents "now".
+#[derive(Debug)]
 pub struct NowFuture {
 	device: Arc<Device>
 }
-
 unsafe impl GpuFuture for NowFuture {
 	fn cleanup_finished(&mut self) {}
 
@@ -47,12 +47,11 @@ unsafe impl GpuFuture for NowFuture {
 	}
 
 	fn check_image_access(
-		&self, _: &ImageAccess, _: ImageLayout, _: bool, _: &Queue
+		&self, _: &dyn ImageViewAccess, _: ImageLayout, _: bool, _: &Queue
 	) -> Result<Option<(PipelineStages, AccessFlagBits)>, AccessCheckError> {
 		Err(AccessCheckError::Unknown)
 	}
 }
-
 unsafe impl DeviceOwned for NowFuture {
 	fn device(&self) -> &Arc<Device> { &self.device }
 }

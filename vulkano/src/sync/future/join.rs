@@ -13,7 +13,7 @@ use crate::{
 	buffer::BufferAccess,
 	command_buffer::submit::SubmitAnyBuilder,
 	device::{Device, DeviceOwned, Queue},
-	image::{ImageAccess, ImageLayout},
+	image::{ImageLayout, ImageViewAccess},
 	sync::{AccessCheckError, AccessFlagBits, FlushError, GpuFuture, PipelineStages}
 };
 
@@ -37,11 +37,11 @@ where
 
 /// Two futures joined into one.
 #[must_use]
+#[derive(Debug)]
 pub struct JoinFuture<A, B> {
 	first: A,
 	second: B
 }
-
 unsafe impl<A, B> DeviceOwned for JoinFuture<A, B>
 where
 	A: DeviceOwned,
@@ -53,7 +53,6 @@ where
 		device
 	}
 }
-
 unsafe impl<A, B> GpuFuture for JoinFuture<A, B>
 where
 	A: GpuFuture,
@@ -194,10 +193,9 @@ where
 				Err(AccessCheckError::Denied(e1))
 			} // TODO: which one?
 			(Ok(_), Err(AccessCheckError::Denied(_)))
-			| (Err(AccessCheckError::Denied(_)), Ok(_)) => panic!(
-				"Contradictory information \
-				 between two futures"
-			),
+			| (Err(AccessCheckError::Denied(_)), Ok(_)) => {
+				panic!("Contradictory information between two futures")
+			}
 			(Ok(None), Ok(None)) => Ok(None),
 			(Ok(Some(a)), Ok(None)) | (Ok(None), Ok(Some(a))) => Ok(Some(a)),
 			(Ok(Some((a1, a2))), Ok(Some((b1, b2)))) => Ok(Some((a1 | b1, a2 | b2)))
@@ -205,7 +203,7 @@ where
 	}
 
 	fn check_image_access(
-		&self, image: &ImageAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
+		&self, image: &dyn ImageViewAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
 	) -> Result<Option<(PipelineStages, AccessFlagBits)>, AccessCheckError> {
 		let first = self.first.check_image_access(image, layout, exclusive, queue);
 		let second = self.second.check_image_access(image, layout, exclusive, queue);
@@ -220,10 +218,9 @@ where
 				Err(AccessCheckError::Denied(e1))
 			} // TODO: which one?
 			(Ok(_), Err(AccessCheckError::Denied(_)))
-			| (Err(AccessCheckError::Denied(_)), Ok(_)) => panic!(
-				"Contradictory information \
-				 between two futures"
-			),
+			| (Err(AccessCheckError::Denied(_)), Ok(_)) => {
+				panic!("Contradictory information between two futures")
+			}
 			(Ok(None), Ok(None)) => Ok(None),
 			(Ok(Some(a)), Ok(None)) | (Ok(None), Ok(Some(a))) => Ok(Some(a)),
 			(Ok(Some((a1, a2))), Ok(Some((b1, b2)))) => Ok(Some((a1 | b1, a2 | b2)))

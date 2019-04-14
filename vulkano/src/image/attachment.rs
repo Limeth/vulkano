@@ -23,7 +23,6 @@ use crate::{
 		sys::{ImageCreationError, UnsafeImage, UnsafeImageView},
 		traits::{ImageAccess, ImageClearValue, ImageContent, ImageViewAccess},
 		ImageDimensions,
-		ImageInner,
 		ImageLayout,
 		ImageUsage,
 		ImageViewType
@@ -158,7 +157,7 @@ impl<F> AttachmentImage<F> {
 			image.bind_memory(mem.memory(), mem.offset())?;
 		}
 
-		let view = unsafe { UnsafeImageView::raw(&image, ImageViewType::Dim2D, 0 .. 1, 0 .. 1)? };
+		let view = unsafe { UnsafeImageView::new(&image, ImageViewType::Dim2D, 0 .. 1, 0 .. 1)? };
 
 		Ok(Arc::new(AttachmentImage {
 			image,

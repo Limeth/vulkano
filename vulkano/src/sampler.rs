@@ -701,7 +701,7 @@ impl From<Error> for SamplerCreationError {
 
 #[cfg(test)]
 mod tests {
-	use sampler;
+	use crate::sampler;
 
 	#[test]
 	fn create_regular() {

@@ -12,7 +12,7 @@ use std::ops::Range;
 use crate::{
 	buffer::{sys::UnsafeBuffer, BufferSlice},
 	device::{DeviceOwned, Queue},
-	image::ImageAccess,
+	image::ImageViewAccess,
 	memory::Content,
 	sync::AccessError
 };
@@ -85,7 +85,7 @@ pub unsafe trait BufferAccess: DeviceOwned {
 	///
 	/// Note that the function must be transitive. In other words if `conflicts(a, b)` is true and
 	/// `conflicts(b, c)` is true, then `conflicts(a, c)` must be true as well.
-	fn conflicts_buffer(&self, other: &BufferAccess) -> bool;
+	fn conflicts_buffer(&self, other: &dyn BufferAccess) -> bool;
 
 	/// Returns true if an access to `self` potentially overlaps the same memory as an access to
 	/// `other`.
@@ -96,7 +96,7 @@ pub unsafe trait BufferAccess: DeviceOwned {
 	///
 	/// Note that the function must be transitive. In other words if `conflicts(a, b)` is true and
 	/// `conflicts(b, c)` is true, then `conflicts(a, c)` must be true as well.
-	fn conflicts_image(&self, other: &ImageAccess) -> bool;
+	fn conflicts_image(&self, other: &dyn ImageViewAccess) -> bool;
 
 	/// Returns a key that uniquely identifies the buffer. Two buffers or images that potentially
 	/// overlap in memory must return the same key.
@@ -157,9 +157,13 @@ where
 
 	fn size(&self) -> usize { (**self).size() }
 
-	fn conflicts_buffer(&self, other: &BufferAccess) -> bool { (**self).conflicts_buffer(other) }
+	fn conflicts_buffer(&self, other: &dyn BufferAccess) -> bool {
+		(**self).conflicts_buffer(other)
+	}
 
-	fn conflicts_image(&self, other: &ImageAccess) -> bool { (**self).conflicts_image(other) }
+	fn conflicts_image(&self, other: &dyn ImageViewAccess) -> bool {
+		(**self).conflicts_image(other)
+	}
 
 	fn conflict_key(&self) -> (u64, usize) { (**self).conflict_key() }
 

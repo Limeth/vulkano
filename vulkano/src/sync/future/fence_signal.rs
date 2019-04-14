@@ -17,7 +17,7 @@ use crate::{
 	buffer::BufferAccess,
 	command_buffer::submit::{SubmitAnyBuilder, SubmitCommandBufferBuilder},
 	device::{Device, DeviceOwned, Queue},
-	image::{ImageAccess, ImageLayout},
+	image::{ImageLayout, ImageViewAccess},
 	sync::{AccessCheckError, AccessFlagBits, Fence, FlushError, GpuFuture, PipelineStages}
 };
 
@@ -47,6 +47,42 @@ pub enum FenceSignalFutureBehavior {
 	Block {
 		/// How long to block the current thread.
 		timeout: Option<Duration>
+	}
+}
+
+// This future can be in three different states: pending (ie. newly-created), submitted (ie. the
+// command that submits the fence has been submitted), or cleaned (ie. the previous future has
+// been dropped).
+#[derive(Debug)]
+enum FenceSignalFutureState<F> {
+	// Newly-created. Not submitted yet.
+	Pending(F, Fence),
+
+	// Partially submitted to the queue. Only happens in situations where submitting requires two
+	// steps, and when the first step succeeded while the second step failed.
+	//
+	// Note that if there's ever a submit operation that needs three steps we will need to rework
+	// this code, as it was designed for two-step operations only.
+	PartiallyFlushed(F, Fence),
+
+	// Submitted to the queue.
+	Flushed(F, Fence),
+
+	// The submission is finished. The previous future and the fence have been cleaned.
+	Cleaned,
+
+	// A function panicked while the state was being modified. Should never happen.
+	Poisoned
+}
+impl<F> FenceSignalFutureState<F> {
+	fn get_prev(&self) -> Option<&F> {
+		match *self {
+			FenceSignalFutureState::Pending(ref prev, _) => Some(prev),
+			FenceSignalFutureState::PartiallyFlushed(ref prev, _) => Some(prev),
+			FenceSignalFutureState::Flushed(ref prev, _) => Some(prev),
+			FenceSignalFutureState::Cleaned => None,
+			FenceSignalFutureState::Poisoned => None
+		}
 	}
 }
 
@@ -82,6 +118,7 @@ pub enum FenceSignalFutureBehavior {
 /// ```
 #[must_use = "Dropping this object will immediately block the thread until the GPU has finished \
               processing the submission"]
+#[derive(Debug)]
 pub struct FenceSignalFuture<F>
 where
 	F: GpuFuture
@@ -92,31 +129,6 @@ where
 	device: Arc<Device>,
 	behavior: FenceSignalFutureBehavior
 }
-
-// This future can be in three different states: pending (ie. newly-created), submitted (ie. the
-// command that submits the fence has been submitted), or cleaned (ie. the previous future has
-// been dropped).
-enum FenceSignalFutureState<F> {
-	// Newly-created. Not submitted yet.
-	Pending(F, Fence),
-
-	// Partially submitted to the queue. Only happens in situations where submitting requires two
-	// steps, and when the first step succeeded while the second step failed.
-	//
-	// Note that if there's ever a submit operation that needs three steps we will need to rework
-	// this code, as it was designed for two-step operations only.
-	PartiallyFlushed(F, Fence),
-
-	// Submitted to the queue.
-	Flushed(F, Fence),
-
-	// The submission is finished. The previous future and the fence have been cleaned.
-	Cleaned,
-
-	// A function panicked while the state was being modified. Should never happen.
-	Poisoned
-}
-
 impl<F> FenceSignalFuture<F>
 where
 	F: GpuFuture
@@ -147,7 +159,6 @@ where
 		}
 	}
 }
-
 impl<F> FenceSignalFuture<F>
 where
 	F: GpuFuture
@@ -277,19 +288,6 @@ where
 		}
 	}
 }
-
-impl<F> FenceSignalFutureState<F> {
-	fn get_prev(&self) -> Option<&F> {
-		match *self {
-			FenceSignalFutureState::Pending(ref prev, _) => Some(prev),
-			FenceSignalFutureState::PartiallyFlushed(ref prev, _) => Some(prev),
-			FenceSignalFutureState::Flushed(ref prev, _) => Some(prev),
-			FenceSignalFutureState::Cleaned => None,
-			FenceSignalFutureState::Poisoned => None
-		}
-	}
-}
-
 unsafe impl<F> GpuFuture for FenceSignalFuture<F>
 where
 	F: GpuFuture
@@ -366,7 +364,7 @@ where
 	}
 
 	fn check_image_access(
-		&self, image: &ImageAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
+		&self, image: &dyn ImageViewAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
 	) -> Result<Option<(PipelineStages, AccessFlagBits)>, AccessCheckError> {
 		let state = self.state.lock().unwrap();
 		if let Some(previous) = state.get_prev() {
@@ -376,14 +374,12 @@ where
 		}
 	}
 }
-
 unsafe impl<F> DeviceOwned for FenceSignalFuture<F>
 where
 	F: GpuFuture
 {
 	fn device(&self) -> &Arc<Device> { &self.device }
 }
-
 impl<F> Drop for FenceSignalFuture<F>
 where
 	F: GpuFuture
@@ -417,7 +413,6 @@ where
 		}
 	}
 }
-
 unsafe impl<F> GpuFuture for Arc<FenceSignalFuture<F>>
 where
 	F: GpuFuture
@@ -445,7 +440,7 @@ where
 	}
 
 	fn check_image_access(
-		&self, image: &ImageAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
+		&self, image: &dyn ImageViewAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
 	) -> Result<Option<(PipelineStages, AccessFlagBits)>, AccessCheckError> {
 		(**self).check_image_access(image, layout, exclusive, queue)
 	}

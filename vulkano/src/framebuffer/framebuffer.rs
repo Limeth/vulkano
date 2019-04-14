@@ -483,352 +483,353 @@ impl From<Error> for FramebufferCreationError {
 	}
 }
 
-#[cfg(test)]
-mod tests {
-	use crate::{
-		format::Format,
-		framebuffer::{
-			EmptySinglePassRenderPassDesc,
-			Framebuffer,
-			FramebufferCreationError,
-			RenderPassDesc
-		},
-		image::attachment::AttachmentImage
-	};
-	use std::sync::Arc;
-
-	#[test]
-	fn simple_create() {
-		let (device, _) = gfx_dev_and_queue!();
-
-		let render_pass = Arc::new(
-			single_pass_renderpass!(device.clone(),
-				attachments: {
-					color: {
-						load: Clear,
-						store: DontCare,
-						format: Format::R8G8B8A8Unorm,
-						samples: 1,
-					}
-				},
-				pass: {
-					color: [color],
-					depth_stencil: {}
-				}
-			)
-			.unwrap()
-		);
-
-		let image =
-			AttachmentImage::new(device.clone(), [1024, 768], Format::R8G8B8A8Unorm).unwrap();
-		let _ = Framebuffer::start(render_pass).add(image.clone()).unwrap().build().unwrap();
-	}
-
-	#[test]
-	fn check_device_limits() {
-		let (device, _) = gfx_dev_and_queue!();
-
-		let rp = EmptySinglePassRenderPassDesc.build_render_pass(device).unwrap();
-		let res = Framebuffer::with_dimensions(rp, [0xffffffff, 0xffffffff, 0xffffffff]).build();
-		match res {
-			Err(FramebufferCreationError::ImageDimensionsTooLarge) => (),
-			_ => panic!()
-		}
-	}
-
-	#[test]
-	fn attachment_format_mismatch() {
-		let (device, _) = gfx_dev_and_queue!();
-
-		let render_pass = Arc::new(
-			single_pass_renderpass!(device.clone(),
-				attachments: {
-					color: {
-						load: Clear,
-						store: DontCare,
-						format: Format::R8G8B8A8Unorm,
-						samples: 1,
-					}
-				},
-				pass: {
-					color: [color],
-					depth_stencil: {}
-				}
-			)
-			.unwrap()
-		);
-
-		let image = AttachmentImage::new(device.clone(), [1024, 768], Format::R8Unorm).unwrap();
-
-		match Framebuffer::start(render_pass).add(image.clone()) {
-			Err(FramebufferCreationError::IncompatibleAttachment(_)) => (),
-			_ => panic!()
-		}
-	}
-
-	// TODO: check samples mismatch
-
-	#[test]
-	fn attachment_dims_larger_than_specified_valid() {
-		let (device, _) = gfx_dev_and_queue!();
-
-		let render_pass = Arc::new(
-			single_pass_renderpass!(device.clone(),
-				attachments: {
-					color: {
-						load: Clear,
-						store: DontCare,
-						format: Format::R8G8B8A8Unorm,
-						samples: 1,
-					}
-				},
-				pass: {
-					color: [color],
-					depth_stencil: {}
-				}
-			)
-			.unwrap()
-		);
-
-		let img = AttachmentImage::new(device.clone(), [600, 600], Format::R8G8B8A8Unorm).unwrap();
-
-		let _ = Framebuffer::with_dimensions(render_pass, [512, 512, 1])
-			.add(img)
-			.unwrap()
-			.build()
-			.unwrap();
-	}
-
-	#[test]
-	fn attachment_dims_smaller_than_specified() {
-		let (device, _) = gfx_dev_and_queue!();
-
-		let render_pass = Arc::new(
-			single_pass_renderpass!(device.clone(),
-				attachments: {
-					color: {
-						load: Clear,
-						store: DontCare,
-						format: Format::R8G8B8A8Unorm,
-						samples: 1,
-					}
-				},
-				pass: {
-					color: [color],
-					depth_stencil: {}
-				}
-			)
-			.unwrap()
-		);
-
-		let img = AttachmentImage::new(device.clone(), [512, 700], Format::R8G8B8A8Unorm).unwrap();
-
-		match Framebuffer::with_dimensions(render_pass, [600, 600, 1]).add(img) {
-			Err(FramebufferCreationError::AttachmenImageDimensionsIncompatible {
-				expected,
-				obtained
-			}) => {
-				assert_eq!(expected, [600, 600, 1]);
-				assert_eq!(obtained, [512, 700, 1]);
-			}
-			_ => panic!()
-		}
-	}
-
-	#[test]
-	fn multi_attachments_dims_not_identical() {
-		let (device, _) = gfx_dev_and_queue!();
-
-		let render_pass = Arc::new(
-			single_pass_renderpass!(device.clone(),
-				attachments: {
-					a: {
-						load: Clear,
-						store: DontCare,
-						format: Format::R8G8B8A8Unorm,
-						samples: 1,
-					},
-					b: {
-						load: Clear,
-						store: DontCare,
-						format: Format::R8G8B8A8Unorm,
-						samples: 1,
-					}
-				},
-				pass: {
-					color: [a, b],
-					depth_stencil: {}
-				}
-			)
-			.unwrap()
-		);
-
-		let a = AttachmentImage::new(device.clone(), [512, 512], Format::R8G8B8A8Unorm).unwrap();
-		let b = AttachmentImage::new(device.clone(), [512, 513], Format::R8G8B8A8Unorm).unwrap();
-
-		match Framebuffer::start(render_pass).add(a).unwrap().add(b) {
-			Err(FramebufferCreationError::AttachmenImageDimensionsIncompatible {
-				expected,
-				obtained
-			}) => {
-				assert_eq!(expected, [512, 512, 1]);
-				assert_eq!(obtained, [512, 513, 1]);
-			}
-			_ => panic!()
-		}
-	}
-
-	#[test]
-	fn multi_attachments_auto_smaller() {
-		let (device, _) = gfx_dev_and_queue!();
-
-		let render_pass = Arc::new(
-			single_pass_renderpass!(device.clone(),
-				attachments: {
-					a: {
-						load: Clear,
-						store: DontCare,
-						format: Format::R8G8B8A8Unorm,
-						samples: 1,
-					},
-					b: {
-						load: Clear,
-						store: DontCare,
-						format: Format::R8G8B8A8Unorm,
-						samples: 1,
-					}
-				},
-				pass: {
-					color: [a, b],
-					depth_stencil: {}
-				}
-			)
-			.unwrap()
-		);
-
-		let a = AttachmentImage::new(device.clone(), [256, 512], Format::R8G8B8A8Unorm).unwrap();
-		let b = AttachmentImage::new(device.clone(), [512, 128], Format::R8G8B8A8Unorm).unwrap();
-
-		let fb = Framebuffer::with_intersecting_dimensions(render_pass)
-			.add(a)
-			.unwrap()
-			.add(b)
-			.unwrap()
-			.build()
-			.unwrap();
-
-		match (fb.width(), fb.height(), fb.layers()) {
-			(256, 128, 1) => (),
-			_ => panic!()
-		}
-	}
-
-	#[test]
-	fn not_enough_attachments() {
-		let (device, _) = gfx_dev_and_queue!();
-
-		let render_pass = Arc::new(
-			single_pass_renderpass!(device.clone(),
-				attachments: {
-					a: {
-						load: Clear,
-						store: DontCare,
-						format: Format::R8G8B8A8Unorm,
-						samples: 1,
-					},
-					b: {
-						load: Clear,
-						store: DontCare,
-						format: Format::R8G8B8A8Unorm,
-						samples: 1,
-					}
-				},
-				pass: {
-					color: [a, b],
-					depth_stencil: {}
-				}
-			)
-			.unwrap()
-		);
-
-		let img = AttachmentImage::new(device.clone(), [256, 512], Format::R8G8B8A8Unorm).unwrap();
-
-		let res = Framebuffer::with_intersecting_dimensions(render_pass).add(img).unwrap().build();
-
-		match res {
-			Err(FramebufferCreationError::AttachmentsCountMismatch {
-				expected: 2,
-				obtained: 1
-			}) => (),
-			_ => panic!()
-		}
-	}
-
-	#[test]
-	fn too_many_attachments() {
-		let (device, _) = gfx_dev_and_queue!();
-
-		let render_pass = Arc::new(
-			single_pass_renderpass!(device.clone(),
-				attachments: {
-					a: {
-						load: Clear,
-						store: DontCare,
-						format: Format::R8G8B8A8Unorm,
-						samples: 1,
-					}
-				},
-				pass: {
-					color: [a],
-					depth_stencil: {}
-				}
-			)
-			.unwrap()
-		);
-
-		let a = AttachmentImage::new(device.clone(), [256, 512], Format::R8G8B8A8Unorm).unwrap();
-		let b = AttachmentImage::new(device.clone(), [256, 512], Format::R8G8B8A8Unorm).unwrap();
-
-		let res = Framebuffer::with_intersecting_dimensions(render_pass).add(a).unwrap().add(b);
-
-		match res {
-			Err(FramebufferCreationError::AttachmentsCountMismatch {
-				expected: 1,
-				obtained: 2
-			}) => (),
-			_ => panic!()
-		}
-	}
-
-	#[test]
-	fn empty_working() {
-		let (device, _) = gfx_dev_and_queue!();
-
-		let rp = EmptySinglePassRenderPassDesc.build_render_pass(device).unwrap();
-		let _ = Framebuffer::with_dimensions(rp, [512, 512, 1]).build().unwrap();
-	}
-
-	#[test]
-	fn cant_determine_dimensions_auto() {
-		let (device, _) = gfx_dev_and_queue!();
-
-		let rp = EmptySinglePassRenderPassDesc.build_render_pass(device).unwrap();
-		let res = Framebuffer::start(rp).build();
-		match res {
-			Err(FramebufferCreationError::CantDetermineDimensions) => (),
-			_ => panic!()
-		}
-	}
-
-	#[test]
-	fn cant_determine_dimensions_intersect() {
-		let (device, _) = gfx_dev_and_queue!();
-
-		let rp = EmptySinglePassRenderPassDesc.build_render_pass(device).unwrap();
-		let res = Framebuffer::with_intersecting_dimensions(rp).build();
-		match res {
-			Err(FramebufferCreationError::CantDetermineDimensions) => (),
-			_ => panic!()
-		}
-	}
-}
+// TODO: Attachment image
+// #[cfg(test)]
+// mod tests {
+// use crate::{
+// format::Format,
+// framebuffer::{
+// EmptySinglePassRenderPassDesc,
+// Framebuffer,
+// FramebufferCreationError,
+// RenderPassDesc
+// },
+// image::attachment::AttachmentImage
+// };
+// use std::sync::Arc;
+//
+// #[test]
+// fn simple_create() {
+// let (device, _) = gfx_dev_and_queue!();
+//
+// let render_pass = Arc::new(
+// single_pass_renderpass!(device.clone(),
+// attachments: {
+// color: {
+// load: Clear,
+// store: DontCare,
+// format: Format::R8G8B8A8Unorm,
+// samples: 1,
+// }
+// },
+// pass: {
+// color: [color],
+// depth_stencil: {}
+// }
+// )
+// .unwrap()
+// );
+//
+// let image =
+// AttachmentImage::new(device.clone(), [1024, 768], Format::R8G8B8A8Unorm).unwrap();
+// let _ = Framebuffer::start(render_pass).add(image.clone()).unwrap().build().unwrap();
+// }
+//
+// #[test]
+// fn check_device_limits() {
+// let (device, _) = gfx_dev_and_queue!();
+//
+// let rp = EmptySinglePassRenderPassDesc.build_render_pass(device).unwrap();
+// let res = Framebuffer::with_dimensions(rp, [0xffffffff, 0xffffffff, 0xffffffff]).build();
+// match res {
+// Err(FramebufferCreationError::ImageDimensionsTooLarge) => (),
+// _ => panic!()
+// }
+// }
+//
+// #[test]
+// fn attachment_format_mismatch() {
+// let (device, _) = gfx_dev_and_queue!();
+//
+// let render_pass = Arc::new(
+// single_pass_renderpass!(device.clone(),
+// attachments: {
+// color: {
+// load: Clear,
+// store: DontCare,
+// format: Format::R8G8B8A8Unorm,
+// samples: 1,
+// }
+// },
+// pass: {
+// color: [color],
+// depth_stencil: {}
+// }
+// )
+// .unwrap()
+// );
+//
+// let image = AttachmentImage::new(device.clone(), [1024, 768], Format::R8Unorm).unwrap();
+//
+// match Framebuffer::start(render_pass).add(image.clone()) {
+// Err(FramebufferCreationError::IncompatibleAttachment(_)) => (),
+// _ => panic!()
+// }
+// }
+//
+// TODO: check samples mismatch
+//
+// #[test]
+// fn attachment_dims_larger_than_specified_valid() {
+// let (device, _) = gfx_dev_and_queue!();
+//
+// let render_pass = Arc::new(
+// single_pass_renderpass!(device.clone(),
+// attachments: {
+// color: {
+// load: Clear,
+// store: DontCare,
+// format: Format::R8G8B8A8Unorm,
+// samples: 1,
+// }
+// },
+// pass: {
+// color: [color],
+// depth_stencil: {}
+// }
+// )
+// .unwrap()
+// );
+//
+// let img = AttachmentImage::new(device.clone(), [600, 600], Format::R8G8B8A8Unorm).unwrap();
+//
+// let _ = Framebuffer::with_dimensions(render_pass, [512, 512, 1])
+// .add(img)
+// .unwrap()
+// .build()
+// .unwrap();
+// }
+//
+// #[test]
+// fn attachment_dims_smaller_than_specified() {
+// let (device, _) = gfx_dev_and_queue!();
+//
+// let render_pass = Arc::new(
+// single_pass_renderpass!(device.clone(),
+// attachments: {
+// color: {
+// load: Clear,
+// store: DontCare,
+// format: Format::R8G8B8A8Unorm,
+// samples: 1,
+// }
+// },
+// pass: {
+// color: [color],
+// depth_stencil: {}
+// }
+// )
+// .unwrap()
+// );
+//
+// let img = AttachmentImage::new(device.clone(), [512, 700], Format::R8G8B8A8Unorm).unwrap();
+//
+// match Framebuffer::with_dimensions(render_pass, [600, 600, 1]).add(img) {
+// Err(FramebufferCreationError::AttachmenImageDimensionsIncompatible {
+// expected,
+// obtained
+// }) => {
+// assert_eq!(expected, [600, 600, 1]);
+// assert_eq!(obtained, [512, 700, 1]);
+// }
+// _ => panic!()
+// }
+// }
+//
+// #[test]
+// fn multi_attachments_dims_not_identical() {
+// let (device, _) = gfx_dev_and_queue!();
+//
+// let render_pass = Arc::new(
+// single_pass_renderpass!(device.clone(),
+// attachments: {
+// a: {
+// load: Clear,
+// store: DontCare,
+// format: Format::R8G8B8A8Unorm,
+// samples: 1,
+// },
+// b: {
+// load: Clear,
+// store: DontCare,
+// format: Format::R8G8B8A8Unorm,
+// samples: 1,
+// }
+// },
+// pass: {
+// color: [a, b],
+// depth_stencil: {}
+// }
+// )
+// .unwrap()
+// );
+//
+// let a = AttachmentImage::new(device.clone(), [512, 512], Format::R8G8B8A8Unorm).unwrap();
+// let b = AttachmentImage::new(device.clone(), [512, 513], Format::R8G8B8A8Unorm).unwrap();
+//
+// match Framebuffer::start(render_pass).add(a).unwrap().add(b) {
+// Err(FramebufferCreationError::AttachmenImageDimensionsIncompatible {
+// expected,
+// obtained
+// }) => {
+// assert_eq!(expected, [512, 512, 1]);
+// assert_eq!(obtained, [512, 513, 1]);
+// }
+// _ => panic!()
+// }
+// }
+//
+// #[test]
+// fn multi_attachments_auto_smaller() {
+// let (device, _) = gfx_dev_and_queue!();
+//
+// let render_pass = Arc::new(
+// single_pass_renderpass!(device.clone(),
+// attachments: {
+// a: {
+// load: Clear,
+// store: DontCare,
+// format: Format::R8G8B8A8Unorm,
+// samples: 1,
+// },
+// b: {
+// load: Clear,
+// store: DontCare,
+// format: Format::R8G8B8A8Unorm,
+// samples: 1,
+// }
+// },
+// pass: {
+// color: [a, b],
+// depth_stencil: {}
+// }
+// )
+// .unwrap()
+// );
+//
+// let a = AttachmentImage::new(device.clone(), [256, 512], Format::R8G8B8A8Unorm).unwrap();
+// let b = AttachmentImage::new(device.clone(), [512, 128], Format::R8G8B8A8Unorm).unwrap();
+//
+// let fb = Framebuffer::with_intersecting_dimensions(render_pass)
+// .add(a)
+// .unwrap()
+// .add(b)
+// .unwrap()
+// .build()
+// .unwrap();
+//
+// match (fb.width(), fb.height(), fb.layers()) {
+// (256, 128, 1) => (),
+// _ => panic!()
+// }
+// }
+//
+// #[test]
+// fn not_enough_attachments() {
+// let (device, _) = gfx_dev_and_queue!();
+//
+// let render_pass = Arc::new(
+// single_pass_renderpass!(device.clone(),
+// attachments: {
+// a: {
+// load: Clear,
+// store: DontCare,
+// format: Format::R8G8B8A8Unorm,
+// samples: 1,
+// },
+// b: {
+// load: Clear,
+// store: DontCare,
+// format: Format::R8G8B8A8Unorm,
+// samples: 1,
+// }
+// },
+// pass: {
+// color: [a, b],
+// depth_stencil: {}
+// }
+// )
+// .unwrap()
+// );
+//
+// let img = AttachmentImage::new(device.clone(), [256, 512], Format::R8G8B8A8Unorm).unwrap();
+//
+// let res = Framebuffer::with_intersecting_dimensions(render_pass).add(img).unwrap().build();
+//
+// match res {
+// Err(FramebufferCreationError::AttachmentsCountMismatch {
+// expected: 2,
+// obtained: 1
+// }) => (),
+// _ => panic!()
+// }
+// }
+//
+// #[test]
+// fn too_many_attachments() {
+// let (device, _) = gfx_dev_and_queue!();
+//
+// let render_pass = Arc::new(
+// single_pass_renderpass!(device.clone(),
+// attachments: {
+// a: {
+// load: Clear,
+// store: DontCare,
+// format: Format::R8G8B8A8Unorm,
+// samples: 1,
+// }
+// },
+// pass: {
+// color: [a],
+// depth_stencil: {}
+// }
+// )
+// .unwrap()
+// );
+//
+// let a = AttachmentImage::new(device.clone(), [256, 512], Format::R8G8B8A8Unorm).unwrap();
+// let b = AttachmentImage::new(device.clone(), [256, 512], Format::R8G8B8A8Unorm).unwrap();
+//
+// let res = Framebuffer::with_intersecting_dimensions(render_pass).add(a).unwrap().add(b);
+//
+// match res {
+// Err(FramebufferCreationError::AttachmentsCountMismatch {
+// expected: 1,
+// obtained: 2
+// }) => (),
+// _ => panic!()
+// }
+// }
+//
+// #[test]
+// fn empty_working() {
+// let (device, _) = gfx_dev_and_queue!();
+//
+// let rp = EmptySinglePassRenderPassDesc.build_render_pass(device).unwrap();
+// let _ = Framebuffer::with_dimensions(rp, [512, 512, 1]).build().unwrap();
+// }
+//
+// #[test]
+// fn cant_determine_dimensions_auto() {
+// let (device, _) = gfx_dev_and_queue!();
+//
+// let rp = EmptySinglePassRenderPassDesc.build_render_pass(device).unwrap();
+// let res = Framebuffer::start(rp).build();
+// match res {
+// Err(FramebufferCreationError::CantDetermineDimensions) => (),
+// _ => panic!()
+// }
+// }
+//
+// #[test]
+// fn cant_determine_dimensions_intersect() {
+// let (device, _) = gfx_dev_and_queue!();
+//
+// let rp = EmptySinglePassRenderPassDesc.build_render_pass(device).unwrap();
+// let res = Framebuffer::with_intersecting_dimensions(rp).build();
+// match res {
+// Err(FramebufferCreationError::CantDetermineDimensions) => (),
+// _ => panic!()
+// }
+// }
+// }

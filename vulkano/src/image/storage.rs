@@ -21,7 +21,6 @@ use crate::{
 		sys::{ImageCreationError, UnsafeImage, UnsafeImageView},
 		traits::{ImageAccess, ImageClearValue, ImageContent, ImageViewAccess},
 		ImageDimensions,
-		ImageInner,
 		ImageLayout,
 		ImageUsage
 	},

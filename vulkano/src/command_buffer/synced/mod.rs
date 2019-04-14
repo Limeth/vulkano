@@ -10,14 +10,14 @@
 //! Contains `SyncCommandBufferBuilder` and `SyncCommandBuffer`.
 
 pub use self::{
-	builder::SyncCommandBufferBuilder,
 	buffer::SyncCommandBuffer,
-	misc::SyncCommandBufferBuilderError,
+	builder::SyncCommandBufferBuilder,
 	commands::{
 		SyncCommandBufferBuilderBindDescriptorSets,
 		SyncCommandBufferBuilderBindVertexBuffer,
 		SyncCommandBufferBuilderExecuteCommands
-	}
+	},
+	misc::SyncCommandBufferBuilderError
 };
 
 mod buffer;

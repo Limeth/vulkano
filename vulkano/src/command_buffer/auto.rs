@@ -66,7 +66,7 @@ use crate::{
 		Subpass,
 		SubpassContents
 	},
-	image::{ImageAccess, ImageLayout},
+	image::{ImageLayout, ImageViewAccess},
 	instance::QueueFamily,
 	pipeline::{
 		input_assembly::Index,
@@ -574,8 +574,8 @@ impl<P> AutoCommandBufferBuilder<P> {
 		layer_count: u32
 	) -> Result<Self, CopyImageError>
 	where
-		S: ImageAccess + Send + Sync + 'static,
-		D: ImageAccess + Send + Sync + 'static
+		S: ImageViewAccess + Send + Sync + 'static,
+		D: ImageViewAccess + Send + Sync + 'static
 	{
 		unsafe {
 			self.ensure_outside_render_pass()?;
@@ -664,8 +664,8 @@ impl<P> AutoCommandBufferBuilder<P> {
 		filter: Filter
 	) -> Result<Self, BlitImageError>
 	where
-		S: ImageAccess + Send + Sync + 'static,
-		D: ImageAccess + Send + Sync + 'static
+		S: ImageViewAccess + Send + Sync + 'static,
+		D: ImageViewAccess + Send + Sync + 'static
 	{
 		unsafe {
 			if !self.graphics_allowed {
@@ -734,10 +734,10 @@ impl<P> AutoCommandBufferBuilder<P> {
 		self, image: I, color: ClearValue
 	) -> Result<Self, ClearColorImageError>
 	where
-		I: ImageAccess + Send + Sync + 'static
+		I: ImageViewAccess + Send + Sync + 'static
 	{
-		let layers = image.dimensions().array_layers();
-		let levels = image.mipmap_levels();
+		let layers = image.subresource_range().array_layers.get();
+		let levels = image.subresource_range().mipmap_levels.get();
 
 		self.clear_color_image_dimensions(image, 0, layers, 0, levels, color)
 	}
@@ -752,7 +752,7 @@ impl<P> AutoCommandBufferBuilder<P> {
 		color: ClearValue
 	) -> Result<Self, ClearColorImageError>
 	where
-		I: ImageAccess + Send + Sync + 'static
+		I: ImageViewAccess + Send + Sync + 'static
 	{
 		unsafe {
 			if !self.graphics_allowed && !self.compute_allowed {
@@ -818,7 +818,7 @@ impl<P> AutoCommandBufferBuilder<P> {
 	) -> Result<Self, CopyBufferImageError>
 	where
 		S: TypedBufferAccess<Content = [Px]> + Send + Sync + 'static,
-		D: ImageAccess + Send + Sync + 'static,
+		D: ImageViewAccess + Send + Sync + 'static,
 		Format: AcceptsPixels<Px>
 	{
 		self.ensure_outside_render_pass()?;
@@ -834,7 +834,7 @@ impl<P> AutoCommandBufferBuilder<P> {
 	) -> Result<Self, CopyBufferImageError>
 	where
 		S: TypedBufferAccess<Content = [Px]> + Send + Sync + 'static,
-		D: ImageAccess + Send + Sync + 'static,
+		D: ImageViewAccess + Send + Sync + 'static,
 		Format: AcceptsPixels<Px>
 	{
 		unsafe {
@@ -894,7 +894,7 @@ impl<P> AutoCommandBufferBuilder<P> {
 		self, source: S, destination: D
 	) -> Result<Self, CopyBufferImageError>
 	where
-		S: ImageAccess + Send + Sync + 'static,
+		S: ImageViewAccess + Send + Sync + 'static,
 		D: TypedBufferAccess<Content = [Px]> + Send + Sync + 'static,
 		Format: AcceptsPixels<Px>
 	{
@@ -910,7 +910,7 @@ impl<P> AutoCommandBufferBuilder<P> {
 		num_layers: u32, mipmap: u32
 	) -> Result<Self, CopyBufferImageError>
 	where
-		S: ImageAccess + Send + Sync + 'static,
+		S: ImageViewAccess + Send + Sync + 'static,
 		D: TypedBufferAccess<Content = [Px]> + Send + Sync + 'static,
 		Format: AcceptsPixels<Px>
 	{
@@ -1540,7 +1540,7 @@ unsafe impl<P> CommandBuffer for AutoCommandBuffer<P> {
 	}
 
 	fn check_image_access(
-		&self, image: &ImageAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
+		&self, image: &dyn ImageViewAccess, layout: ImageLayout, exclusive: bool, queue: &Queue
 	) -> Result<Option<(PipelineStages, AccessFlagBits)>, AccessCheckError> {
 		self.inner.check_image_access(image, layout, exclusive, queue)
 	}

@@ -16,15 +16,22 @@
 mod unsafe_image;
 mod unsafe_image_view;
 
-pub use self::{unsafe_image::*, unsafe_image_view::*};
+pub use self::{
+	unsafe_image::{ImageCreationError, LinearLayout, UnsafeImage},
+	unsafe_image_view::UnsafeImageView
+};
 
 #[cfg(test)]
 mod tests {
 	use std::{iter::Empty, u32};
 
-	use super::{ImageCreationError, ImageUsage, UnsafeImage};
+	use super::{ImageCreationError, UnsafeImage};
 
-	use crate::{format::Format, image::ImageDimensions, sync::Sharing};
+	use crate::{
+		format::Format,
+		image::{ImageDimensions, ImageUsage},
+		sync::Sharing
+	};
 
 	#[test]
 	fn create_sampled() {
@@ -37,12 +44,7 @@ mod tests {
 				device,
 				usage,
 				Format::R8G8B8A8Unorm,
-				ImageDimensions::Dim2D {
-					width: 32,
-					height: 32,
-					array_layers: 1,
-					cubemap_compatible: false
-				},
+				ImageDimensions::Dim2D { width: 32, height: 32 },
 				1,
 				1,
 				Sharing::Exclusive::<Empty<_>>,
@@ -65,12 +67,7 @@ mod tests {
 				device,
 				usage,
 				Format::R8G8B8A8Unorm,
-				ImageDimensions::Dim2D {
-					width: 32,
-					height: 32,
-					array_layers: 1,
-					cubemap_compatible: false
-				},
+				ImageDimensions::Dim2D { width: 32, height: 32 },
 				1,
 				1,
 				Sharing::Exclusive::<Empty<_>>,
@@ -92,12 +89,7 @@ mod tests {
 				device,
 				usage,
 				Format::R8G8B8A8Unorm,
-				ImageDimensions::Dim2D {
-					width: 32,
-					height: 32,
-					array_layers: 1,
-					cubemap_compatible: false
-				},
+				ImageDimensions::Dim2D { width: 32, height: 32 },
 				0,
 				1,
 				Sharing::Exclusive::<Empty<_>>,
@@ -123,12 +115,7 @@ mod tests {
 				device,
 				usage,
 				Format::R8G8B8A8Unorm,
-				ImageDimensions::Dim2D {
-					width: 32,
-					height: 32,
-					array_layers: 1,
-					cubemap_compatible: false
-				},
+				ImageDimensions::Dim2D { width: 32, height: 32 },
 				5,
 				1,
 				Sharing::Exclusive::<Empty<_>>,
@@ -154,12 +141,7 @@ mod tests {
 				device,
 				usage,
 				Format::R8G8B8A8Unorm,
-				ImageDimensions::Dim2D {
-					width: 32,
-					height: 32,
-					array_layers: 1,
-					cubemap_compatible: false
-				},
+				ImageDimensions::Dim2D { width: 32, height: 32 },
 				1,
 				0,
 				Sharing::Exclusive::<Empty<_>>,
@@ -186,12 +168,7 @@ mod tests {
 				device,
 				usage,
 				Format::R8G8B8A8Unorm,
-				ImageDimensions::Dim2D {
-					width: 32,
-					height: 32,
-					array_layers: 1,
-					cubemap_compatible: false
-				},
+				ImageDimensions::Dim2D { width: 32, height: 32 },
 				1,
 				u32::MAX,
 				Sharing::Exclusive::<Empty<_>>,
@@ -220,12 +197,7 @@ mod tests {
 				device,
 				usage,
 				Format::R8G8B8A8Unorm,
-				ImageDimensions::Dim2D {
-					width: 32,
-					height: 32,
-					array_layers: 1,
-					cubemap_compatible: false
-				},
+				ImageDimensions::Dim2D { width: 32, height: 32 },
 				2,
 				1,
 				Sharing::Exclusive::<Empty<_>>,
@@ -252,12 +224,7 @@ mod tests {
 				device,
 				usage,
 				Format::ASTC_5x4UnormBlock,
-				ImageDimensions::Dim2D {
-					width: 32,
-					height: 32,
-					array_layers: 1,
-					cubemap_compatible: false
-				},
+				ImageDimensions::Dim2D { width: 32, height: 32 },
 				1,
 				u32::MAX,
 				Sharing::Exclusive::<Empty<_>>,
@@ -284,12 +251,7 @@ mod tests {
 				device,
 				usage,
 				Format::R8G8B8A8Unorm,
-				ImageDimensions::Dim2D {
-					width: 32,
-					height: 32,
-					array_layers: 1,
-					cubemap_compatible: false
-				},
+				ImageDimensions::Dim2D { width: 32, height: 32 },
 				1,
 				1,
 				Sharing::Exclusive::<Empty<_>>,
@@ -304,34 +266,34 @@ mod tests {
 		};
 	}
 
-	#[test]
-	fn cubecompatible_dims_mismatch() {
-		let (device, _) = gfx_dev_and_queue!();
-
-		let usage = ImageUsage { sampled: true, ..ImageUsage::none() };
-
-		let res = unsafe {
-			UnsafeImage::new(
-				device,
-				usage,
-				Format::R8G8B8A8Unorm,
-				ImageDimensions::Dim2D {
-					width: 32,
-					height: 64,
-					array_layers: 1,
-					cubemap_compatible: true
-				},
-				1,
-				1,
-				Sharing::Exclusive::<Empty<_>>,
-				false,
-				false
-			)
-		};
-
-		match res {
-			Err(ImageCreationError::UnsupportedDimensions { .. }) => (),
-			_ => panic!()
-		};
-	}
+	// #[test]
+	// fn cubecompatible_dims_mismatch() {
+	// let (device, _) = gfx_dev_and_queue!();
+	//
+	// let usage = ImageUsage { sampled: true, ..ImageUsage::none() };
+	//
+	// let res = unsafe {
+	// UnsafeImage::new(
+	// device,
+	// usage,
+	// Format::R8G8B8A8Unorm,
+	// ImageDimensions::Dim2D {
+	// width: 32,
+	// height: 64,
+	// array_layers: 1,
+	// cubemap_compatible: true
+	// },
+	// 1,
+	// 1,
+	// Sharing::Exclusive::<Empty<_>>,
+	// false,
+	// false
+	// )
+	// };
+	//
+	// match res {
+	// Err(ImageCreationError::UnsupportedDimensions { .. }) => (),
+	// _ => panic!()
+	// };
+	// }
 }
