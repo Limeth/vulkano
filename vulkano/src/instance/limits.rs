@@ -12,6 +12,7 @@
 use vk_sys as vk;
 
 /// Limits of a physical device.
+#[derive(Debug, Clone, Copy)]
 pub struct Limits<'a> {
 	limits: &'a vk::PhysicalDeviceLimits
 }
