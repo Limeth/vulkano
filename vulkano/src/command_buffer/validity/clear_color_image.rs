@@ -25,7 +25,7 @@ where
 {
 	assert_eq!(image.parent().device().internal_object(), device.internal_object());
 
-	if !image.inner().usage_transfer_destination() {
+	if !image.usage().transfer_destination {
 		return Err(CheckClearColorImageError::MissingTransferUsage)
 	}
 

@@ -10,10 +10,16 @@
 //! be able to copy between image layers, for instance. It also requires the whole
 //! image to be in the same layout.
 //!
-//! The `NonOverlappingImageResourceLocker` is a locker that uses a mutex internally
-//! to guard a hashmap of nonoverlapping ranges. This locker doesn't allow the existence
-//! of multiple overlapping views, or rather, once you use any of them, the others will error
-//! until the original used one is dropped.
+//! TODO: ArrayImageResourceLocker - implement and document a locker that
+//! only allows access to one array layer at a time. This will be a compromise
+//! between the simple locker and the matrix locker. It will also be able to only
+//! use atomics and hence be lock-free.
+//!
+//! The `MatrixImageResourceLocker` is the exact opposite of the simple locker.
+//! It stores layout state for each mipmap of each array layer in a matrix of size
+//! `array_layers * mipmap_levels` (see `crate::image::layout::ImageLayoutMatrix`).
+//! It also uses a mutex internally so it should be used with care. It can, however,
+//! handle even overlapping image views correctly.
 //!
 
 use std::num::NonZeroU32;
@@ -23,12 +29,12 @@ use crate::{
 	sync::AccessError
 };
 
+mod image;
 mod matrix_locker;
-// mod nonoverlapping_locker;
 mod simple_locker;
 
+pub use image::SyncImage;
 pub use matrix_locker::MatrixImageResourceLocker;
-// pub use nonoverlapping_locker::NonOverlappingImageResourceLocker;
 pub use simple_locker::SimpleImageResourceLocker;
 
 /// Trait for image resource lockers.
@@ -39,7 +45,7 @@ pub use simple_locker::SimpleImageResourceLocker;
 /// resource doesn't have race conditions while the GPU is using it.
 ///
 /// The locker is provided with a subresource range and expected layout. If the locker
-/// detects a conflict while attempting to lock a resource, it should return an error.
+/// detects a conflict while attempting to lock a resource, it will return an error.
 ///
 /// This trait is unsafe because incorrect implementation can result in race conditions
 /// on both the CPU side and the GPU side.

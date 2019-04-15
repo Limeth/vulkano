@@ -595,7 +595,7 @@ where
 				}
 			}
 			DescriptorDescTy::InputAttachment { multisampled, array_layers } => {
-				if !image_view.parent().inner().usage_input_attachment() {
+				if !image_view.usage().input_attachment {
 					return Err(PersistentDescriptorSetError::MissingImageUsage(
 						MissingImageUsage::InputAttachment
 					))
@@ -804,9 +804,9 @@ fn image_match_desc<I>(
 where
 	I: ?Sized + ImageViewAccess
 {
-	if desc.sampled && !image_view.parent().inner().usage_sampled() {
+	if desc.sampled && !image_view.usage().sampled {
 		return Err(PersistentDescriptorSetError::MissingImageUsage(MissingImageUsage::Sampled))
-	} else if !desc.sampled && !image_view.parent().inner().usage_storage() {
+	} else if !desc.sampled && !image_view.usage().storage {
 		return Err(PersistentDescriptorSetError::MissingImageUsage(MissingImageUsage::Storage))
 	}
 

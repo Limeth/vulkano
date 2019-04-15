@@ -173,9 +173,11 @@ where
 
 		let dimensions = match self.dimensions {
 			FramebufferBuildeImageDimensions::AutoIdentical(None) => {
-				FramebufferBuildeImageDimensions::AutoIdentical(Some(
-					[img_dims.width().get(), img_dims.height().get(), img_dims.array_layers().get()]
-				))
+				FramebufferBuildeImageDimensions::AutoIdentical(Some([
+					img_dims.width().get(),
+					img_dims.height().get(),
+					img_dims.array_layers().get()
+				]))
 			}
 			FramebufferBuildeImageDimensions::AutoIdentical(Some(current)) => {
 				if img_dims.width().get() != current[0]
@@ -184,7 +186,11 @@ where
 				{
 					return Err(FramebufferCreationError::AttachmenImageDimensionsIncompatible {
 						expected: current,
-						obtained: [img_dims.width().get(), img_dims.height().get(), img_dims.array_layers().get()]
+						obtained: [
+							img_dims.width().get(),
+							img_dims.height().get(),
+							img_dims.array_layers().get()
+						]
 					})
 				}
 
@@ -192,9 +198,11 @@ where
 			}
 			FramebufferBuildeImageDimensions::AutoSmaller(None) => {
 				let dims = [img_dims.width(), img_dims.height(), img_dims.array_layers()];
-				FramebufferBuildeImageDimensions::AutoSmaller(Some(
-					[img_dims.width().get(), img_dims.height().get(), img_dims.array_layers().get()]
-				))
+				FramebufferBuildeImageDimensions::AutoSmaller(Some([
+					img_dims.width().get(),
+					img_dims.height().get(),
+					img_dims.array_layers().get()
+				]))
 			}
 			FramebufferBuildeImageDimensions::AutoSmaller(Some(current)) => {
 				let new_dims = [
@@ -212,13 +220,19 @@ where
 				{
 					return Err(FramebufferCreationError::AttachmenImageDimensionsIncompatible {
 						expected: current,
-						obtained: [img_dims.width().get(), img_dims.height().get(), img_dims.array_layers().get()]
+						obtained: [
+							img_dims.width().get(),
+							img_dims.height().get(),
+							img_dims.array_layers().get()
+						]
 					})
 				}
 
-				FramebufferBuildeImageDimensions::Specific(
-					[img_dims.width().get(), img_dims.height().get(), img_dims.array_layers().get()]
-				)
+				FramebufferBuildeImageDimensions::Specific([
+					img_dims.width().get(),
+					img_dims.height().get(),
+					img_dims.array_layers().get()
+				])
 			}
 		};
 

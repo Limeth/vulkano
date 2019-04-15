@@ -7,8 +7,7 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use std::sync::Arc;
-use std::num::NonZeroU32;
+use std::{num::NonZeroU32, sync::Arc};
 
 use crate::{
 	buffer::BufferAccess,
@@ -18,6 +17,7 @@ use crate::{
 		traits::{ImageAccess, ImageClearValue, ImageContent, ImageViewAccess},
 		ImageDimensions,
 		ImageLayout,
+		ImageSubresourceLayoutError,
 		ImageSubresourceRange,
 		ImageViewType
 	},
@@ -74,7 +74,7 @@ impl<W> SwapchainImage<W> {
 	/// Returns the dimensions of the image.
 	///
 	/// A `SwapchainImage` is always two-dimensional.
-	pub fn dimensions(&self) -> [NonZeroU32; 2] { self.inner_image().dimensions.width_height() }
+	pub fn dimensions(&self) -> [NonZeroU32; 2] { self.inner_image().dimensions().width_height() }
 
 	/// Returns the swapchain this image belongs to.
 	pub fn swapchain(&self) -> &Arc<Swapchain<W>> { &self.swapchain }
@@ -100,7 +100,10 @@ unsafe impl<W> ImageAccess for SwapchainImage<W> {
 
 	fn conflict_key(&self) -> u64 { ImageAccess::inner(self).key() }
 
-	fn current_layout(&self, _: ImageSubresourceRange) -> Result<ImageLayout, ()> {
+	fn current_layout(
+		&self, _: ImageSubresourceRange
+	) -> Result<ImageLayout, ImageSubresourceLayoutError> {
+		// TODO: Is this okay?
 		Ok(ImageLayout::PresentSrc)
 	}
 
@@ -141,19 +144,19 @@ unsafe impl<W> ImageViewAccess for SwapchainImage<W> {
 		ImageDimensions::Dim2D { width: dims[0], height: dims[1] }
 	}
 
-	fn descriptor_set_storage_image_layout(&self) -> ImageLayout {
+	fn required_layout_descriptor_storage(&self) -> ImageLayout {
 		ImageLayout::ShaderReadOnlyOptimal
 	}
 
-	fn descriptor_set_combined_image_sampler_layout(&self) -> ImageLayout {
+	fn required_layout_descriptor_combined(&self) -> ImageLayout {
 		ImageLayout::ShaderReadOnlyOptimal
 	}
 
-	fn descriptor_set_sampled_image_layout(&self) -> ImageLayout {
+	fn required_layout_descriptor_sampled(&self) -> ImageLayout {
 		ImageLayout::ShaderReadOnlyOptimal
 	}
 
-	fn descriptor_set_input_attachment_layout(&self) -> ImageLayout {
+	fn required_layout_descriptor_input_attachment(&self) -> ImageLayout {
 		ImageLayout::ShaderReadOnlyOptimal
 	}
 
@@ -161,7 +164,9 @@ unsafe impl<W> ImageViewAccess for SwapchainImage<W> {
 
 	fn conflicts_buffer(&self, other: &dyn BufferAccess) -> bool { false }
 
-	fn current_layout(&self) -> Result<ImageLayout, ()> { Ok(ImageLayout::PresentSrc) }
+	fn current_layout(&self) -> Result<ImageLayout, ImageSubresourceLayoutError> {
+		Ok(ImageLayout::PresentSrc)
+	}
 
 	fn required_layout(&self) -> ImageLayout { ImageLayout::PresentSrc }
 }

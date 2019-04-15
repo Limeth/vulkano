@@ -11,14 +11,14 @@ use std::{
 	error,
 	fmt,
 	mem,
+	num::NonZeroU32,
 	ptr,
 	sync::{
 		atomic::{AtomicBool, Ordering},
 		Arc,
 		Mutex
 	},
-	time::Duration,
-	num::NonZeroU32
+	time::Duration
 };
 
 use vk_sys as vk;
@@ -71,8 +71,8 @@ use crate::{
 /// when creating the swapchain, plus a future that represents the moment when the image will
 /// become available from the GPU (which may not be *immediately*).
 ///
-/// If you try to draw on an image without acquiring it first, the execution will block. (TODO
-/// behavior may change).
+/// If you try to draw on an image without acquiring it first, the execution will block return
+/// an error.
 pub fn acquire_next_image<W>(
 	swapchain: Arc<Swapchain<W>>, timeout: Option<Duration>
 ) -> Result<(usize, SwapchainAcquireFuture<W>), AcquireError> {
@@ -234,9 +234,9 @@ impl<W> Swapchain<W> {
 	// TODO: isn't it unsafe to take the surface through an Arc when it comes to vulkano-win?
 	pub fn new<F: FormatDesc, S: Into<SharingMode>>(
 		device: Arc<Device>, surface: Arc<Surface<W>>, sharing: S, dimensions: [NonZeroU32; 2],
-		layers: NonZeroU32, num_images: NonZeroU32, format: F, color_space: ColorSpace, usage: ImageUsage,
-		transform: SurfaceTransform, alpha: CompositeAlpha, mode: PresentMode, clipped: bool,
-		old_swapchain: Option<&Swapchain<W>>
+		layers: NonZeroU32, num_images: NonZeroU32, format: F, color_space: ColorSpace,
+		usage: ImageUsage, transform: SurfaceTransform, alpha: CompositeAlpha, mode: PresentMode,
+		clipped: bool, old_swapchain: Option<&Swapchain<W>>
 	) -> Result<(Arc<Swapchain<W>>, Vec<Arc<SwapchainImage<W>>>), SwapchainCreationError> {
 		assert_eq!(device.instance().internal_object(), surface.instance().internal_object());
 
@@ -344,7 +344,10 @@ impl<W> Swapchain<W> {
 				minImageCount: num_images.get(),
 				imageFormat: format as u32,
 				imageColorSpace: color_space as u32,
-				imageExtent: vk::Extent2D { width: dimensions[0].get(), height: dimensions[1].get() },
+				imageExtent: vk::Extent2D {
+					width: dimensions[0].get(),
+					height: dimensions[1].get()
+				},
 				imageArrayLayers: layers.get(),
 				imageUsage: usage.to_usage_bits(),
 				imageSharingMode: sh_mode,
@@ -407,7 +410,7 @@ impl<W> Swapchain<W> {
 				let img = UnsafeImage::from_raw(
 					device.clone(),
 					image,
-					usage.to_usage_bits(),
+					usage,
 					format,
 					dims,
 					crate::NONZERO_ONE,
@@ -478,7 +481,9 @@ impl<W> Swapchain<W> {
 	/// Returns the number of images of the swapchain.
 	///
 	/// See the documentation of `Swapchain::new`.
-	pub fn num_images(&self) -> NonZeroU32 { unsafe { NonZeroU32::new_unchecked(self.images.len() as u32) } }
+	pub fn num_images(&self) -> NonZeroU32 {
+		unsafe { NonZeroU32::new_unchecked(self.images.len() as u32) }
+	}
 
 	/// Returns the format of the images of the swapchain.
 	///
@@ -496,7 +501,7 @@ impl<W> Swapchain<W> {
 	pub fn dimensions(&self) -> [NonZeroU32; 2] { self.dimensions }
 
 	/// Returns the number of layers of the images of the swapchain.
-	/// 
+	///
 	/// See the documentation of `Swapchain::new`.
 	pub fn layers(&self) -> NonZeroU32 { self.layers }
 

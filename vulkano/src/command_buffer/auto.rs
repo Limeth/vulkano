@@ -825,9 +825,13 @@ impl<P> AutoCommandBufferBuilder<P> {
 
 		let dims = destination.dimensions().width_height_depth();
 		self.copy_buffer_to_image_dimensions(
-			source, destination,
-			[0, 0, 0], [dims[0].get(), dims[1].get(), dims[2].get()],
-			0, 1, 0
+			source,
+			destination,
+			[0, 0, 0],
+			[dims[0].get(), dims[1].get(), dims[2].get()],
+			0,
+			1,
+			0
 		)
 	}
 
@@ -906,9 +910,13 @@ impl<P> AutoCommandBufferBuilder<P> {
 
 		let dims = source.dimensions().width_height_depth();
 		self.copy_image_to_buffer_dimensions(
-			source, destination,
-			[0, 0, 0], [dims[0].get(), dims[1].get(), dims[2].get()],
-			0, 1, 0
+			source,
+			destination,
+			[0, 0, 0],
+			[dims[0].get(), dims[1].get(), dims[2].get()],
+			0,
+			1,
+			0
 		)
 	}
 

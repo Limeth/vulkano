@@ -38,11 +38,11 @@ where
 	assert_eq!(source.parent().device().internal_object(), device.internal_object());
 	assert_eq!(destination.parent().device().internal_object(), device.internal_object());
 
-	if !source.inner().usage_transfer_source() {
+	if !source.usage().transfer_source {
 		return Err(CheckBlitImageError::MissingTransferSourceUsage)
 	}
 
-	if !destination.inner().usage_transfer_destination() {
+	if !destination.usage().transfer_destination {
 		return Err(CheckBlitImageError::MissingTransferDestinationUsage)
 	}
 
@@ -113,15 +113,19 @@ where
 		return Err(CheckBlitImageError::SourceCoordinatesOutOfRange)
 	}
 
-	if source_bottom_right[0] < 0 || source_bottom_right[0] > source_dimensions.width().get() as i32 {
+	if source_bottom_right[0] < 0 || source_bottom_right[0] > source_dimensions.width().get() as i32
+	{
 		return Err(CheckBlitImageError::SourceCoordinatesOutOfRange)
 	}
 
-	if source_bottom_right[1] < 0 || source_bottom_right[1] > source_dimensions.height().get() as i32 {
+	if source_bottom_right[1] < 0
+		|| source_bottom_right[1] > source_dimensions.height().get() as i32
+	{
 		return Err(CheckBlitImageError::SourceCoordinatesOutOfRange)
 	}
 
-	if source_bottom_right[2] < 0 || source_bottom_right[2] > source_dimensions.depth().get() as i32 {
+	if source_bottom_right[2] < 0 || source_bottom_right[2] > source_dimensions.depth().get() as i32
+	{
 		return Err(CheckBlitImageError::SourceCoordinatesOutOfRange)
 	}
 

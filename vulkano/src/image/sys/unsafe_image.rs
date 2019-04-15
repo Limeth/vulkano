@@ -1,5 +1,5 @@
 use smallvec::SmallVec;
-use std::{error, fmt, mem, ops::Range, ptr, sync::Arc, num::NonZeroU32};
+use std::{fmt, mem, num::NonZeroU32, ptr, sync::Arc};
 
 use vk_sys as vk;
 
@@ -7,8 +7,9 @@ use crate::{
 	check_errors,
 	device::Device,
 	format::{Format, FormatTy},
-	image::{ImageDimensions, ImageUsage, MipmapsCount},
-	memory::{DeviceMemory, DeviceMemoryAllocError, MemoryRequirements},
+	image::{ImageCreationError, ImageDimensions, ImageUsage, MipmapsCount},
+	instance::Limits,
+	memory::{DeviceMemory, MemoryRequirements},
 	sync::Sharing,
 	Error,
 	OomError,
@@ -18,9 +19,7 @@ use crate::{
 /// A storage for pixels or arbitrary data.
 ///
 /// # Safety
-///
 /// This type is not just unsafe but very unsafe. Don't use it directly.
-///
 /// - You must manually bind memory to the image with `bind_memory`. The memory must respect the
 ///   requirements returned by `new`.
 /// - The memory that you bind to the image must be manually kept alive.
@@ -28,70 +27,46 @@ use crate::{
 /// - The usage must be manually enforced.
 /// - The image layout must be manually enforced and transitioned.
 pub struct UnsafeImage {
-	pub(in crate::image) device: Arc<Device>,
+	device: Arc<Device>,
 
 	image: vk::Image,
-	pub(in crate::image) usage: vk::ImageUsageFlagBits,
+	usage: ImageUsage,
 
-	pub(in crate::image) format: Format,
+	format: Format,
 	// Features that are supported for this particular format.
 	format_features: vk::FormatFeatureFlagBits,
 
-	pub(in crate::image) dimensions: ImageDimensions,
-	pub(in crate::image) samples: NonZeroU32,
-	pub(in crate::image) mipmap_levels: NonZeroU32,
+	dimensions: ImageDimensions,
+	samples: NonZeroU32,
+	mipmap_levels: NonZeroU32,
 
 	// `vkDestroyImage` is called only if `needs_destruction` is true.
 	needs_destruction: bool
 }
-
 impl UnsafeImage {
-	/// Creates a new image and allocates memory for it.
+	/// Creates a new image and returns the memory allocation requirements.
 	///
-	/// # Panic
-	///
-	/// - Panics if one of the dimensions is 0.
-	/// - Panics if the number of mipmaps is 0.
-	/// - Panics if the number of samples is 0.
-	pub unsafe fn new<'a, Mi, I>(
-		device: Arc<Device>, usage: ImageUsage, format: Format, dimensions: ImageDimensions,
-		samples: NonZeroU32, mipmaps: Mi, sharing: Sharing<I>, linear_tiling: bool,
-		preinitialized_layout: bool
+	/// The requirements should be used to allocate memory and then bind
+	/// it to the image using `bind_memory(..)`.
+	pub unsafe fn new<'a, M, I>(
+		device: Arc<Device>, sharing: Sharing<I>, usage: ImageUsage, format: Format,
+		dimensions: ImageDimensions, samples: NonZeroU32, mipmap_levels: M,
+		preinitialized_layout: bool, linear_tiling: bool
 	) -> Result<(UnsafeImage, MemoryRequirements), ImageCreationError>
 	where
-		Mi: Into<MipmapsCount>,
+		M: Into<MipmapsCount>,
 		I: Iterator<Item = u32>
 	{
-		let sharing = match sharing {
+		// TODO: doesn't check that the proper features are enabled
+		let vk = device.pointers();
+		let vk_i = device.instance().pointers();
+
+		let (sharing_mode, sharing_indices) = match sharing {
 			Sharing::Exclusive => (vk::SHARING_MODE_EXCLUSIVE, SmallVec::<[u32; 8]>::new()),
 			Sharing::Concurrent(ids) => (vk::SHARING_MODE_CONCURRENT, ids.collect())
 		};
 
-		UnsafeImage::new_impl(
-			device,
-			usage,
-			format,
-			dimensions,
-			samples,
-			mipmaps.into(),
-			sharing,
-			linear_tiling,
-			preinitialized_layout
-		)
-	}
-
-	// Non-templated version to avoid inlining and improve compile times.
-	// TODO: Does it really?
-	unsafe fn new_impl(
-		device: Arc<Device>, usage: ImageUsage, format: Format, dimensions: ImageDimensions,
-		samples: NonZeroU32, mipmaps: MipmapsCount,
-		(sh_mode, sh_indices): (vk::SharingMode, SmallVec<[u32; 8]>), linear_tiling: bool,
-		preinitialized_layout: bool
-	) -> Result<(UnsafeImage, MemoryRequirements), ImageCreationError> {
-		// TODO: doesn't check that the proper features are enabled
-
-		let vk = device.pointers();
-		let vk_i = device.instance().pointers();
+		let device_limits = device.physical_device().limits();
 
 		// Checking if image usage conforms to what is supported.
 		let format_features = {
@@ -146,7 +121,6 @@ impl UnsafeImage {
 
 			features
 		};
-
 		// If `transient_attachment` is true, then only `color_attachment`,
 		// `depth_stencil_attachment` and `input_attachment` can be true as well.
 		if usage.transient_attachment {
@@ -162,110 +136,9 @@ impl UnsafeImage {
 				return Err(ImageCreationError::UnsupportedUsage)
 			}
 		}
-
-		// This function is going to perform various checks and write to `capabilities_error` in
-		// case of error.
-		//
-		// If `capabilities_error` is not `None` after the checks are finished, the function will
-		// check for additional image capabilities (section 31.4 of the specs).
-		let mut capabilities_error = None;
-
-		// Compute the number of mipmaps.
-		let mipmap_levels = match mipmaps.into() {
-			MipmapsCount::Specific(num) => {
-				let max_mipmaps = dimensions.max_mipmaps();
-				if num == 0 {
-					return Err(ImageCreationError::InvalidMipmapsCount {
-						obtained: num,
-						valid_range: 1 .. max_mipmaps.get() + 1
-					})
-				} else if num > max_mipmaps.get() {
-					capabilities_error = Some(ImageCreationError::InvalidMipmapsCount {
-						obtained: num,
-						valid_range: 1 .. max_mipmaps.get() + 1
-					});
-				}
-
-				// No unsafe because num is checked to not be 0
-				NonZeroU32::new_unchecked(num)
-			}
-			MipmapsCount::Log2 => dimensions.max_mipmaps(),
-			MipmapsCount::One => crate::NONZERO_ONE
-		};
-
-		let device_limits = device.physical_device().limits();
-
-		// Checking whether the number of samples is supported.
 		if !samples.get().is_power_of_two() {
 			return Err(ImageCreationError::UnsupportedSamplesCount(samples.get()))
-		} else {
-			let mut supported_samples = 0x7f; // all bits up to VK_SAMPLE_COUNT_64_BIT
-
-			if usage.sampled {
-				match format.ty() {
-					FormatTy::Float | FormatTy::Compressed => {
-						supported_samples &=
-							device_limits.sampled_image_color_sample_counts();
-					}
-					FormatTy::Uint | FormatTy::Sint => {
-						supported_samples &=
-							device_limits.sampled_image_integer_sample_counts();
-					}
-					FormatTy::Depth => {
-						supported_samples &=
-							device_limits.sampled_image_depth_sample_counts();
-					}
-					FormatTy::Stencil => {
-						supported_samples &=
-							device_limits.sampled_image_stencil_sample_counts();
-					}
-					FormatTy::DepthStencil => {
-						supported_samples &=
-							device_limits.sampled_image_depth_sample_counts();
-						supported_samples &=
-							device_limits.sampled_image_stencil_sample_counts();
-					}
-				}
-			}
-
-			if usage.storage {
-				supported_samples &=
-					device_limits.storage_image_sample_counts();
-			}
-
-			if usage.color_attachment
-				|| usage.depth_stencil_attachment
-				|| usage.input_attachment
-				|| usage.transient_attachment
-			{
-				match format.ty() {
-					FormatTy::Float | FormatTy::Compressed | FormatTy::Uint | FormatTy::Sint => {
-						supported_samples &=
-							device_limits.framebuffer_color_sample_counts();
-					}
-					FormatTy::Depth => {
-						supported_samples &=
-							device_limits.framebuffer_depth_sample_counts();
-					}
-					FormatTy::Stencil => {
-						supported_samples &=
-							device_limits.framebuffer_stencil_sample_counts();
-					}
-					FormatTy::DepthStencil => {
-						supported_samples &=
-							device_limits.framebuffer_depth_sample_counts();
-						supported_samples &=
-							device_limits.framebuffer_stencil_sample_counts();
-					}
-				}
-			}
-
-			if (samples.get() & supported_samples) == 0 {
-				let err = ImageCreationError::UnsupportedSamplesCount(samples.get());
-				capabilities_error = Some(err);
-			}
 		}
-
 		// If the `shaderStorageImageMultisample` feature is not enabled and we have
 		// `usage_storage` set to true, then the number of samples must be 1.
 		if usage.storage && samples.get() > 1 {
@@ -273,67 +146,22 @@ impl UnsafeImage {
 				return Err(ImageCreationError::ShaderStorageImageMultisampleFeatureNotEnabled)
 			}
 		}
+		let (dimensions_type, dimensions_extent, array_layers, dimensions_flags) =
+			dimensions.vk_type();
 
-		if !dimensions.check_limits(device_limits) {
-			return Err(ImageCreationError::UnsupportedDimensions(dimensions))
-		}
-		// Decoding the dimensions.
-		let (ty, extent, array_layers, flags) = match dimensions {
-			ImageDimensions::Dim1D { .. } | ImageDimensions::Dim1DArray { .. } => {
-				let extent = vk::Extent3D { width: dimensions.width().get(), height: 1, depth: 1 };
-				(vk::IMAGE_TYPE_1D, extent, dimensions.array_layers().get(), 0)
-			}
-			ImageDimensions::Dim2D { .. } | ImageDimensions::Dim2DArray { .. } => {
-				let extent = vk::Extent3D {
-					width: dimensions.width().get(),
-					height: dimensions.height().get(),
-					depth: 1
-				};
-				(vk::IMAGE_TYPE_2D, extent, dimensions.array_layers().get(), 0)
-			}
-			ImageDimensions::Cubemap { .. } | ImageDimensions::CubemapArray { .. } => {
-				let extent = vk::Extent3D {
-					width: dimensions.width().get(),
-					height: dimensions.width().get(),
-					depth: 1
-				};
-				(
-					vk::IMAGE_TYPE_2D,
-					extent,
-					dimensions.array_layers().get(),
-					vk::IMAGE_CREATE_CUBE_COMPATIBLE_BIT
-				)
-			}
-			ImageDimensions::Dim3D { .. } => {
-				let extent = vk::Extent3D {
-					width: dimensions.width().get(),
-					height: dimensions.height().get(),
-					depth: dimensions.depth().get()
-				};
-				(vk::IMAGE_TYPE_3D, extent, 1, 0)
-			}
-		};
-
-		let usage = usage.to_usage_bits();
-
-		// Now that all checks have been performed, if any of the check failed we query the Vulkan
-		// implementation for additional image capabilities.
-		if let Some(capabilities_error) = capabilities_error {
-			let tiling =
-				if linear_tiling { vk::IMAGE_TILING_LINEAR } else { vk::IMAGE_TILING_OPTIMAL };
-
-			let mut output = mem::uninitialized();
+		// Check dimensions, samples and mipmaps againts device capabilities.
+		let mipmap_levels = {
+			let mut capabilities = mem::uninitialized();
 			let physical_device = device.physical_device().internal_object();
 			let r = vk_i.GetPhysicalDeviceImageFormatProperties(
 				physical_device,
 				format as u32,
-				ty,
-				tiling,
-				usage,
-				0, // TODO
-				&mut output
+				dimensions_type,
+				if linear_tiling { vk::IMAGE_TILING_LINEAR } else { vk::IMAGE_TILING_OPTIMAL },
+				usage.to_usage_bits(),
+				dimensions_flags,
+				&mut capabilities
 			);
-
 			match check_errors(r) {
 				Ok(_) => (),
 				Err(Error::FormatNotSupported) => {
@@ -342,26 +170,26 @@ impl UnsafeImage {
 				Err(err) => return Err(err.into())
 			}
 
-			if extent.width > output.maxExtent.width
-				|| extent.height > output.maxExtent.height
-				|| extent.depth > output.maxExtent.depth
-				|| mipmap_levels.get() > output.maxMipLevels
-				|| array_layers > output.maxArrayLayers
-				|| (samples.get() & output.sampleCounts) == 0
-			{
-				return Err(capabilities_error)
-			}
-		}
+			UnsafeImage::check_capabilities(
+				device_limits,
+				capabilities,
+				usage,
+				format,
+				dimensions,
+				samples,
+				mipmap_levels.into()
+			)?
+		};
 
 		// Everything now ok. Creating the image.
 		let image = {
 			let infos = vk::ImageCreateInfo {
 				sType: vk::STRUCTURE_TYPE_IMAGE_CREATE_INFO,
 				pNext: ptr::null(),
-				flags,
-				imageType: ty,
+				flags: dimensions_flags,
+				imageType: dimensions_type,
 				format: format as u32,
-				extent,
+				extent: dimensions_extent,
 				mipLevels: mipmap_levels.get(),
 				arrayLayers: array_layers,
 				samples: samples.get(),
@@ -370,10 +198,10 @@ impl UnsafeImage {
 				} else {
 					vk::IMAGE_TILING_OPTIMAL
 				},
-				usage,
-				sharingMode: sh_mode,
-				queueFamilyIndexCount: sh_indices.len() as u32,
-				pQueueFamilyIndices: sh_indices.as_ptr(),
+				usage: usage.to_usage_bits(),
+				sharingMode: sharing_mode,
+				queueFamilyIndexCount: sharing_indices.len() as u32,
+				pQueueFamilyIndices: sharing_indices.as_ptr(),
 				initialLayout: if preinitialized_layout {
 					vk::IMAGE_LAYOUT_PREINITIALIZED
 				} else {
@@ -440,7 +268,7 @@ impl UnsafeImage {
 			usage,
 			format,
 			dimensions,
-			samples: samples,
+			samples,
 			mipmap_levels,
 			format_features,
 			needs_destruction: true
@@ -449,12 +277,110 @@ impl UnsafeImage {
 		Ok((image, mem_reqs))
 	}
 
-	/// Creates an image from a raw handle. The image won't be destroyed.
+	/// Checks limits and capabilitied for the requested parameters.
 	///
-	/// This function is for example used at the swapchain's initialization.
+	/// Returns the computed number of mipmaps, as this is the only parameter
+	/// passed that has a different output.
+	fn check_capabilities(
+		device_limits: Limits, capabilities: vk::ImageFormatProperties, usage: ImageUsage,
+		format: Format, dimensions: ImageDimensions, samples: NonZeroU32,
+		mipmap_levels: MipmapsCount
+	) -> Result<NonZeroU32, ImageCreationError> {
+		if !dimensions.check_limits(device_limits) {
+			if dimensions.width().get() > capabilities.maxExtent.width
+				|| dimensions.height().get() > capabilities.maxExtent.height
+				|| dimensions.depth().get() > capabilities.maxExtent.depth
+				|| dimensions.array_layers().get() > capabilities.maxArrayLayers
+			{
+				return Err(ImageCreationError::UnsupportedDimensions(dimensions))
+			}
+		}
+
+		// Checking whether the number of samples is supported.
+		{
+			let mut supported_samples = 0x7f; // all bits up to VK_SAMPLE_COUNT_64_BIT
+
+			if usage.sampled {
+				match format.ty() {
+					FormatTy::Float | FormatTy::Compressed => {
+						supported_samples &= device_limits.sampled_image_color_sample_counts();
+					}
+					FormatTy::Uint | FormatTy::Sint => {
+						supported_samples &= device_limits.sampled_image_integer_sample_counts();
+					}
+					FormatTy::Depth => {
+						supported_samples &= device_limits.sampled_image_depth_sample_counts();
+					}
+					FormatTy::Stencil => {
+						supported_samples &= device_limits.sampled_image_stencil_sample_counts();
+					}
+					FormatTy::DepthStencil => {
+						supported_samples &= device_limits.sampled_image_depth_sample_counts();
+						supported_samples &= device_limits.sampled_image_stencil_sample_counts();
+					}
+				}
+			}
+
+			if usage.storage {
+				supported_samples &= device_limits.storage_image_sample_counts();
+			}
+
+			if usage.color_attachment
+				|| usage.depth_stencil_attachment
+				|| usage.input_attachment
+				|| usage.transient_attachment
+			{
+				match format.ty() {
+					FormatTy::Float | FormatTy::Compressed | FormatTy::Uint | FormatTy::Sint => {
+						supported_samples &= device_limits.framebuffer_color_sample_counts();
+					}
+					FormatTy::Depth => {
+						supported_samples &= device_limits.framebuffer_depth_sample_counts();
+					}
+					FormatTy::Stencil => {
+						supported_samples &= device_limits.framebuffer_stencil_sample_counts();
+					}
+					FormatTy::DepthStencil => {
+						supported_samples &= device_limits.framebuffer_depth_sample_counts();
+						supported_samples &= device_limits.framebuffer_stencil_sample_counts();
+					}
+				}
+			}
+
+			if (samples.get() & supported_samples) == 0 {
+				if (samples.get() & capabilities.sampleCounts) == 0 {
+					return Err(ImageCreationError::UnsupportedSamplesCount(samples.get()))
+				}
+			}
+		}
+
+		let mipmap_levels = match mipmap_levels.for_image(dimensions) {
+			Ok(number) => number,
+			Err(number) => {
+				if number.get() > capabilities.maxMipLevels {
+					return Err(ImageCreationError::InvalidMipmapsCount {
+						requested: number.get(),
+						valid_range: 1 .. dimensions.max_mipmaps().get()
+					})
+				} else {
+					number
+				}
+			}
+		};
+
+		Ok(mipmap_levels)
+	}
+
+	/// Creates an image from a raw handle.
+	///
+	/// This function expects the image to be already
+	/// created and allocated. The image won't be destroyed on
+	/// drop. This function is useful for wrapping the raw
+	/// image objects obtained from Vulkan itself,
+	/// such as when creating a swapchain.
 	pub unsafe fn from_raw(
-		device: Arc<Device>, handle: u64, usage: u32, format: Format, dimensions: ImageDimensions,
-		samples: NonZeroU32, mipmap_levels: NonZeroU32
+		device: Arc<Device>, handle: u64, usage: ImageUsage, format: Format,
+		dimensions: ImageDimensions, samples: NonZeroU32, mipmap_levels: NonZeroU32
 	) -> UnsafeImage {
 		let vk_i = device.instance().pointers();
 		let physical_device = device.physical_device().internal_object();
@@ -500,6 +426,24 @@ impl UnsafeImage {
 
 	/// Returns a key unique to each `UnsafeImage`. Can be used for the `conflicts_key` method.
 	pub fn key(&self) -> u64 { self.image }
+
+	/// Device getter.
+	pub fn device(&self) -> &Arc<Device> { &self.device }
+
+	/// Usage getter.
+	pub fn usage(&self) -> ImageUsage { self.usage }
+
+	/// Format getter.
+	pub fn format(&self) -> Format { self.format }
+
+	/// Dimensions getter.
+	pub fn dimensions(&self) -> ImageDimensions { self.dimensions }
+
+	/// Samples getter.
+	pub fn samples(&self) -> NonZeroU32 { self.samples }
+
+	/// Mipmap levels getter.
+	pub fn mipmap_levels(&self) -> NonZeroU32 { self.mipmap_levels }
 
 	/// Queries the layout of an image in memory. Only valid for images with linear tiling.
 	///
@@ -594,34 +538,6 @@ impl UnsafeImage {
 	pub fn supports_linear_filtering(&self) -> bool {
 		(self.format_features & vk::FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) != 0
 	}
-
-	pub fn usage_transfer_source(&self) -> bool {
-		(self.usage & vk::IMAGE_USAGE_TRANSFER_SRC_BIT) != 0
-	}
-
-	pub fn usage_transfer_destination(&self) -> bool {
-		(self.usage & vk::IMAGE_USAGE_TRANSFER_DST_BIT) != 0
-	}
-
-	pub fn usage_sampled(&self) -> bool { (self.usage & vk::IMAGE_USAGE_SAMPLED_BIT) != 0 }
-
-	pub fn usage_storage(&self) -> bool { (self.usage & vk::IMAGE_USAGE_STORAGE_BIT) != 0 }
-
-	pub fn usage_color_attachment(&self) -> bool {
-		(self.usage & vk::IMAGE_USAGE_COLOR_ATTACHMENT_BIT) != 0
-	}
-
-	pub fn usage_depth_stencil_attachment(&self) -> bool {
-		(self.usage & vk::IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0
-	}
-
-	pub fn usage_transient_attachment(&self) -> bool {
-		(self.usage & vk::IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT) != 0
-	}
-
-	pub fn usage_input_attachment(&self) -> bool {
-		(self.usage & vk::IMAGE_USAGE_INPUT_ATTACHMENT_BIT) != 0
-	}
 }
 
 unsafe impl VulkanObject for UnsafeImage {
@@ -645,79 +561,6 @@ impl Drop for UnsafeImage {
 				let vk = self.device.pointers();
 				vk.DestroyImage(self.device.internal_object(), self.image, ptr::null());
 			}
-		}
-	}
-}
-
-/// Error that can happen when creating an instance.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ImageCreationError {
-	/// Allocating memory failed.
-	AllocError(DeviceMemoryAllocError),
-	/// The dimensions are too large, or one of the dimensions is 0.
-	UnsupportedDimensions(ImageDimensions),
-	/// A wrong number of mipmaps was provided.
-	InvalidMipmapsCount { obtained: u32, valid_range: Range<u32> },
-	/// The requested number of samples is not supported, or is 0.
-	UnsupportedSamplesCount(u32),
-	/// The requested format is not supported by the Vulkan implementation.
-	FormatNotSupported,
-	/// The format is supported, but at least one of the requested usages is not supported.
-	UnsupportedUsage,
-	/// The `shader_storage_image_multisample` feature must be enabled to create such an image.
-	ShaderStorageImageMultisampleFeatureNotEnabled
-}
-impl fmt::Display for ImageCreationError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match self {
-			ImageCreationError::AllocError(e) => write!(f, "Memory allocation failed: {}", e),
-			ImageCreationError::InvalidMipmapsCount { obtained, valid_range } => write!(
-				f,
-				"A wrong number of mipmaps provided: {} valid range: {:?}",
-				obtained, valid_range
-			),
-			ImageCreationError::UnsupportedSamplesCount(samples) => {
-				write!(f, "The requested number of sampler is not supported: {}", samples)
-			}
-			ImageCreationError::UnsupportedDimensions(dims) => {
-				write!(f, "The requested dimensions are not supported: {:?}", dims)
-			}
-			ImageCreationError::FormatNotSupported => {
-				write!(f, "The requested format is not supported")
-			}
-			ImageCreationError::UnsupportedUsage => {
-				write!(f, "The requested usage is not supported for requested format")
-			}
-			ImageCreationError::ShaderStorageImageMultisampleFeatureNotEnabled => {
-				write!(f, "The `shader_storage_image_multisample` feature must be enabled")
-			}
-		}
-	}
-}
-impl error::Error for ImageCreationError {
-	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-		match self {
-			ImageCreationError::AllocError(e) => e.source(),
-			_ => None
-		}
-	}
-}
-impl From<OomError> for ImageCreationError {
-	fn from(err: OomError) -> ImageCreationError {
-		ImageCreationError::AllocError(DeviceMemoryAllocError::OomError(err))
-	}
-}
-impl From<DeviceMemoryAllocError> for ImageCreationError {
-	fn from(err: DeviceMemoryAllocError) -> ImageCreationError {
-		ImageCreationError::AllocError(err)
-	}
-}
-impl From<Error> for ImageCreationError {
-	fn from(err: Error) -> ImageCreationError {
-		match err {
-			err @ Error::OutOfHostMemory => ImageCreationError::AllocError(err.into()),
-			err @ Error::OutOfDeviceMemory => ImageCreationError::AllocError(err.into()),
-			_ => panic!("unexpected error: {:?}", err)
 		}
 	}
 }

@@ -1862,13 +1862,13 @@ impl<'b, P> SyncCommandBufferBuilderBindDescriptorSets<'b, P> {
 					let mut ignore_me_hack = false;
 					let layout = match desc.ty {
 						DescriptorDescTy::CombinedImageSampler(_) => {
-							image_view.descriptor_set_combined_image_sampler_layout()
+							image_view.required_layout_descriptor_combined()
 						}
 						DescriptorDescTy::Image(ref img) => {
 							if img.sampled {
-								image_view.descriptor_set_sampled_image_layout()
+								image_view.required_layout_descriptor_sampled()
 							} else {
-								image_view.descriptor_set_storage_image_layout()
+								image_view.required_layout_descriptor_storage()
 							}
 						}
 						DescriptorDescTy::InputAttachment { .. } => {
@@ -1878,7 +1878,7 @@ impl<'b, P> SyncCommandBufferBuilderBindDescriptorSets<'b, P> {
 							// return a `Conflict` error. For now as a work-around we simply ignore
 							// input attachments.
 							ignore_me_hack = true;
-							image_view.descriptor_set_input_attachment_layout()
+							image_view.required_layout_descriptor_input_attachment()
 						}
 						_ => panic!("Tried to bind an image to a non-image descriptor")
 					};

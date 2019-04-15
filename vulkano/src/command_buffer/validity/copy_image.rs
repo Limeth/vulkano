@@ -36,11 +36,11 @@ where
 	assert_eq!(source.parent().device().internal_object(), device.internal_object());
 	assert_eq!(destination.parent().device().internal_object(), device.internal_object());
 
-	if !source.inner().usage_transfer_source() {
+	if !source.usage().transfer_source {
 		return Err(CheckCopyImageError::MissingTransferSourceUsage)
 	}
 
-	if !destination.inner().usage_transfer_destination() {
+	if !destination.usage().transfer_destination {
 		return Err(CheckCopyImageError::MissingTransferDestinationUsage)
 	}
 
@@ -89,15 +89,19 @@ where
 		return Err(CheckCopyImageError::DestinationCoordinatesOutOfRange)
 	}
 
-	if source_offset[0] < 0 || source_offset[0] as u32 + extent[0] > source_dimensions.width().get() {
+	if source_offset[0] < 0 || source_offset[0] as u32 + extent[0] > source_dimensions.width().get()
+	{
 		return Err(CheckCopyImageError::SourceCoordinatesOutOfRange)
 	}
 
-	if source_offset[1] < 0 || source_offset[1] as u32 + extent[1] > source_dimensions.height().get() {
+	if source_offset[1] < 0
+		|| source_offset[1] as u32 + extent[1] > source_dimensions.height().get()
+	{
 		return Err(CheckCopyImageError::SourceCoordinatesOutOfRange)
 	}
 
-	if source_offset[2] < 0 || source_offset[2] as u32 + extent[2] > source_dimensions.depth().get() {
+	if source_offset[2] < 0 || source_offset[2] as u32 + extent[2] > source_dimensions.depth().get()
+	{
 		return Err(CheckCopyImageError::SourceCoordinatesOutOfRange)
 	}
 

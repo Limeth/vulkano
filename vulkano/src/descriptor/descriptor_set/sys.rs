@@ -746,7 +746,7 @@ impl DescriptorWrite {
 			binding,
 			first_array_element: array_element,
 			inner: smallvec!({
-				let layout = image.descriptor_set_storage_image_layout() as u32;
+				let layout = image.required_layout_descriptor_storage() as u32;
 				DescriptorWriteInner::StorageImage(image.inner().internal_object(), layout)
 			})
 		}
@@ -768,7 +768,7 @@ impl DescriptorWrite {
 			binding,
 			first_array_element: array_element,
 			inner: smallvec!({
-				let layout = image.descriptor_set_sampled_image_layout() as u32;
+				let layout = image.required_layout_descriptor_sampled() as u32;
 				DescriptorWriteInner::SampledImage(image.inner().internal_object(), layout)
 			})
 		}
@@ -784,7 +784,7 @@ impl DescriptorWrite {
 			binding,
 			first_array_element: array_element,
 			inner: smallvec!({
-				let layout = image.descriptor_set_combined_image_sampler_layout() as u32;
+				let layout = image.required_layout_descriptor_combined() as u32;
 				DescriptorWriteInner::CombinedImageSampler(
 					sampler.internal_object(),
 					image.inner().internal_object(),
@@ -944,7 +944,7 @@ impl DescriptorWrite {
 			binding,
 			first_array_element: array_element,
 			inner: smallvec!({
-				let layout = image.descriptor_set_input_attachment_layout() as u32;
+				let layout = image.required_layout_descriptor_input_attachment() as u32;
 				DescriptorWriteInner::InputAttachment(image.inner().internal_object(), layout)
 			})
 		}

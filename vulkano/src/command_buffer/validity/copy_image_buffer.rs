@@ -49,12 +49,12 @@ where
 			if !buffer_inner.buffer.usage_transfer_source() {
 				return Err(CheckCopyBufferImageError::SourceMissingTransferUsage)
 			}
-			if !image.inner().usage_transfer_destination() {
+			if !image.usage().transfer_destination {
 				return Err(CheckCopyBufferImageError::DestinationMissingTransferUsage)
 			}
 		}
 		CheckCopyBufferImageTy::ImageToBuffer => {
-			if !image.inner().usage_transfer_source() {
+			if !image.usage().transfer_source {
 				return Err(CheckCopyBufferImageError::SourceMissingTransferUsage)
 			}
 			if !buffer_inner.buffer.usage_transfer_destination() {

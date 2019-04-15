@@ -6,7 +6,7 @@ use crate::{
 	check_errors,
 	device::Device,
 	format::{Format, FormatTy},
-	image::{ImageDimensions, ImageSubresourceRange, ImageViewType, Swizzle},
+	image::{ImageDimensions, ImageSubresourceRange, ImageUsage, ImageViewType, Swizzle},
 	OomError,
 	VulkanObject
 };
@@ -17,13 +17,13 @@ pub struct UnsafeImageView {
 	device: Arc<Device>,
 
 	view: vk::ImageView,
-	pub(in crate::image) format: Format,
 
-	pub(in crate::image) dimensions: ImageDimensions,
-	pub(in crate::image) subresource_range: ImageSubresourceRange,
+	usage: ImageUsage,
+	format: Format,
 
-	usage: vk::ImageUsageFlagBits,
-	pub(in crate::image) swizzle: Swizzle
+	dimensions: ImageDimensions,
+	subresource_range: ImageSubresourceRange,
+	swizzle: Swizzle
 }
 
 impl UnsafeImageView {
@@ -43,15 +43,17 @@ impl UnsafeImageView {
 		image: &UnsafeImage, view_type: ImageViewType, format: Option<Format>, swizzle: Swizzle,
 		subresource_range: ImageSubresourceRange
 	) -> Result<UnsafeImageView, OomError> {
-		let vk = image.device.pointers();
+		let vk = image.device().pointers();
 
-		assert!(subresource_range.array_layers_end().get() <= image.dimensions.array_layers().get());
-		assert!(subresource_range.mipmap_levels_end().get() <= image.mipmap_levels.get());
+		assert!(
+			subresource_range.array_layers_end().get() <= image.dimensions().array_layers().get()
+		);
+		assert!(subresource_range.mipmap_levels_end().get() <= image.mipmap_levels().get());
 
 		// TODO: Views can have different formats than their underlying images, but
 		// only if certain requirements are met. We need to check those before we
 		// allow creating views with different formats.
-		let view_format = image.format;
+		let view_format = image.format();
 
 		let aspect_mask = match view_format.ty() {
 			FormatTy::Float | FormatTy::Uint | FormatTy::Sint | FormatTy::Compressed => {
@@ -63,7 +65,7 @@ impl UnsafeImageView {
 		};
 
 		let view_type_flag = {
-			let image_view_type = ImageViewType::from(image.dimensions);
+			let image_view_type = ImageViewType::from(image.dimensions());
 
 			if !view_type.compatible_with(image_view_type) {
 				panic!(
@@ -114,7 +116,7 @@ impl UnsafeImageView {
 
 			let mut output = mem::uninitialized();
 			check_errors(vk.CreateImageView(
-				image.device.internal_object(),
+				image.device().internal_object(),
 				&infos,
 				ptr::null(),
 				&mut output
@@ -123,75 +125,63 @@ impl UnsafeImageView {
 		};
 
 		let dimensions = match view_type {
-			ImageViewType::Dim1D => ImageDimensions::Dim1D { width: image.dimensions.width() },
+			ImageViewType::Dim1D => ImageDimensions::Dim1D { width: image.dimensions().width() },
 			ImageViewType::Dim1DArray => ImageDimensions::Dim1DArray {
-				width: image.dimensions.width(),
+				width: image.dimensions().width(),
 				array_layers: subresource_range.array_layers
 			},
 
 			ImageViewType::Dim2D => ImageDimensions::Dim2D {
-				width: image.dimensions.width(),
-				height: image.dimensions.height()
+				width: image.dimensions().width(),
+				height: image.dimensions().height()
 			},
 			ImageViewType::Dim2DArray => ImageDimensions::Dim2DArray {
-				width: image.dimensions.width(),
-				height: image.dimensions.height(),
+				width: image.dimensions().width(),
+				height: image.dimensions().height(),
 				array_layers: subresource_range.array_layers
 			},
 
-			ImageViewType::Cubemap => ImageDimensions::Cubemap { size: image.dimensions.width() },
+			ImageViewType::Cubemap => ImageDimensions::Cubemap { size: image.dimensions().width() },
 			ImageViewType::CubemapArray => ImageDimensions::CubemapArray {
-				size: image.dimensions.width(),
+				size: image.dimensions().width(),
 				array_layers: subresource_range.array_layers
 			},
 
 			ImageViewType::Dim3D => ImageDimensions::Dim3D {
-				width: image.dimensions.width(),
-				height: image.dimensions.height(),
-				depth: image.dimensions.depth()
+				width: image.dimensions().width(),
+				height: image.dimensions().height(),
+				depth: image.dimensions().depth()
 			}
 		};
 
 		Ok(UnsafeImageView {
-			device: image.device.clone(),
+			device: image.device().clone(),
 			view,
+			
+			usage: image.usage(),
 			format: view_format,
 
 			dimensions,
 			subresource_range,
 
-			usage: image.usage,
 			swizzle
 		})
 	}
 
-	pub fn usage_transfer_source(&self) -> bool {
-		(self.usage & vk::IMAGE_USAGE_TRANSFER_SRC_BIT) != 0
-	}
+	/// Usage getter.
+	pub fn usage(&self) -> ImageUsage { self.usage }
 
-	pub fn usage_transfer_destination(&self) -> bool {
-		(self.usage & vk::IMAGE_USAGE_TRANSFER_DST_BIT) != 0
-	}
+	/// Format getter.
+	pub fn format(&self) -> Format { self.format }
 
-	pub fn usage_sampled(&self) -> bool { (self.usage & vk::IMAGE_USAGE_SAMPLED_BIT) != 0 }
+	/// Dimensions getter.
+	pub fn dimensions(&self) -> ImageDimensions { self.dimensions }
 
-	pub fn usage_storage(&self) -> bool { (self.usage & vk::IMAGE_USAGE_STORAGE_BIT) != 0 }
+	/// Subresource range getter.
+	pub fn subresource_range(&self) -> ImageSubresourceRange { self.subresource_range }
 
-	pub fn usage_color_attachment(&self) -> bool {
-		(self.usage & vk::IMAGE_USAGE_COLOR_ATTACHMENT_BIT) != 0
-	}
-
-	pub fn usage_depth_stencil_attachment(&self) -> bool {
-		(self.usage & vk::IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0
-	}
-
-	pub fn usage_transient_attachment(&self) -> bool {
-		(self.usage & vk::IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT) != 0
-	}
-
-	pub fn usage_input_attachment(&self) -> bool {
-		(self.usage & vk::IMAGE_USAGE_INPUT_ATTACHMENT_BIT) != 0
-	}
+	/// Swizzle getter.
+	pub fn swizzle(&self) -> Swizzle { self.swizzle }
 }
 
 unsafe impl VulkanObject for UnsafeImageView {

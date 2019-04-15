@@ -1,5 +1,4 @@
-use std::sync::Arc;
-use std::num::NonZeroU32;
+use std::{num::NonZeroU32, sync::Arc};
 
 use crate::{
 	buffer::BufferAccess,
@@ -13,7 +12,14 @@ use crate::{
 		PossibleStencilFormatDesc,
 		PossibleUintFormatDesc
 	},
-	image::{sys::UnsafeImage, ImageDimensions, ImageLayout, ImageSubresourceRange},
+	image::{
+		sys::UnsafeImage,
+		ImageDimensions,
+		ImageLayout,
+		ImageSubresourceLayoutError,
+		ImageSubresourceRange,
+		ImageUsage
+	},
 	sync::AccessError,
 	SafeDeref
 };
@@ -23,11 +29,13 @@ pub unsafe trait ImageAccess {
 	/// Returns the inner unsafe image object used by this image.
 	fn inner(&self) -> &UnsafeImage;
 
-	fn device(&self) -> &Arc<Device> { &self.inner().device }
+	fn device(&self) -> &Arc<Device> { &self.inner().device() }
 
+	/// Returns the usage this image was created with.
+	fn usage(&self) -> ImageUsage { self.inner().usage() }
 
 	/// Returns the format of this image.
-	fn format(&self) -> Format { self.inner().format }
+	fn format(&self) -> Format { self.inner().format() }
 	/// Returns true if the image is a color image.
 	fn has_color(&self) -> bool {
 		let format = self.format();
@@ -46,11 +54,11 @@ pub unsafe trait ImageAccess {
 
 
 	/// Returns the dimensions of the image.
-	fn dimensions(&self) -> ImageDimensions { self.inner().dimensions }
+	fn dimensions(&self) -> ImageDimensions { self.inner().dimensions() }
 	/// Returns the number of mipmap levels of this image.
-	fn mipmap_levels(&self) -> NonZeroU32 { self.inner().mipmap_levels }
+	fn mipmap_levels(&self) -> NonZeroU32 { self.inner().mipmap_levels() }
 	/// Returns the number of samples of this image.
-	fn samples(&self) -> NonZeroU32 { self.inner().samples }
+	fn samples(&self) -> NonZeroU32 { self.inner().samples() }
 
 
 	/// Returns true if the image can be used as a source for blits.
@@ -106,8 +114,9 @@ pub unsafe trait ImageAccess {
 
 
 	/// Returns the current layout for given subresource range if the whole range has the same layout.
-	/// Otherwise returns Err(()).
-	fn current_layout(&self, subresource_range: ImageSubresourceRange) -> Result<ImageLayout, ()>;
+	fn current_layout(
+		&self, subresource_range: ImageSubresourceRange
+	) -> Result<ImageLayout, ImageSubresourceLayoutError>;
 
 	/// A proxy method for the internal `ImageResourceLocker::initiate_gpu_lock` implementation.
 	///
@@ -150,7 +159,9 @@ where
 
 	fn conflict_key(&self) -> u64 { (**self).conflict_key() }
 
-	fn current_layout(&self, subresource_range: ImageSubresourceRange) -> Result<ImageLayout, ()> {
+	fn current_layout(
+		&self, subresource_range: ImageSubresourceRange
+	) -> Result<ImageLayout, ImageSubresourceLayoutError> {
 		(**self).current_layout(subresource_range)
 	}
 
@@ -171,41 +182,3 @@ where
 		(**self).decrease_gpu_lock(subresource_range, transitioned_layout)
 	}
 }
-
-// Wraps around an object that implements `ImageAccess` and modifies the initial layout
-// requirement to be either `Undefined` or `Preinitialized`.
-// #[derive(Debug, Copy, Clone)]
-// pub struct ImageAccessFromUndefinedLayout<I> {
-// image: I,
-// preinitialized: bool
-// }
-//
-// unsafe impl<I: ImageAccess> ImageAccess for ImageAccessFromUndefinedLayout<I> {
-// fn inner(&self) -> &UnsafeImage { self.image.inner() }
-//
-// fn initial_layout_requirement(&self) -> ImageLayout {
-// if self.preinitialized {
-// ImageLayout::Preinitialized
-// } else {
-// ImageLayout::Undefined
-// }
-// }
-//
-// fn final_layout_requirement(&self) -> ImageLayout { self.image.final_layout_requirement() }
-//
-// fn conflicts_buffer(&self, other: &BufferAccess) -> bool { self.image.conflicts_buffer(other) }
-//
-// fn conflicts_image(&self, other: &ImageAccess) -> bool { self.image.conflicts_image(other) }
-//
-// fn conflict_key(&self) -> u64 { self.image.conflict_key() }
-//
-// fn try_gpu_lock(
-// &self, exclusive_access: bool, expected_layout: ImageLayout
-// ) -> Result<(), AccessError> {
-// self.image.try_gpu_lock(exclusive_access, expected_layout)
-// }
-//
-// unsafe fn increase_gpu_lock(&self) { self.image.increase_gpu_lock() }
-//
-// unsafe fn unlock(&self, new_layout: Option<ImageLayout>) { self.image.unlock(new_layout) }
-// }

@@ -2201,8 +2201,7 @@ pub union ClearColorValue {
 }
 
 #[repr(C)]
-#[derive(Debug)]
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct ClearDepthStencilValue {
 	pub depth: f32,
 	pub stencil: u32

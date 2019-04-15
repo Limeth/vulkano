@@ -9,7 +9,14 @@ use crate::{
 		PossibleStencilFormatDesc,
 		PossibleUintFormatDesc
 	},
-	image::{sys::UnsafeImageView, ImageDimensions, ImageLayout, ImageSubresourceRange},
+	image::{
+		sys::UnsafeImageView,
+		ImageDimensions,
+		ImageLayout,
+		ImageSubresourceLayoutError,
+		ImageSubresourceRange,
+		ImageUsage
+	},
 	sampler::Sampler,
 	sync::AccessError,
 	SafeDeref
@@ -24,13 +31,12 @@ pub unsafe trait ImageViewAccess {
 	/// Returns the inner unsafe image view object used by this image view.
 	fn inner(&self) -> &UnsafeImageView;
 
-	/// Returns the dimensions of the image view.
-	fn dimensions(&self) -> ImageDimensions;
-	/// Returns the subresource range for this view.
-	fn subresource_range(&self) -> ImageSubresourceRange { self.inner().subresource_range }
+	/// Returns the usage of this view.
+	// TODO: Can this be different from parent?
+	fn usage(&self) -> ImageUsage { self.inner().usage() }
 
 	/// Returns the format of this view. This can be different from the parent's format.
-	fn format(&self) -> Format { self.inner().format }
+	fn format(&self) -> Format { self.inner().format() }
 	/// Returns true if this view format is color.
 	fn has_color(&self) -> bool {
 		let format = self.format();
@@ -47,20 +53,16 @@ pub unsafe trait ImageViewAccess {
 		format.is_stencil() || format.is_depth_stencil()
 	}
 
-	/// Returns the image layout to use in a descriptor with the given subresource.
-	fn descriptor_set_storage_image_layout(&self) -> ImageLayout;
-	/// Returns the image layout to use in a descriptor with the given subresource.
-	fn descriptor_set_combined_image_sampler_layout(&self) -> ImageLayout;
-	/// Returns the image layout to use in a descriptor with the given subresource.
-	fn descriptor_set_sampled_image_layout(&self) -> ImageLayout;
-	/// Returns the image layout to use in a descriptor with the given subresource.
-	fn descriptor_set_input_attachment_layout(&self) -> ImageLayout;
+	/// Returns the dimensions of the image view.
+	fn dimensions(&self) -> ImageDimensions;
+	/// Returns the subresource range for this view.
+	fn subresource_range(&self) -> ImageSubresourceRange { self.inner().subresource_range() }
 
 	/// Returns true if the view doesn't use components swizzling.
 	///
 	/// Must be true when the view is used as a framebuffer attachment or TODO: I don't remember
 	/// the other thing.
-	fn identity_swizzle(&self) -> bool;
+	fn identity_swizzle(&self) -> bool { self.inner().swizzle().identity() }
 
 	/// Returns true if the given sampler can be used with this image view.
 	///
@@ -114,16 +116,28 @@ pub unsafe trait ImageViewAccess {
 		self.parent().decrease_gpu_lock(self.subresource_range(), transitioned_layout)
 	}
 
-	/// Reports the current layout of the view or Err(()) if the range
-	/// has multiple different layouts.
+	/// Reports the current layout of the view.
 	///
 	/// If this value is incorrect, bad things can happen.
-	fn current_layout(&self) -> Result<ImageLayout, ()>;
+	fn current_layout(&self) -> Result<ImageLayout, ImageSubresourceLayoutError>;
 
-	/// Reports to vulkano which layout the views wants to be at the end of an auto command buffer.
+	/// Reports to vulkano which layout the view wants to be at the end of an auto command buffer.
 	///
 	/// Returning `ImageLayout::Undefined` means the view doesn't have a requirement.
 	fn required_layout(&self) -> ImageLayout;
+
+	/// Reports to vulkano which layout the view wants to be when used as a storage image
+	/// in descriptor set.
+	fn required_layout_descriptor_storage(&self) -> ImageLayout;
+	/// Reports to vulkano which layout the view wants to be when used as a sampled image
+	/// in descriptor set.
+	fn required_layout_descriptor_sampled(&self) -> ImageLayout;
+	/// Reports to vulkano which layout the view wants to be when used as a combined
+	/// image and sampler in descriptor set.
+	fn required_layout_descriptor_combined(&self) -> ImageLayout;
+	/// Reports to vulkano which layout the view wants to be when used as an input
+	/// attachment in descriptor set.
+	fn required_layout_descriptor_input_attachment(&self) -> ImageLayout;
 }
 
 unsafe impl<T> ImageViewAccess for T
@@ -139,22 +153,6 @@ where
 
 	fn subresource_range(&self) -> ImageSubresourceRange { (**self).subresource_range() }
 
-	fn descriptor_set_storage_image_layout(&self) -> ImageLayout {
-		(**self).descriptor_set_storage_image_layout()
-	}
-
-	fn descriptor_set_combined_image_sampler_layout(&self) -> ImageLayout {
-		(**self).descriptor_set_combined_image_sampler_layout()
-	}
-
-	fn descriptor_set_sampled_image_layout(&self) -> ImageLayout {
-		(**self).descriptor_set_sampled_image_layout()
-	}
-
-	fn descriptor_set_input_attachment_layout(&self) -> ImageLayout {
-		(**self).descriptor_set_input_attachment_layout()
-	}
-
 	fn identity_swizzle(&self) -> bool { (**self).identity_swizzle() }
 
 	fn can_be_sampled(&self, sampler: &Sampler) -> bool { (**self).can_be_sampled(sampler) }
@@ -169,7 +167,25 @@ where
 
 	fn conflict_key(&self) -> u64 { (**self).conflict_key() }
 
-	fn current_layout(&self) -> Result<ImageLayout, ()> { (**self).current_layout() }
+	fn current_layout(&self) -> Result<ImageLayout, ImageSubresourceLayoutError> {
+		(**self).current_layout()
+	}
 
 	fn required_layout(&self) -> ImageLayout { (**self).required_layout() }
+
+	fn required_layout_descriptor_storage(&self) -> ImageLayout {
+		(**self).required_layout_descriptor_storage()
+	}
+
+	fn required_layout_descriptor_sampled(&self) -> ImageLayout {
+		(**self).required_layout_descriptor_sampled()
+	}
+
+	fn required_layout_descriptor_combined(&self) -> ImageLayout {
+		(**self).required_layout_descriptor_combined()
+	}
+
+	fn required_layout_descriptor_input_attachment(&self) -> ImageLayout {
+		(**self).required_layout_descriptor_input_attachment()
+	}
 }

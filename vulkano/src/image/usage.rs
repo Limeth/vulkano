@@ -49,7 +49,6 @@ pub struct ImageUsage {
 	/// read from it in a following pass.
 	pub input_attachment: bool
 }
-
 impl ImageUsage {
 	/// Builds a `ImageUsage` with all values set to true. Note that using the returned value will
 	/// produce an error because of `transient_attachment` being true.
@@ -130,7 +129,6 @@ impl ImageUsage {
 		}
 	}
 }
-
 impl BitOr for ImageUsage {
 	type Output = Self;
 
