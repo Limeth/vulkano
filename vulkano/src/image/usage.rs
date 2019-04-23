@@ -7,7 +7,7 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use std::ops::BitOr;
+use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign};
 
 use vk_sys as vk;
 
@@ -18,7 +18,7 @@ use vk_sys as vk;
 /// If `transient_attachment` is true, then only `color_attachment`, `depth_stencil_attachment`
 /// and `input_attachment` can be true as well. The rest must be false or an error will be returned
 /// when creating the image.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ImageUsage {
 	/// Can be used as a source for transfers. Includes blits.
 	pub transfer_source: bool,
@@ -52,7 +52,7 @@ pub struct ImageUsage {
 impl ImageUsage {
 	/// Builds a `ImageUsage` with all values set to true. Note that using the returned value will
 	/// produce an error because of `transient_attachment` being true.
-	pub fn all() -> ImageUsage {
+	pub const fn all() -> Self {
 		ImageUsage {
 			transfer_source: true,
 			transfer_destination: true,
@@ -65,16 +65,8 @@ impl ImageUsage {
 		}
 	}
 
-	/// Builds a `ImageUsage` with all values set to false. Useful as a default value.
-	///
-	/// # Example
-	///
-	/// ```rust
-	/// use vulkano::image::ImageUsage;
-	///
-	/// let _usage = ImageUsage { transfer_destination: true, sampled: true, ..ImageUsage::none() };
-	/// ```
-	pub fn none() -> ImageUsage {
+	/// Same as default but is const.
+	pub const fn none() -> Self {
 		ImageUsage {
 			transfer_source: false,
 			transfer_destination: false,
@@ -85,6 +77,18 @@ impl ImageUsage {
 			transient_attachment: false,
 			input_attachment: false
 		}
+	}
+
+	/// Returns true if any of the values is true.
+	pub fn any(&self) -> bool {
+		self.transfer_source
+			|| self.transfer_destination
+			|| self.sampled
+			|| self.storage
+			|| self.color_attachment
+			|| self.depth_stencil_attachment
+			|| self.transient_attachment
+			|| self.input_attachment
 	}
 
 	pub(crate) fn to_usage_bits(&self) -> vk::ImageUsageFlagBits {
@@ -144,4 +148,26 @@ impl BitOr for ImageUsage {
 			input_attachment: self.input_attachment || rhs.input_attachment
 		}
 	}
+}
+impl BitOrAssign for ImageUsage {
+	fn bitor_assign(&mut self, rhs: Self) { *self = *self | rhs; }
+}
+impl BitAnd for ImageUsage {
+	type Output = Self;
+
+	fn bitand(self, rhs: Self) -> Self {
+		ImageUsage {
+			transfer_source: self.transfer_source && rhs.transfer_source,
+			transfer_destination: self.transfer_destination && rhs.transfer_destination,
+			sampled: self.sampled && rhs.sampled,
+			storage: self.storage && rhs.storage,
+			color_attachment: self.color_attachment && rhs.color_attachment,
+			depth_stencil_attachment: self.depth_stencil_attachment && rhs.depth_stencil_attachment,
+			transient_attachment: self.transient_attachment && rhs.transient_attachment,
+			input_attachment: self.input_attachment && rhs.input_attachment
+		}
+	}
+}
+impl BitAndAssign for ImageUsage {
+	fn bitand_assign(&mut self, rhs: Self) { *self = *self & rhs; }
 }

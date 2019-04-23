@@ -1,4 +1,4 @@
-use std::{fmt, mem, ptr, sync::Arc};
+use std::{error, fmt, mem, ops::Range, ptr, sync::Arc};
 
 use vk_sys as vk;
 
@@ -25,30 +25,29 @@ pub struct UnsafeImageView {
 	subresource_range: ImageSubresourceRange,
 	swizzle: Swizzle
 }
-
 impl UnsafeImageView {
 	/// Creates a new view from an image.
 	///
 	/// Note that you must create the view with identity swizzling if you want to use this view
 	/// as a framebuffer attachment.
-	///
-	/// # Panic
-	///
-	/// - Panics if `mipmap_levels` or `array_layers` is out of range of the image.
-	/// - Panics if the view types doesn't match the dimensions of the image (for example a 2D
-	///   view from a 3D image).
-	/// - Panics if trying to create a cubemap with a number of array layers different from 6.
-	/// - Panics if trying to create a cubemap array with a number of array layers not a multiple of 6.
 	pub unsafe fn new(
-		image: &UnsafeImage, view_type: ImageViewType, format: Option<Format>, swizzle: Swizzle,
-		subresource_range: ImageSubresourceRange
-	) -> Result<UnsafeImageView, OomError> {
+		image: &UnsafeImage, view_type: Option<ImageViewType>, format: Option<Format>,
+		swizzle: Swizzle, subresource_range: ImageSubresourceRange
+	) -> Result<UnsafeImageView, UnsafeImageViewCreationError> {
 		let vk = image.device().pointers();
 
-		assert!(
-			subresource_range.array_layers_end().get() <= image.dimensions().array_layers().get()
-		);
-		assert!(subresource_range.mipmap_levels_end().get() <= image.mipmap_levels().get());
+		if subresource_range.array_layers_end().get() > image.dimensions().array_layers().get() {
+			return Err(UnsafeImageViewCreationError::ArrayLayersOutOfRange {
+				requested: subresource_range.array_layers_range(),
+				array_layers: image.dimensions().array_layers().get()
+			})
+		}
+		if subresource_range.mipmap_levels_end().get() > image.mipmap_levels().get() {
+			return Err(UnsafeImageViewCreationError::MipmapLevelsOutOfRange {
+				requested: subresource_range.mipmap_levels_range(),
+				mipmap_levels: image.mipmap_levels().get()
+			})
+		}
 
 		// TODO: Views can have different formats than their underlying images, but
 		// only if certain requirements are met. We need to check those before we
@@ -64,25 +63,46 @@ impl UnsafeImageView {
 			FormatTy::DepthStencil => vk::IMAGE_ASPECT_DEPTH_BIT | vk::IMAGE_ASPECT_STENCIL_BIT
 		};
 
-		let view_type_flag = {
+		let (view_type, view_type_flag) = {
 			let image_view_type = ImageViewType::from(image.dimensions());
 
-			if !view_type.compatible_with(image_view_type) {
-				panic!(
-					"Cannot create an image view with type {:?} into an image of type {:?}",
-					view_type, image_view_type
-				);
-			}
-			if subresource_range.array_layers.get() > 1
-				&& (!view_type.is_array() || !image_view_type.is_array())
-			{
-				panic!(
-					"Cannot create an array image view with type {:?} and {} layers into an image of type {:?}",
-					view_type,  subresource_range.array_layers, image_view_type
-				);
-			}
+			let view_type = if let Some(view_type) = view_type {
+				if !view_type.compatible_with(image_view_type) {
+					return Err(UnsafeImageViewCreationError::ImageViewNotCompatible {
+						requested: view_type,
+						actual: image_view_type
+					})
+				}
+				if subresource_range.array_layers.get() > 1 {
+					if !view_type.is_array() {
+						return Err(UnsafeImageViewCreationError::ViewNotArrayType {
+							view_type,
+							array_layers: subresource_range.array_layers.get()
+						})
+					}
+					if !image_view_type.is_array() {
+						return Err(UnsafeImageViewCreationError::ImageNotArrayType {
+							view_type: image_view_type,
+							array_layers: subresource_range.array_layers.get()
+						})
+					}
+				}
+				if (view_type == ImageViewType::Cubemap
+					&& subresource_range.array_layers.get() != 6)
+					|| (view_type == ImageViewType::CubemapArray
+						&& subresource_range.array_layers.get() % 6 != 0)
+				{
+					return Err(UnsafeImageViewCreationError::ArrayLayersCubemapMismatch {
+						array_layers: subresource_range.array_layers.get()
+					})
+				}
 
-			match view_type {
+				view_type
+			} else {
+				image_view_type
+			};
+
+			let view_type_flag = match view_type {
 				ImageViewType::Dim1D => vk::IMAGE_VIEW_TYPE_1D,
 				ImageViewType::Dim1DArray => vk::IMAGE_VIEW_TYPE_1D_ARRAY,
 
@@ -93,7 +113,9 @@ impl UnsafeImageView {
 				ImageViewType::CubemapArray => vk::IMAGE_VIEW_TYPE_CUBE_ARRAY,
 
 				ImageViewType::Dim3D => vk::IMAGE_VIEW_TYPE_CUBE_ARRAY
-			}
+			};
+
+			(view_type, view_type_flag)
 		};
 
 		let view = {
@@ -115,12 +137,15 @@ impl UnsafeImageView {
 			};
 
 			let mut output = mem::uninitialized();
-			check_errors(vk.CreateImageView(
+			match check_errors(vk.CreateImageView(
 				image.device().internal_object(),
 				&infos,
 				ptr::null(),
 				&mut output
-			))?;
+			)) {
+				Err(e) => Err(OomError::from(e))?,
+				Ok(_) => ()
+			};
 			output
 		};
 
@@ -157,7 +182,7 @@ impl UnsafeImageView {
 		Ok(UnsafeImageView {
 			device: image.device().clone(),
 			view,
-			
+
 			usage: image.usage(),
 			format: view_format,
 
@@ -205,4 +230,105 @@ impl Drop for UnsafeImageView {
 			vk.DestroyImageView(self.device.internal_object(), self.view, ptr::null());
 		}
 	}
+}
+
+
+#[derive(Debug)]
+pub enum UnsafeImageViewCreationError {
+	OomError(OomError),
+
+	/// The requested image view type is not compatible with the image view type.
+	ImageViewNotCompatible {
+		requested: ImageViewType,
+		actual: ImageViewType
+	},
+
+	/// The requested range of mipmap levels is out of range of actual range of mipmap levels.
+	MipmapLevelsOutOfRange {
+		requested: Range<u32>,
+		mipmap_levels: u32
+	},
+
+	/// Requested view type is not array type, but requested multiple array layers.
+	ViewNotArrayType {
+		view_type: ImageViewType,
+		array_layers: u32
+	},
+
+	/// Requested image is not array type, but requested multiple array layers.
+	ImageNotArrayType {
+		view_type: ImageViewType,
+		array_layers: u32
+	},
+
+	/// The requested range of array layers is out of range of actual range of array layers.
+	ArrayLayersOutOfRange {
+		requested: Range<u32>,
+		array_layers: u32
+	},
+
+	/// The requested number of array layers is not compatible with cubemap view type (must be a multiple of 6).
+	ArrayLayersCubemapMismatch {
+		array_layers: u32
+	}
+}
+impl fmt::Display for UnsafeImageViewCreationError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			UnsafeImageViewCreationError::OomError(e) => e.fmt(f),
+
+			UnsafeImageViewCreationError::ImageViewNotCompatible { requested, actual }
+			=> write!(
+				f,
+				"The requested image view type ({:?}) is not compatible with the image view type ({:?})",
+				requested, actual
+			),
+
+			UnsafeImageViewCreationError::MipmapLevelsOutOfRange { requested, mipmap_levels }
+			=> write!(
+				f,
+				"The requested range of mipmap levels ({:?}) is out of range of actual range of mipmap levels (0 .. {})",
+				requested, mipmap_levels
+			),
+
+			UnsafeImageViewCreationError::ViewNotArrayType { view_type, array_layers }
+			=> write!(
+				f,
+				"Requested view type ({:?}) is not array type, but requested multiple array layers ({})",
+				view_type, array_layers
+			),
+
+			UnsafeImageViewCreationError::ImageNotArrayType { view_type, array_layers }
+			=> write!(
+				f,
+				"Requested image type ({:?}) is not array type, but requested multiple array layers ({})",
+				view_type, array_layers
+			),
+
+			UnsafeImageViewCreationError::ArrayLayersOutOfRange { requested, array_layers }
+			=> write!(
+				f,
+				"The requested range of array layers ({:?}) is out of range of actual range of array layers (0 .. {})",
+				requested, array_layers
+			),
+
+			UnsafeImageViewCreationError::ArrayLayersCubemapMismatch { array_layers }
+			=> write!(
+				f,
+				"The requested number of array ({}) layers is not compatible with cubemap view type (must be a multiple of 6)",
+				array_layers
+			)
+		}
+	}
+}
+impl error::Error for UnsafeImageViewCreationError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			UnsafeImageViewCreationError::OomError(e) => e.source(),
+			_ => None
+		}
+	}
+}
+impl From<OomError> for UnsafeImageViewCreationError {
+	fn from(err: OomError) -> Self { UnsafeImageViewCreationError::OomError(err) }
 }

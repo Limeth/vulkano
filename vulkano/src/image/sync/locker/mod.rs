@@ -25,15 +25,13 @@
 use std::num::NonZeroU32;
 
 use crate::{
-	image::{ImageLayout, ImageSubresourceRange},
+	image::{ImageLayout, ImageLayoutEnd, ImageSubresourceLayoutError, ImageSubresourceRange},
 	sync::AccessError
 };
 
-mod image;
 mod matrix_locker;
 mod simple_locker;
 
-pub use image::SyncImage;
 pub use matrix_locker::MatrixImageResourceLocker;
 pub use simple_locker::SimpleImageResourceLocker;
 
@@ -49,12 +47,30 @@ pub use simple_locker::SimpleImageResourceLocker;
 ///
 /// This trait is unsafe because incorrect implementation can result in race conditions
 /// on both the CPU side and the GPU side.
-pub unsafe trait ImageResourceLocker {
+pub unsafe trait ImageResourceLocker: std::fmt::Debug {
 	/// Initialized a new resource locker.
 	///
 	/// The locker assumes that the whole resource is in the implicit layout
 	/// (`ImageLayout::Uninitialized` or `ImageLayout::Preinitialized` if `preinitialized == true`).
 	fn new(preinitialized: bool, array_layers: NonZeroU32, mipmap_levels: NonZeroU32) -> Self;
+
+	/// Attempts to initialize a new resource locker using the existing data
+	/// from another one.
+	///
+	/// This function doesn't preserve locks from the other locker.
+	///
+	/// Returns Err if the complexity of this locker is too low to represent the current
+	/// state in other locker.
+	fn try_from_locker(
+		other: impl ImageResourceLocker, array_layers: NonZeroU32, mipmap_levels: NonZeroU32
+	) -> Result<Self, ImageSubresourceLayoutError>
+	where
+		Self: Sized;
+
+	/// Returns the layout of the subresource range if the whole subresource has the same layout.
+	fn current_layout(
+		&self, subresource_range: ImageSubresourceRange
+	) -> Result<ImageLayout, ImageSubresourceLayoutError>;
 
 	/// Locks the subresource for usage on the GPU. Returns an error if the lock can't be acquired.
 	///
@@ -99,6 +115,6 @@ pub unsafe trait ImageResourceLocker {
 	/// This function is unsafe because the transitioned layout must also be supported
 	/// by the image subresource and must not be `Undefined`.
 	unsafe fn decrease_gpu_lock(
-		&self, range: ImageSubresourceRange, new_layout: Option<ImageLayout>
+		&self, range: ImageSubresourceRange, new_layout: Option<ImageLayoutEnd>
 	);
 }

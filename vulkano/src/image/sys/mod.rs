@@ -13,89 +13,36 @@
 //! other image or image view types of this library, and all custom image or image view types
 //! that you create must wrap around the types in this module.
 
-use std::{error, fmt, ops::Range};
-
-use crate::{image::ImageDimensions, memory::DeviceMemoryAllocError, Error, OomError};
-
 mod unsafe_image;
 mod unsafe_image_view;
 
 pub use self::{
-	unsafe_image::{LinearLayout, UnsafeImage},
-	unsafe_image_view::UnsafeImageView
+	unsafe_image::{UnsafeImage, UnsafeImageCreationError},
+	unsafe_image_view::{UnsafeImageView, UnsafeImageViewCreationError}
 };
 
-/// Error that can happen when creating an instance.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ImageCreationError {
-	/// Allocating memory failed.
-	AllocError(DeviceMemoryAllocError),
-	/// The dimensions are too large, or one of the dimensions is 0.
-	UnsupportedDimensions(ImageDimensions),
-	/// A wrong number of mipmaps was provided.
-	InvalidMipmapsCount { requested: u32, valid_range: Range<u32> },
-	/// The requested number of samples is not supported, or is 0.
-	UnsupportedSamplesCount(u32),
-	/// The requested format is not supported by the Vulkan implementation.
-	FormatNotSupported,
-	/// The format is supported, but at least one of the requested usages is not supported.
-	UnsupportedUsage,
-	/// The `shader_storage_image_multisample` feature must be enabled to create such an image.
-	ShaderStorageImageMultisampleFeatureNotEnabled
-}
-impl fmt::Display for ImageCreationError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match self {
-			ImageCreationError::AllocError(e) => write!(f, "Memory allocation failed: {}", e),
-			ImageCreationError::InvalidMipmapsCount { requested, valid_range } => write!(
-				f,
-				"A wrong number of mipmaps provided: {} valid range: {:?}",
-				requested, valid_range
-			),
-			ImageCreationError::UnsupportedSamplesCount(samples) => {
-				write!(f, "The requested number of sampler is not supported: {}", samples)
-			}
-			ImageCreationError::UnsupportedDimensions(dims) => {
-				write!(f, "The requested dimensions are not supported: {:?}", dims)
-			}
-			ImageCreationError::FormatNotSupported => {
-				write!(f, "The requested format is not supported")
-			}
-			ImageCreationError::UnsupportedUsage => {
-				write!(f, "The requested usage is not supported for requested format")
-			}
-			ImageCreationError::ShaderStorageImageMultisampleFeatureNotEnabled => {
-				write!(f, "The `shader_storage_image_multisample` feature must be enabled")
-			}
-		}
-	}
-}
-impl error::Error for ImageCreationError {
-	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-		match self {
-			ImageCreationError::AllocError(e) => e.source(),
-			_ => None
-		}
-	}
-}
-impl From<OomError> for ImageCreationError {
-	fn from(err: OomError) -> ImageCreationError {
-		ImageCreationError::AllocError(DeviceMemoryAllocError::OomError(err))
-	}
-}
-impl From<DeviceMemoryAllocError> for ImageCreationError {
-	fn from(err: DeviceMemoryAllocError) -> ImageCreationError {
-		ImageCreationError::AllocError(err)
-	}
-}
-impl From<Error> for ImageCreationError {
-	fn from(err: Error) -> ImageCreationError {
-		match err {
-			err @ Error::OutOfHostMemory => ImageCreationError::AllocError(err.into()),
-			err @ Error::OutOfDeviceMemory => ImageCreationError::AllocError(err.into()),
-			_ => panic!("unexpected error: {:?}", err)
-		}
-	}
+/// Describes the memory layout of an image with linear tiling.
+///
+/// Obtained by calling `*_linear_layout` on the image.
+///
+/// The address of a texel at `(x, y, z, layer)` is `layer * array_pitch + z * depth_pitch +
+/// y * row_pitch + x * size_of_each_texel + offset`. `size_of_each_texel` must be determined
+/// depending on the format. The same formula applies for compressed formats, except that the
+/// coordinates must be in number of blocks.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct LinearLayout {
+	/// Number of bytes from the start of the memory and the start of the queried subresource.
+	pub offset: usize,
+	/// Total number of bytes for the queried subresource. Can be used for a safety check.
+	pub size: usize,
+	/// Number of bytes between two texels or two blocks in adjacent rows.
+	pub row_pitch: usize,
+	/// Number of bytes between two texels or two blocks in adjacent array layers. This value is
+	/// undefined for images with only one array layer.
+	pub array_pitch: usize,
+	/// Number of bytes between two texels or two blocks in adjacent depth layers. This value is
+	/// undefined for images that are not three-dimensional.
+	pub depth_pitch: usize
 }
 
 #[cfg(test)]

@@ -13,10 +13,10 @@ use crate::{
 	buffer::BufferAccess,
 	format::{ClearValue, Format, FormatDesc},
 	image::{
-		sys::{UnsafeImage, UnsafeImageView},
+		layout::{ImageLayout, ImageLayoutEnd, RequiredLayouts},
+		sys::{UnsafeImage, UnsafeImageView, UnsafeImageViewCreationError},
 		traits::{ImageAccess, ImageClearValue, ImageContent, ImageViewAccess},
 		ImageDimensions,
-		ImageLayout,
 		ImageSubresourceLayoutError,
 		ImageSubresourceRange,
 		ImageViewType
@@ -39,14 +39,17 @@ use crate::{
 /// method on the swapchain), which will have the effect of showing the content of the image to
 /// the screen. Once an image has been presented, it can no longer be used unless it is acquired
 /// again.
-// TODO: #[derive(Debug)]
 pub struct SwapchainImage<W> {
 	swapchain: Arc<Swapchain<W>>,
 	image_offset: usize,
 	view: UnsafeImageView
 }
-
 impl<W> SwapchainImage<W> {
+	const REQUIRED_LAYOUTS: RequiredLayouts = RequiredLayouts {
+		global: Some(ImageLayoutEnd::PresentSrc),
+		..RequiredLayouts::none()
+	};
+
 	/// Builds a `SwapchainImage` from raw components.
 	///
 	/// This is an internal method that you shouldn't call.
@@ -54,9 +57,9 @@ impl<W> SwapchainImage<W> {
 		swapchain: Arc<Swapchain<W>>, id: usize
 	) -> Result<Arc<SwapchainImage<W>>, OomError> {
 		let image = swapchain.raw_image(id).unwrap();
-		let view = UnsafeImageView::new(
+		let view = match UnsafeImageView::new(
 			&image,
-			ImageViewType::Dim2D,
+			Some(ImageViewType::Dim2D),
 			None,
 			Default::default(),
 			ImageSubresourceRange {
@@ -66,7 +69,11 @@ impl<W> SwapchainImage<W> {
 				mipmap_levels: crate::NONZERO_ONE,
 				mipmap_levels_offset: 0
 			}
-		)?;
+		) {
+			Ok(v) => v,
+			Err(UnsafeImageViewCreationError::OomError(e)) => return Err(e),
+			e => panic!("Could not create swapchain view: {:?}", e)
+		};
 
 		Ok(Arc::new(SwapchainImage { swapchain: swapchain.clone(), image_offset: id, view }))
 	}
@@ -81,7 +88,6 @@ impl<W> SwapchainImage<W> {
 
 	fn inner_image(&self) -> &UnsafeImage { self.swapchain.raw_image(self.image_offset).unwrap() }
 }
-
 unsafe impl<W> ImageAccess for SwapchainImage<W> {
 	fn inner(&self) -> &UnsafeImage { self.inner_image() }
 
@@ -117,7 +123,9 @@ unsafe impl<W> ImageAccess for SwapchainImage<W> {
 
 	unsafe fn increase_gpu_lock(&self, _: ImageSubresourceRange) {}
 
-	unsafe fn decrease_gpu_lock(&self, _: ImageSubresourceRange, new_layout: Option<ImageLayout>) {
+	unsafe fn decrease_gpu_lock(
+		&self, _: ImageSubresourceRange, new_layout: Option<ImageLayoutEnd>
+	) {
 		// TODO: store that the image was initialized?
 	}
 }
@@ -127,13 +135,11 @@ unsafe impl<W> ImageClearValue<<Format as FormatDesc>::ClearValue> for Swapchain
 		Some(self.swapchain.format().decode_clear_value(value))
 	}
 }
-
 unsafe impl<P, W> ImageContent<P> for SwapchainImage<W> {
 	fn matches_format(&self) -> bool {
 		true // FIXME:
 	}
 }
-
 unsafe impl<W> ImageViewAccess for SwapchainImage<W> {
 	fn parent(&self) -> &ImageAccess { self }
 
@@ -144,29 +150,18 @@ unsafe impl<W> ImageViewAccess for SwapchainImage<W> {
 		ImageDimensions::Dim2D { width: dims[0], height: dims[1] }
 	}
 
-	fn required_layout_descriptor_storage(&self) -> ImageLayout {
-		ImageLayout::ShaderReadOnlyOptimal
-	}
-
-	fn required_layout_descriptor_combined(&self) -> ImageLayout {
-		ImageLayout::ShaderReadOnlyOptimal
-	}
-
-	fn required_layout_descriptor_sampled(&self) -> ImageLayout {
-		ImageLayout::ShaderReadOnlyOptimal
-	}
-
-	fn required_layout_descriptor_input_attachment(&self) -> ImageLayout {
-		ImageLayout::ShaderReadOnlyOptimal
-	}
-
 	fn identity_swizzle(&self) -> bool { true }
 
 	fn conflicts_buffer(&self, other: &dyn BufferAccess) -> bool { false }
 
-	fn current_layout(&self) -> Result<ImageLayout, ImageSubresourceLayoutError> {
-		Ok(ImageLayout::PresentSrc)
+	fn required_layouts(&self) -> &RequiredLayouts { &Self::REQUIRED_LAYOUTS }
+}
+impl<W> std::fmt::Debug for SwapchainImage<W> {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(
+			f,
+			"SwapchainImage {{ swapchain: {:?}, image_offset: {}, view: {:?} }}",
+			self.swapchain, self.image_offset, self.view
+		)
 	}
-
-	fn required_layout(&self) -> ImageLayout { ImageLayout::PresentSrc }
 }

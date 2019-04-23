@@ -18,32 +18,30 @@
 //! fast. Most implementations have hardware dedicated to reading from images if you access them
 //! through a sampler.
 //!
-//! # Properties of an image
-//!
 //! # Images and image views
-//!
 //! There is a distinction between *images* and *image views*. As its name suggests, an image
-//! view describes how the GPU must interpret the image.
+//! view describes how the GPU must interpret, or view, the image, while in image is the actual
+//! state of the memory.
 //!
-//! Transfer and memory operations operate on images themselves, while reading/writing an image
-//! operates on image views. You can create multiple image views from the same image.
+//! In the Vulkano library, an image is any object that implements the `ImageAccess` trait and an image
+//! view is any object that implements the `ImageViewAccess` trait.
 //!
-//! # High-level wrappers
+//! The `ImageAccess` trait is implemented for [`SyncImage`](sync/image/struct.SyncImage.html), which
+//! is a wrapper around `UnsafeImage`. It takes care of:
+//! - Binding memory to the image and keeping the memory alive.
+//! - Managing CPU and GPU access to the image through the `ImageResourceLocker` implementation.
 //!
-//! In the vulkano library, an image is any object that implements the `Image` trait and an image
-//! view is any object that implements the `ImageView` trait.
+//! Make sure to read the documentation of [`ImageResourceLocker`](sync/trait.ImageResourceLocker.html)
+//! and the difference between the Vulkano provided implementations.
 //!
-//! Since these traits are low-level, you are encouraged to not implement them yourself but instead
-//! use one of the provided implementations that are specialized depending on the way you are going
-//! to use the image:
+//! The `ImageViewAccess` trait is implemented for [`ImageView`](view/struct.ImageView.html),
+//! which is a wrapper around `UnsafeImageView`. It takes care of:
+//! - Keeping a reference to the target image, so it stays alive.
+//! - Does additional checks at creation to ensure it is compatible with the image.
+//! - Provides specialized constructors for common use cases such as attachment, immutable or storage.
 //!
-//! - An `AttachmentImage` can be used when you want to draw to an image.
-//! - An `ImmutableImage` stores data which never need be changed after the initial upload,
-//!   like a texture.
-//!
-//! # Low-level information
-//!
-//! To be written.
+//! For more specific use cases, you should create an `ImageView` through the main `new` constructor,
+//! although the specialized constructors provide additional checks which you'll have to do yourself.
 //!
 
 use std::{error, fmt, num::NonZeroU32};
@@ -51,31 +49,26 @@ use std::{error, fmt, num::NonZeroU32};
 use vk_sys as vk;
 
 mod dimensions;
-mod layout;
+pub use dimensions::{ImageDimensionsType, ImageDimensions, ImageSubresourceRange, ImageViewType};
+
+pub mod layout;
+pub use layout::*;
+
 mod usage;
+pub use usage::ImageUsage;
 
-// mod attachment;
-// mod immutable;
-// mod storage;
-mod swapchain;
-
-mod view;
-
-pub mod sync;
 pub mod sys;
 pub mod traits;
-
-// pub use attachment::AttachmentImage;
-// pub use immutable::ImmutableImage;
-// pub use storage::StorageImage;
-pub use swapchain::SwapchainImage;
-
-pub use layout::{ImageLayout, ImageEndLayout};
-pub use sys::ImageCreationError;
 pub use traits::{ImageAccess, ImageViewAccess};
 
-pub use dimensions::{ImageDimensionType, ImageDimensions, ImageSubresourceRange, ImageViewType};
-pub use usage::ImageUsage;
+pub mod sync;
+pub use sync::{ImageCreationError, SyncImage};
+
+mod swapchain;
+pub use swapchain::SwapchainImage;
+
+pub mod view;
+pub use view::{ImageView, ImageViewCreationError};
 
 /// Specifies how many mipmaps must be allocated.
 ///
@@ -89,7 +82,7 @@ pub enum MipmapsCount {
 	/// implementation may report that it supports a greater value.
 	Log2,
 
-	/// Allocate one mipmap (ie. just the main level). Always supported.
+	/// Allocate one mipmap (just the main level). Always supported.
 	One,
 
 	/// Allocate the given number of mipmaps. May result in an error if the value is out of range
@@ -117,7 +110,13 @@ impl MipmapsCount {
 	}
 }
 impl From<NonZeroU32> for MipmapsCount {
-	fn from(num: NonZeroU32) -> MipmapsCount { MipmapsCount::Specific(num) }
+	fn from(num: NonZeroU32) -> MipmapsCount {
+		if num.get() == 1 {
+			MipmapsCount::One
+		} else {
+			MipmapsCount::Specific(num)
+		}
+	}
 }
 
 /// Specifies how the components of an image must be swizzled.
@@ -141,17 +140,21 @@ pub struct Swizzle {
 	pub a: ComponentSwizzle
 }
 impl Swizzle {
+	pub fn identity() -> Self {
+		Swizzle {
+			r: ComponentSwizzle::Identity,
+			g: ComponentSwizzle::Identity,
+			b: ComponentSwizzle::Identity,
+			a: ComponentSwizzle::Identity
+		}
+	}
+
 	/// Returns true if this is an identity swizzle.
-	pub fn identity(&self) -> bool {
-		if self.r == ComponentSwizzle::Identity
+	pub fn is_identity(&self) -> bool {
+		self.r == ComponentSwizzle::Identity
 			&& self.g == ComponentSwizzle::Identity
 			&& self.b == ComponentSwizzle::Identity
 			&& self.a == ComponentSwizzle::Identity
-		{
-			true
-		} else {
-			false
-		}
 	}
 }
 impl Into<vk::ComponentMapping> for Swizzle {

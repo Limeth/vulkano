@@ -1,20 +1,22 @@
-use smallvec::SmallVec;
-use std::{fmt, mem, num::NonZeroU32, ptr, sync::Arc};
+use std::{error, fmt, mem, num::NonZeroU32, ops::Range, ptr, sync::Arc};
 
+use smallvec::SmallVec;
 use vk_sys as vk;
 
 use crate::{
 	check_errors,
 	device::Device,
 	format::{Format, FormatTy},
-	image::{ImageCreationError, ImageDimensions, ImageUsage, MipmapsCount},
+	image::{ImageDimensions, ImageUsage, MipmapsCount},
 	instance::Limits,
-	memory::{DeviceMemory, MemoryRequirements},
+	memory::{DeviceMemory, DeviceMemoryAllocError, MemoryRequirements},
 	sync::Sharing,
 	Error,
 	OomError,
 	VulkanObject
 };
+
+use super::LinearLayout;
 
 /// A storage for pixels or arbitrary data.
 ///
@@ -52,7 +54,7 @@ impl UnsafeImage {
 		device: Arc<Device>, sharing: Sharing<I>, usage: ImageUsage, format: Format,
 		dimensions: ImageDimensions, samples: NonZeroU32, mipmap_levels: M,
 		preinitialized_layout: bool, linear_tiling: bool
-	) -> Result<(UnsafeImage, MemoryRequirements), ImageCreationError>
+	) -> Result<(UnsafeImage, MemoryRequirements), UnsafeImageCreationError>
 	where
 		M: Into<MipmapsCount>,
 		I: Iterator<Item = u32>
@@ -81,22 +83,22 @@ impl UnsafeImage {
 				output.optimalTilingFeatures
 			};
 			if features == 0 {
-				return Err(ImageCreationError::FormatNotSupported)
+				return Err(UnsafeImageCreationError::FormatNotSupported)
 			}
 
 			if usage.sampled && (features & vk::FORMAT_FEATURE_SAMPLED_IMAGE_BIT == 0) {
-				return Err(ImageCreationError::UnsupportedUsage)
+				return Err(UnsafeImageCreationError::UnsupportedUsage)
 			}
 			if usage.storage && (features & vk::FORMAT_FEATURE_STORAGE_IMAGE_BIT == 0) {
-				return Err(ImageCreationError::UnsupportedUsage)
+				return Err(UnsafeImageCreationError::UnsupportedUsage)
 			}
 			if usage.color_attachment && (features & vk::FORMAT_FEATURE_COLOR_ATTACHMENT_BIT == 0) {
-				return Err(ImageCreationError::UnsupportedUsage)
+				return Err(UnsafeImageCreationError::UnsupportedUsage)
 			}
 			if usage.depth_stencil_attachment
 				&& (features & vk::FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT == 0)
 			{
-				return Err(ImageCreationError::UnsupportedUsage)
+				return Err(UnsafeImageCreationError::UnsupportedUsage)
 			}
 			if usage.input_attachment
 				&& (features
@@ -104,18 +106,18 @@ impl UnsafeImage {
 						| vk::FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
 					== 0)
 			{
-				return Err(ImageCreationError::UnsupportedUsage)
+				return Err(UnsafeImageCreationError::UnsupportedUsage)
 			}
 			if device.loaded_extensions().khr_maintenance1 {
 				if usage.transfer_source
 					&& (features & vk::FORMAT_FEATURE_TRANSFER_SRC_BIT_KHR == 0)
 				{
-					return Err(ImageCreationError::UnsupportedUsage)
+					return Err(UnsafeImageCreationError::UnsupportedUsage)
 				}
 				if usage.transfer_destination
 					&& (features & vk::FORMAT_FEATURE_TRANSFER_DST_BIT_KHR == 0)
 				{
-					return Err(ImageCreationError::UnsupportedUsage)
+					return Err(UnsafeImageCreationError::UnsupportedUsage)
 				}
 			}
 
@@ -132,18 +134,18 @@ impl UnsafeImage {
 				..usage.clone()
 			};
 
-			if u != ImageUsage::none() {
-				return Err(ImageCreationError::UnsupportedUsage)
+			if u != ImageUsage::default() {
+				return Err(UnsafeImageCreationError::UnsupportedUsage)
 			}
 		}
 		if !samples.get().is_power_of_two() {
-			return Err(ImageCreationError::UnsupportedSamplesCount(samples.get()))
+			return Err(UnsafeImageCreationError::UnsupportedSamplesCount(samples.get()))
 		}
 		// If the `shaderStorageImageMultisample` feature is not enabled and we have
 		// `usage_storage` set to true, then the number of samples must be 1.
 		if usage.storage && samples.get() > 1 {
 			if !device.enabled_features().shader_storage_image_multisample {
-				return Err(ImageCreationError::ShaderStorageImageMultisampleFeatureNotEnabled)
+				return Err(UnsafeImageCreationError::ShaderStorageImageMultisampleFeatureNotEnabled)
 			}
 		}
 		let (dimensions_type, dimensions_extent, array_layers, dimensions_flags) =
@@ -165,7 +167,7 @@ impl UnsafeImage {
 			match check_errors(r) {
 				Ok(_) => (),
 				Err(Error::FormatNotSupported) => {
-					return Err(ImageCreationError::FormatNotSupported)
+					return Err(UnsafeImageCreationError::FormatNotSupported)
 				}
 				Err(err) => return Err(err.into())
 			}
@@ -281,18 +283,21 @@ impl UnsafeImage {
 	///
 	/// Returns the computed number of mipmaps, as this is the only parameter
 	/// passed that has a different output.
+	// Part of the `new` function extracted so it's reusable
+	// and more readable.
+	#[inline(always)]
 	fn check_capabilities(
 		device_limits: Limits, capabilities: vk::ImageFormatProperties, usage: ImageUsage,
 		format: Format, dimensions: ImageDimensions, samples: NonZeroU32,
 		mipmap_levels: MipmapsCount
-	) -> Result<NonZeroU32, ImageCreationError> {
+	) -> Result<NonZeroU32, UnsafeImageCreationError> {
 		if !dimensions.check_limits(device_limits) {
 			if dimensions.width().get() > capabilities.maxExtent.width
 				|| dimensions.height().get() > capabilities.maxExtent.height
 				|| dimensions.depth().get() > capabilities.maxExtent.depth
 				|| dimensions.array_layers().get() > capabilities.maxArrayLayers
 			{
-				return Err(ImageCreationError::UnsupportedDimensions(dimensions))
+				return Err(UnsafeImageCreationError::UnsupportedDimensions(dimensions))
 			}
 		}
 
@@ -349,7 +354,7 @@ impl UnsafeImage {
 
 			if (samples.get() & supported_samples) == 0 {
 				if (samples.get() & capabilities.sampleCounts) == 0 {
-					return Err(ImageCreationError::UnsupportedSamplesCount(samples.get()))
+					return Err(UnsafeImageCreationError::UnsupportedSamplesCount(samples.get()))
 				}
 			}
 		}
@@ -358,7 +363,7 @@ impl UnsafeImage {
 			Ok(number) => number,
 			Err(number) => {
 				if number.get() > capabilities.maxMipLevels {
-					return Err(ImageCreationError::InvalidMipmapsCount {
+					return Err(UnsafeImageCreationError::InvalidMipmapsCount {
 						requested: number.get(),
 						valid_range: 1 .. dimensions.max_mipmaps().get()
 					})
@@ -565,26 +570,75 @@ impl Drop for UnsafeImage {
 	}
 }
 
-/// Describes the memory layout of an image with linear tiling.
-///
-/// Obtained by calling `*_linear_layout` on the image.
-///
-/// The address of a texel at `(x, y, z, layer)` is `layer * array_pitch + z * depth_pitch +
-/// y * row_pitch + x * size_of_each_texel + offset`. `size_of_each_texel` must be determined
-/// depending on the format. The same formula applies for compressed formats, except that the
-/// coordinates must be in number of blocks.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct LinearLayout {
-	/// Number of bytes from the start of the memory and the start of the queried subresource.
-	pub offset: usize,
-	/// Total number of bytes for the queried subresource. Can be used for a safety check.
-	pub size: usize,
-	/// Number of bytes between two texels or two blocks in adjacent rows.
-	pub row_pitch: usize,
-	/// Number of bytes between two texels or two blocks in adjacent array layers. This value is
-	/// undefined for images with only one array layer.
-	pub array_pitch: usize,
-	/// Number of bytes between two texels or two blocks in adjacent depth layers. This value is
-	/// undefined for images that are not three-dimensional.
-	pub depth_pitch: usize
+/// Error that can happen when creating an instance.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum UnsafeImageCreationError {
+	/// Allocating memory failed.
+	AllocError(DeviceMemoryAllocError),
+	/// The dimensions are too large, or one of the dimensions is 0.
+	UnsupportedDimensions(ImageDimensions),
+	/// A wrong number of mipmaps was provided.
+	InvalidMipmapsCount { requested: u32, valid_range: Range<u32> },
+	/// The requested number of samples is not supported, or is 0.
+	UnsupportedSamplesCount(u32),
+	/// The requested format is not supported by the Vulkan implementation.
+	FormatNotSupported,
+	/// The format is supported, but at least one of the requested usages is not supported.
+	UnsupportedUsage,
+	/// The `shader_storage_image_multisample` feature must be enabled to create such an image.
+	ShaderStorageImageMultisampleFeatureNotEnabled
+}
+impl fmt::Display for UnsafeImageCreationError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			UnsafeImageCreationError::AllocError(e) => write!(f, "Memory allocation failed: {}", e),
+			UnsafeImageCreationError::InvalidMipmapsCount { requested, valid_range } => write!(
+				f,
+				"A wrong number of mipmaps provided: {} valid range: {:?}",
+				requested, valid_range
+			),
+			UnsafeImageCreationError::UnsupportedSamplesCount(samples) => {
+				write!(f, "The requested number of sampler is not supported: {}", samples)
+			}
+			UnsafeImageCreationError::UnsupportedDimensions(dims) => {
+				write!(f, "The requested dimensions are not supported: {:?}", dims)
+			}
+			UnsafeImageCreationError::FormatNotSupported => {
+				write!(f, "The requested format is not supported")
+			}
+			UnsafeImageCreationError::UnsupportedUsage => {
+				write!(f, "The requested usage is not supported for requested format")
+			}
+			UnsafeImageCreationError::ShaderStorageImageMultisampleFeatureNotEnabled => {
+				write!(f, "The `shader_storage_image_multisample` feature must be enabled")
+			}
+		}
+	}
+}
+impl error::Error for UnsafeImageCreationError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		match self {
+			UnsafeImageCreationError::AllocError(e) => e.source(),
+			_ => None
+		}
+	}
+}
+impl From<OomError> for UnsafeImageCreationError {
+	fn from(err: OomError) -> UnsafeImageCreationError {
+		UnsafeImageCreationError::AllocError(DeviceMemoryAllocError::OomError(err))
+	}
+}
+impl From<DeviceMemoryAllocError> for UnsafeImageCreationError {
+	fn from(err: DeviceMemoryAllocError) -> UnsafeImageCreationError {
+		UnsafeImageCreationError::AllocError(err)
+	}
+}
+impl From<Error> for UnsafeImageCreationError {
+	fn from(err: Error) -> UnsafeImageCreationError {
+		match err {
+			err @ Error::OutOfHostMemory => UnsafeImageCreationError::AllocError(err.into()),
+			err @ Error::OutOfDeviceMemory => UnsafeImageCreationError::AllocError(err.into()),
+			_ => panic!("unexpected error: {:?}", err)
+		}
+	}
 }

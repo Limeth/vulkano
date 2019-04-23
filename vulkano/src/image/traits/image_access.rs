@@ -13,9 +13,9 @@ use crate::{
 		PossibleUintFormatDesc
 	},
 	image::{
+		layout::{ImageLayout, ImageLayoutEnd},
 		sys::UnsafeImage,
 		ImageDimensions,
-		ImageLayout,
 		ImageSubresourceLayoutError,
 		ImageSubresourceRange,
 		ImageUsage
@@ -25,7 +25,7 @@ use crate::{
 };
 
 /// Trait for types that represent the way a GPU can access an image.
-pub unsafe trait ImageAccess {
+pub unsafe trait ImageAccess: std::fmt::Debug {
 	/// Returns the inner unsafe image object used by this image.
 	fn inner(&self) -> &UnsafeImage;
 
@@ -66,16 +66,18 @@ pub unsafe trait ImageAccess {
 	/// Returns true if the image can be used as a destination for blits.
 	fn supports_blit_destination(&self) -> bool { self.inner().supports_blit_destination() }
 
-	// /// Wraps around this `ImageAccess` and returns an identical `ImageAccess` but whose initial
-	// /// layout requirement is either `Undefined` or `Preinitialized`.
-	// unsafe fn forced_undefined_initial_layout(
-	// 	self, preinitialized: bool
-	// ) -> ImageAccessFromUndefinedLayout<Self>
-	// where
-	// 	Self: Sized
-	// {
-	// 	ImageAccessFromUndefinedLayout { image: self, preinitialized }
-	// }
+
+	/// Returns a key that uniquely identifies the memory content of the image.
+	/// Two ranges that potentially overlap in memory must return the same key.
+	///
+	/// The key is shared amongst all buffers and images, which means that you can make several
+	/// different image objects share the same memory, or make some image objects share memory
+	/// with buffers, as long as they return the same key.
+	///
+	/// Since it is possible to accidentally return the same key for memory ranges that don't
+	/// overlap, the `conflicts_image` or `conflicts_buffer` function should always be called to
+	/// verify whether they actually overlap.
+	fn conflict_key(&self) -> u64 { self.inner().key() }
 
 	/// Returns true if an access to `self` potentially overlaps the same memory as an
 	/// access to `other`.
@@ -100,20 +102,11 @@ pub unsafe trait ImageAccess {
 		other_subresource_range: ImageSubresourceRange
 	) -> bool;
 
-	/// Returns a key that uniquely identifies the memory content of the image.
-	/// Two ranges that potentially overlap in memory must return the same key.
-	///
-	/// The key is shared amongst all buffers and images, which means that you can make several
-	/// different image objects share the same memory, or make some image objects share memory
-	/// with buffers, as long as they return the same key.
-	///
-	/// Since it is possible to accidentally return the same key for memory ranges that don't
-	/// overlap, the `conflicts_image` or `conflicts_buffer` function should always be called to
-	/// verify whether they actually overlap.
-	fn conflict_key(&self) -> u64;
 
-
-	/// Returns the current layout for given subresource range if the whole range has the same layout.
+	/// A proxy method for the internal `ImageResourceLocker::current_layout` implementation.
+	///
+	/// The implementation isn't required to use `ImageResourceLocker` implementation to handle
+	/// locking and unlocking, however this is recommended and used throughout vulkano.
 	fn current_layout(
 		&self, subresource_range: ImageSubresourceRange
 	) -> Result<ImageLayout, ImageSubresourceLayoutError>;
@@ -138,12 +131,12 @@ pub unsafe trait ImageAccess {
 	/// The implementation isn't required to use `ImageResourceLocker` implementation to handle
 	/// locking and unlocking, however this is recommended and used throughout vulkano.
 	unsafe fn decrease_gpu_lock(
-		&self, subresource_range: ImageSubresourceRange, transitioned_layout: Option<ImageLayout>
+		&self, subresource_range: ImageSubresourceRange, new_layout: Option<ImageLayoutEnd>
 	);
 }
 unsafe impl<T> ImageAccess for T
 where
-	T: SafeDeref,
+	T: std::fmt::Debug + SafeDeref,
 	T::Target: ImageAccess
 {
 	fn inner(&self) -> &UnsafeImage { (**self).inner() }
@@ -177,7 +170,8 @@ where
 	}
 
 	unsafe fn decrease_gpu_lock(
-		&self, subresource_range: ImageSubresourceRange, transitioned_layout: Option<ImageLayout>
+		&self, subresource_range: ImageSubresourceRange,
+		transitioned_layout: Option<ImageLayoutEnd>
 	) {
 		(**self).decrease_gpu_lock(subresource_range, transitioned_layout)
 	}

@@ -5,7 +5,7 @@ use std::{
 
 use super::ImageResourceLocker;
 use crate::{
-	image::{ImageLayout, ImageSubresourceRange},
+	image::{ImageLayout, ImageLayoutEnd, ImageSubresourceLayoutError, ImageSubresourceRange},
 	sync::AccessError
 };
 
@@ -28,7 +28,6 @@ type AtomicU32 = std::sync::atomic::AtomicUsize;
 /// The whole image must always be in the same layout.
 #[derive(Debug)]
 pub struct SimpleImageResourceLocker {
-	implicit_layout: ImageLayout,
 	array_layers: NonZeroU32,
 	mipmap_levels: NonZeroU32,
 
@@ -53,7 +52,6 @@ unsafe impl ImageResourceLocker for SimpleImageResourceLocker {
 		let current_layout = AtomicU32::new(implicit_layout as u32 as usize);
 
 		SimpleImageResourceLocker {
-			implicit_layout,
 			array_layers,
 			mipmap_levels,
 
@@ -62,9 +60,34 @@ unsafe impl ImageResourceLocker for SimpleImageResourceLocker {
 		}
 	}
 
-	fn initiate_gpu_lock(
-		&self, _: ImageSubresourceRange, exclusive: bool, expected_layout: ImageLayout
-	) -> Result<(), AccessError> {
+	fn try_from_locker(
+		other: impl ImageResourceLocker, array_layers: NonZeroU32, mipmap_levels: NonZeroU32
+	) -> Result<Self, ImageSubresourceLayoutError>
+	where
+		Self: Sized
+	{
+		let other_layout = other.current_layout(ImageSubresourceRange {
+			array_layers,
+			array_layers_offset: 0,
+
+			mipmap_levels,
+			mipmap_levels_offset: 0
+		})?;
+
+		let current_layout = AtomicU32::new(other_layout as u32 as usize);
+
+		Ok(SimpleImageResourceLocker {
+			array_layers,
+			mipmap_levels,
+
+			lock: AtomicIsize::new(0),
+			current_layout
+		})
+	}
+
+	fn current_layout(
+		&self, _: ImageSubresourceRange
+	) -> Result<ImageLayout, ImageSubresourceLayoutError> {
 		let current_layout = {
 			// TODO: AtomicU32 stable pls
 			let current_num = self.current_layout.load(Ordering::Acquire) as u32;
@@ -72,6 +95,13 @@ unsafe impl ImageResourceLocker for SimpleImageResourceLocker {
 			// We never store anything else but `ImageLayout as u32` in the atomic.
 			unsafe { std::mem::transmute(current_num) }
 		};
+		Ok(current_layout)
+	}
+
+	fn initiate_gpu_lock(
+		&self, range: ImageSubresourceRange, exclusive: bool, expected_layout: ImageLayout
+	) -> Result<(), AccessError> {
+		let current_layout = self.current_layout(range).unwrap();
 		if expected_layout != ImageLayout::Undefined && current_layout != expected_layout {
 			return Err(AccessError::ImageLayoutMismatch {
 				requested: expected_layout,
@@ -123,7 +153,7 @@ unsafe impl ImageResourceLocker for SimpleImageResourceLocker {
 	}
 
 	unsafe fn decrease_gpu_lock(
-		&self, range: ImageSubresourceRange, new_layout: Option<ImageLayout>
+		&self, range: ImageSubresourceRange, new_layout: Option<ImageLayoutEnd>
 	) {
 		// TODO: Could this ordering be a less strict one (like Acquire)?
 		let mut lock_value = self.lock.load(Ordering::SeqCst);
@@ -145,7 +175,8 @@ unsafe impl ImageResourceLocker for SimpleImageResourceLocker {
 				}
 
 				// TODO: AtomicU32 stable pls
-				self.current_layout.store(new_layout as u32 as usize, Ordering::Release);
+				self.current_layout
+					.store(ImageLayout::from(new_layout) as u32 as usize, Ordering::Release);
 			}
 
 			let wanted_lock_value = if lock_value < 0 { lock_value + 1 } else { lock_value - 1 };

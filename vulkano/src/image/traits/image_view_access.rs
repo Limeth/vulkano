@@ -10,12 +10,13 @@ use crate::{
 		PossibleUintFormatDesc
 	},
 	image::{
+		layout::{ImageLayout, ImageLayoutEnd},
 		sys::UnsafeImageView,
 		ImageDimensions,
-		ImageLayout,
 		ImageSubresourceLayoutError,
 		ImageSubresourceRange,
-		ImageUsage
+		ImageUsage,
+		RequiredLayouts
 	},
 	sampler::Sampler,
 	sync::AccessError,
@@ -25,7 +26,24 @@ use crate::{
 use super::ImageAccess;
 
 /// Trait for types that represent the GPU can access an image view.
-pub unsafe trait ImageViewAccess {
+///
+/// Image views are the way to work with images in Vulkan and Vulkano, you need
+/// one to perform any operation on images.
+///
+/// The power of image views comes from the fact that they can be created for
+/// subresource ranges. That is, they can be created for certain ranges of array layers
+/// and mipmap levels. For example, having a cubemap, you could create a view for each face
+/// and then bind those views as framebuffer attachments, rendering to them or reading from
+/// them as if they were separate textures (because they basically are).
+///
+/// There is one promiment problem that can arise, however. How do we synchronize accesses
+/// of these views. Each subresource range can have a different layout. That means that if
+/// you create overlapping views you could run into a case where your view is no longer in one
+/// layout but in multiple different ones. If this happens, the `current_layout` function will
+/// return an error. If you pass such view into a command buffer, you will get an error.
+///
+/// For more info on how Vulkano keeps track of layouts, see documentation of the crate::image::sync module.
+pub unsafe trait ImageViewAccess: std::fmt::Debug {
 	/// Returns a dynamic reference to the parent image.
 	fn parent(&self) -> &dyn ImageAccess;
 	/// Returns the inner unsafe image view object used by this image view.
@@ -54,7 +72,7 @@ pub unsafe trait ImageViewAccess {
 	}
 
 	/// Returns the dimensions of the image view.
-	fn dimensions(&self) -> ImageDimensions;
+	fn dimensions(&self) -> ImageDimensions { self.inner().dimensions() }
 	/// Returns the subresource range for this view.
 	fn subresource_range(&self) -> ImageSubresourceRange { self.inner().subresource_range() }
 
@@ -62,7 +80,7 @@ pub unsafe trait ImageViewAccess {
 	///
 	/// Must be true when the view is used as a framebuffer attachment or TODO: I don't remember
 	/// the other thing.
-	fn identity_swizzle(&self) -> bool { self.inner().swizzle().identity() }
+	fn identity_swizzle(&self) -> bool { self.inner().swizzle().is_identity() }
 
 	/// Returns true if the given sampler can be used with this image view.
 	///
@@ -81,7 +99,9 @@ pub unsafe trait ImageViewAccess {
 	///
 	/// Note that the function must be transitive. In other words if `conflicts(a, b)` is true and
 	/// `conflicts(b, c)` is true, then `conflicts(a, c)` must be true as well.
-	fn conflicts_buffer(&self, other: &dyn BufferAccess) -> bool;
+	fn conflicts_buffer(&self, other: &dyn BufferAccess) -> bool {
+		false // TODO
+	}
 
 	/// Returns true if an access to `self` potentially overlaps the same memory as an
 	/// access to `other`.
@@ -112,37 +132,24 @@ pub unsafe trait ImageViewAccess {
 	unsafe fn increase_gpu_lock(&self) { self.parent().increase_gpu_lock(self.subresource_range()) }
 
 	/// Equivalent to `self.parent().decrease_gpu_lock(self.subresource_range(), transitioned_layout)`.
-	unsafe fn decrease_gpu_lock(&self, transitioned_layout: Option<ImageLayout>) {
+	unsafe fn decrease_gpu_lock(&self, transitioned_layout: Option<ImageLayoutEnd>) {
 		self.parent().decrease_gpu_lock(self.subresource_range(), transitioned_layout)
 	}
 
 	/// Reports the current layout of the view.
 	///
 	/// If this value is incorrect, bad things can happen.
-	fn current_layout(&self) -> Result<ImageLayout, ImageSubresourceLayoutError>;
+	fn current_layout(&self) -> Result<ImageLayout, ImageSubresourceLayoutError> {
+		self.parent().current_layout(self.subresource_range())
+	}
 
-	/// Reports to vulkano which layout the view wants to be at the end of an auto command buffer.
-	///
-	/// Returning `ImageLayout::Undefined` means the view doesn't have a requirement.
-	fn required_layout(&self) -> ImageLayout;
-
-	/// Reports to vulkano which layout the view wants to be when used as a storage image
-	/// in descriptor set.
-	fn required_layout_descriptor_storage(&self) -> ImageLayout;
-	/// Reports to vulkano which layout the view wants to be when used as a sampled image
-	/// in descriptor set.
-	fn required_layout_descriptor_sampled(&self) -> ImageLayout;
-	/// Reports to vulkano which layout the view wants to be when used as a combined
-	/// image and sampler in descriptor set.
-	fn required_layout_descriptor_combined(&self) -> ImageLayout;
-	/// Reports to vulkano which layout the view wants to be when used as an input
-	/// attachment in descriptor set.
-	fn required_layout_descriptor_input_attachment(&self) -> ImageLayout;
+	/// Getter for required layouts.
+	fn required_layouts(&self) -> &RequiredLayouts;
 }
 
 unsafe impl<T> ImageViewAccess for T
 where
-	T: SafeDeref,
+	T: std::fmt::Debug + SafeDeref,
 	T::Target: ImageViewAccess
 {
 	fn parent(&self) -> &dyn ImageAccess { (**self).parent() }
@@ -171,21 +178,5 @@ where
 		(**self).current_layout()
 	}
 
-	fn required_layout(&self) -> ImageLayout { (**self).required_layout() }
-
-	fn required_layout_descriptor_storage(&self) -> ImageLayout {
-		(**self).required_layout_descriptor_storage()
-	}
-
-	fn required_layout_descriptor_sampled(&self) -> ImageLayout {
-		(**self).required_layout_descriptor_sampled()
-	}
-
-	fn required_layout_descriptor_combined(&self) -> ImageLayout {
-		(**self).required_layout_descriptor_combined()
-	}
-
-	fn required_layout_descriptor_input_attachment(&self) -> ImageLayout {
-		(**self).required_layout_descriptor_input_attachment()
-	}
+	fn required_layouts(&self) -> &RequiredLayouts { (**self).required_layouts() }
 }
