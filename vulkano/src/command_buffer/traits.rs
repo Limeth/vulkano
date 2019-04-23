@@ -318,10 +318,11 @@ where
 impl<F: GpuFuture, Cb: CommandBuffer> fmt::Debug for CommandBufferExecFuture<F, Cb> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		// TODO: CommandBuffer debug
+		// TODO: Stack overflow if the previous chain is longish
 		write!(f,
-			"CommandBufferExecFuture {{ previous: {:?}, command_buffer: CommandBuffer, queue: {:?}, \
+			"CommandBufferExecFuture {{ previous: <GpuFuture>, command_buffer: CommandBuffer, queue: {:?}, \
 			submitted: {:?}, finished: {:?} }}",
-			self.previous, self.queue, self.submitted, self.finished
+			self.queue, self.submitted, self.finished
 		)
 	}
 }

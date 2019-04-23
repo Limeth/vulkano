@@ -207,6 +207,7 @@ where
 	) -> Result<Option<(PipelineStages, AccessFlagBits)>, AccessCheckError> {
 		let first = self.first.check_image_access(image, layout, exclusive, queue);
 		let second = self.second.check_image_access(image, layout, exclusive, queue);
+
 		debug_assert!(
 			!exclusive || !(first.is_ok() && second.is_ok()),
 			"Two futures gave exclusive access to the same resource"

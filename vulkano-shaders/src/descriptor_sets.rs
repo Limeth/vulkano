@@ -199,7 +199,7 @@ fn descriptor_infos(
 				let is_ssbo = decoration_buffer_block && !decoration_block;
 
 				// Determine whether there's a NonWritable decoration.
-				//let non_writable = false;       // TODO: tricky because the decoration is on struct members
+				//let non_writable = false; // TODO: tricky because the decoration is on struct members
 
 				let desc = quote!{
 					DescriptorDescTy::Buffer(DescriptorBufferDesc {
@@ -259,10 +259,10 @@ fn descriptor_infos(
 							false => quote!{ DescriptorDescTy::Image }
 						};
 						let dim = match *dim {
-							Dim::Dim1D => quote!{ ImageDimensionsType::OneDimensional },
-							Dim::Dim2D => quote!{ ImageDimensionsType::TwoDimensional },
-							Dim::Dim3D => quote!{ ImageDimensionsType::ThreeDimensional },
+							Dim::Dim1D => quote!{ ImageDimensionsType::D1 },
+							Dim::Dim2D => quote!{ ImageDimensionsType::D2 },
 							Dim::DimCube => quote!{ ImageDimensionsType::Cube },
+							Dim::Dim3D => quote!{ ImageDimensionsType::D3 },
 							Dim::DimRect => panic!("Vulkan doesn't support rectangle textures"),
 							_ => unreachable!()
 						};
@@ -270,8 +270,8 @@ fn descriptor_infos(
 						let desc = quote!{
 							#ty(DescriptorImageDesc {
 								sampled: #sampled,
-								dimensions: #dim,
-								format: None,       // TODO: specify format if known
+								dimensions_type: #dim,
+								format: None, // TODO: specify format if known
 								multisampled: #ms,
 								array_layers: #arrayed,
 							})
