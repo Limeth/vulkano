@@ -7,15 +7,24 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
+use std::{error, fmt};
+
 use vk_sys as vk;
 
-use super::ImageSubresourceRange;
+use crate::image::ImageUsage;
+
+pub mod matrix;
+pub mod typesafety;
+
+pub use matrix::{
+	ImageLayoutMatrix,
+	ImageLayoutMatrixEntry,
+	ImageLayoutMatrixIter,
+	ImageLayoutMatrixIterMut
+};
+pub use typesafety::*;
 
 /// Layout of an image.
-///
-/// > **Note**: In vulkano, image layouts are mostly a low-level detail. You can ignore them,
-/// > unless you use an unsafe function that states in its documentation that you must take care of
-/// > an image's layout.
 ///
 /// In the Vulkan API, each mipmap level of each array layer is in one of the layouts of this enum.
 ///
@@ -32,234 +41,130 @@ use super::ImageSubresourceRange;
 #[repr(u32)]
 pub enum ImageLayout {
 	Undefined = vk::IMAGE_LAYOUT_UNDEFINED,
+
 	General = vk::IMAGE_LAYOUT_GENERAL,
+
 	ColorAttachmentOptimal = vk::IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	DepthStencilAttachmentOptimal = vk::IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 	DepthStencilReadOnlyOptimal = vk::IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
 	ShaderReadOnlyOptimal = vk::IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+
 	TransferSrcOptimal = vk::IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 	TransferDstOptimal = vk::IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+
 	Preinitialized = vk::IMAGE_LAYOUT_PREINITIALIZED,
-	PresentSrc = vk::IMAGE_LAYOUT_PRESENT_SRC_KHR
+
+	PresentSrc = vk::IMAGE_LAYOUT_PRESENT_SRC_KHR,
+
+	DepthReadOnlyStencilAttachmentOptimal =
+		vk::IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL,
+	DepthAttachmentStencilReadOnlyOptimal =
+		vk::IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL /* SharedPresent = vk::IMAGE_LAYOUT_SHARED_PRESENT_KHR? What is this? What is it good for? */
+}
+impl ImageLayout {
+	/// Returns Ok(()) if layout is valid for given usage.
+	pub fn valid_for_usage(&self, usage: ImageUsage) -> Result<(), InvalidLayoutUsageError> {
+		let result = match self {
+			ImageLayout::Undefined => true,
+			ImageLayout::General => true,
+
+			ImageLayout::ColorAttachmentOptimal => usage.color_attachment,
+			ImageLayout::DepthStencilAttachmentOptimal => usage.depth_stencil_attachment,
+			ImageLayout::DepthStencilReadOnlyOptimal => usage.depth_stencil_attachment,
+			ImageLayout::ShaderReadOnlyOptimal => usage.sampled || usage.input_attachment,
+
+			ImageLayout::TransferSrcOptimal => usage.transfer_source,
+			ImageLayout::TransferDstOptimal => usage.transfer_destination,
+
+			ImageLayout::Preinitialized => true,
+
+			ImageLayout::PresentSrc => true,
+
+			ImageLayout::DepthReadOnlyStencilAttachmentOptimal => usage.depth_stencil_attachment,
+			ImageLayout::DepthAttachmentStencilReadOnlyOptimal => usage.depth_stencil_attachment
+		};
+
+		if result {
+			Ok(())
+		} else {
+			Err(InvalidLayoutUsageError { layout: *self, usage })
+		}
+	}
 }
 
-/// Struct that stores information about image layouts for individual mipmap levels and array layers.
-///
-/// An image with A array layers and M mipmap levels can be represented as AxM matrix.
-/// This struct uses such matrix to remember which subresource has what layout.
-///
-/// The type D allows storing arbitrary user data in each field of the matrix.
-/// This is used in ImageResourceLocker implementations.
+/// Describes how the view behaves in respect to requesting layouts.
+#[derive(Debug, Default)]
+pub struct RequiredLayouts {
+	/// The layout required at the end of a command buffer.
+	///
+	/// Is `None`, the view won't request a specific layout at the end of the
+	/// auto command buffer.
+	pub global: Option<ImageLayoutEnd>,
+
+	/// Layout in descriptor sets as storage image.
+	///
+	/// None means that this view cannot be used in such descriptors.
+	pub storage: Option<ImageLayoutStorageImage>,
+	/// Layout in descriptor sets as sampled image.
+	///
+	/// None means that this view cannot be used in such descriptors.
+	pub sampled: Option<ImageLayoutSampledImage>,
+	/// Layout in descriptor sets as combined image and sampler.
+	///
+	/// None means that this view cannot be used in such descriptors.
+	pub combined: Option<ImageLayoutCombinedImage>,
+	/// Layout in descriptor sets as input attachment.
+	///
+	/// None means that this view cannot be used in such descriptors.
+	/// TODO: currently is ignored in descriptor set logic
+	pub input_attachment: Option<ImageLayoutInputAttachment>
+}
+impl RequiredLayouts {
+	/// Same as default but const.
+	pub const fn none() -> Self {
+		RequiredLayouts {
+			global: None,
+
+			storage: None,
+			sampled: None,
+			combined: None,
+			input_attachment: None
+		}
+	}
+
+	/// Calls `valid_for_usage` on each field.
+	pub fn valid_for_usage(&self, usage: ImageUsage) -> Result<(), InvalidLayoutUsageError> {
+		if let Some(layout) = self.global {
+			layout.valid_for_usage(usage)?;
+		}
+		if let Some(layout) = self.storage {
+			layout.valid_for_usage(usage)?;
+		}
+		if let Some(layout) = self.sampled {
+			layout.valid_for_usage(usage)?;
+		}
+		if let Some(layout) = self.combined {
+			layout.valid_for_usage(usage)?;
+		}
+		if let Some(layout) = self.input_attachment {
+			layout.valid_for_usage(usage)?;
+		}
+
+		Ok(())
+	}
+}
+
+/// The layout is invalid with this usage.
 #[derive(Debug)]
-pub struct ImageLayoutMatrix<D = ()> {
-	matrix: Vec<ImageLayoutMatrixEntry<D>>,
-
-	width: u32
-}
-impl ImageLayoutMatrix<()> {
-	/// Creates a new layout matrix with `D = ()`.
-	pub fn new(width: u32, height: u32, layout: ImageLayout) -> Self {
-		let matrix =
-			vec![ImageLayoutMatrixEntry { layout, data: () }; width as usize * height as usize];
-
-		ImageLayoutMatrix { matrix, width }
-	}
-}
-impl<D> ImageLayoutMatrix<D> {
-	/// Creates a new layout matrix with custom data. Returns Err if `data.len() % width != 0`.
-	pub fn new_data<I>(width: u32, layout: ImageLayout, data: I) -> Result<Self, ()>
-	where
-		I: ExactSizeIterator<Item = D>
-	{
-		if data.len() % width as usize != 0 {
-			return Err(())
-		}
-
-		let matrix = data.map(|d| ImageLayoutMatrixEntry { layout, data: d }).collect();
-
-		Ok(ImageLayoutMatrix { matrix, width })
-	}
-
-	/// Creates a new layout matrix with custom layouts and custom data.
-	/// Returns Err if `layouts_data.len() % width != 0`.
-	pub fn new_layouts_data<I>(width: u32, layouts_data: I) -> Result<Self, ()>
-	where
-		I: ExactSizeIterator<Item = (ImageLayout, D)>
-	{
-		if layouts_data.len() % width as usize != 0 {
-			return Err(())
-		}
-
-		let matrix =
-			layouts_data.map(|(l, d)| ImageLayoutMatrixEntry { layout: l, data: d }).collect();
-
-		Ok(ImageLayoutMatrix { matrix, width })
-	}
-
-	pub fn height(&self) -> u32 { self.matrix.len() as u32 / self.width }
-
-	/// Panics if range is out of bounds.
-	pub fn iter_subresource_range(&self, range: ImageSubresourceRange) -> ImageLayoutMatrixIter<D> {
-		if range.array_layers_offset >= self.width || range.mipmap_levels_offset >= self.height() {
-			panic!(
-				"Subresource range {:?} out of bounds of layout matrix {}x{}",
-				range,
-				self.width,
-				self.height()
-			)
-		}
-
-		ImageLayoutMatrixIter::new(&self.matrix, self.width as usize, range)
-	}
-
-	/// Panics if range is out of bounds.
-	pub fn iter_subresource_range_mut(
-		&mut self, range: ImageSubresourceRange
-	) -> ImageLayoutMatrixIterMut<D> {
-		if range.array_layers_offset >= self.width || range.mipmap_levels_offset >= self.height() {
-			panic!(
-				"Subresource range {:?} out of bounds of layout matrix {}x{}",
-				range,
-				self.width,
-				self.height()
-			)
-		}
-
-		ImageLayoutMatrixIterMut::new(&mut self.matrix, self.width as usize, range)
-	}
-}
-
-// Implements iterator and mut iterator for layout matrix.
-//
-// Macros can't expand to multiple items, so we have to call the macro
-// three times for each iterator.
-// Also can't expand to incomplete items, so the @inner_return parts
-// are a little hacky.
-macro_rules! iterator_impl_macro {
-	(@strct $vi: vis $name: ident $($ref_type: ident)?) => {
-		#[derive(Debug)]
-		$vi struct $name<'a, D> {
-			matrix: &'a $( $ref_type )? Vec<ImageLayoutMatrixEntry<D>>,
-			base_offset: usize,
-			matrix_width: usize,
-
-			width: usize,
-			height: usize,
-			current: usize
-		}
-	};
-	(@strct_impl $vi: vis $name: ident $($ref_type: ident)?) => {
-		impl<'a, D> $name<'a, D> {
-			$vi fn new(
-				matrix: &'a $( $ref_type )? Vec<ImageLayoutMatrixEntry<D>>,
-				matrix_width: usize,
-				range: ImageSubresourceRange
-			) -> Self {
-				$name {
-					matrix,
-					base_offset: range.array_layers_offset as usize
-						+ range.mipmap_levels_offset as usize * matrix_width,
-					matrix_width,
-
-					width: range.array_layers.get() as usize,
-					height: range.mipmap_levels.get() as usize,
-
-					current: 0
-				}
-			}
-		}
-	};
-	(@iterator $name: ident $($ref_type: ident)?) => {
-		impl<'a, D> Iterator for $name<'a, D> {
-			type Item = &'a $( $ref_type )? ImageLayoutMatrixEntry<D>;
-
-			fn next(&mut self) -> Option<Self::Item> {
-				let x_current = self.current % self.width;
-				let y_current = self.current / self.width;
-				if y_current >= self.height {
-					None
-				} else {
-					let current_index = self.base_offset + y_current * self.matrix_width + x_current;
-					self.current += 1;
-
-					iterator_impl_macro!(@inner_return self.matrix[current_index], $( $ref_type )?)
-				}
-			}
-
-			fn size_hint(&self) -> (usize, Option<usize>) {
-				let remaining = self.width * self.height - self.current;
-				(remaining, Some(remaining))
-			}
-		}
-	};
-	(@exactsizeiterator $name: ident $($ref_type: ident)?) => {
-		impl<'a, D> ExactSizeIterator for $name<'a, D> {
-			fn len(&self) -> usize {
-				self.width * self.height - self.current
-			}
-		}
-	};
-
-	(@inner_return $self_matrix_current_index: expr,) => {
-		Some(&$self_matrix_current_index)
-	};
-	(@inner_return $self_matrix_current_index: expr, $ref_type: ident) => {
-		unsafe {
-			let pointer = (&mut $self_matrix_current_index) as *mut _;
-			let unbounded_reference = &mut *pointer;
-
-			Some(unbounded_reference)
-		}
-	};
-}
-iterator_impl_macro!(@strct pub ImageLayoutMatrixIter);
-iterator_impl_macro!(@strct_impl ImageLayoutMatrixIter);
-iterator_impl_macro!(@iterator ImageLayoutMatrixIter);
-iterator_impl_macro!(@exactsizeiterator ImageLayoutMatrixIter);
-
-iterator_impl_macro!(@strct pub ImageLayoutMatrixIterMut mut);
-iterator_impl_macro!(@strct_impl ImageLayoutMatrixIterMut mut);
-iterator_impl_macro!(@iterator ImageLayoutMatrixIterMut mut);
-iterator_impl_macro!(@exactsizeiterator ImageLayoutMatrixIterMut mut);
-
-
-/// One field of the ImageLayoutMatrix.
-#[derive(Debug)]
-pub struct ImageLayoutMatrixEntry<D> {
-	/// The layout of this field.
+pub struct InvalidLayoutUsageError {
 	pub layout: ImageLayout,
-	/// The user data.
-	pub data: D
+	pub usage: ImageUsage
 }
-impl<D: Clone> Clone for ImageLayoutMatrixEntry<D> {
-	fn clone(&self) -> Self {
-		ImageLayoutMatrixEntry { layout: self.layout, data: self.data.clone() }
+impl fmt::Display for InvalidLayoutUsageError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "The layout {:?} is invalid with usage {:?}", self.layout, self.usage)
 	}
 }
-impl<D: Copy + Clone> Copy for ImageLayoutMatrixEntry<D> {}
-
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-	use std::num::NonZeroU32;
-
-	#[test]
-	fn test_image_layout_matrix() {
-		let mut matrix =
-			ImageLayoutMatrix::new_data(4, ImageLayout::Undefined, (0 .. 16).into_iter()).unwrap();
-
-		let mut iter = matrix.iter_subresource_range_mut(ImageSubresourceRange {
-			array_layers: crate::NONZERO_ONE,
-			array_layers_offset: 1,
-
-			mipmap_levels: crate::NONZERO_ONE,
-			mipmap_levels_offset: 1
-		});
-
-		assert_eq!(iter.len(), 2);
-		assert_eq!(iter.next().unwrap().data, 5);
-		assert_eq!(iter.next().unwrap().data, 9);
-		assert!(iter.next().is_none());
-	}
+impl error::Error for InvalidLayoutUsageError {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> { None }
 }

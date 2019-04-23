@@ -2,7 +2,7 @@ use std::{cmp, num::NonZeroU32, ops::Range};
 
 use vk_sys as vk;
 
-use crate::instance::Limits;
+use crate::{image::ImageAccess, instance::Limits};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ImageDimensions {
@@ -239,8 +239,8 @@ impl ImageDimensions {
 	pub fn is_array(&self) -> bool { ImageViewType::from(*self).is_array() }
 
 	/// Returns the number of dimensions these dimensions have.
-	pub fn dimension_type(&self) -> ImageDimensionType {
-		ImageViewType::from(*self).dimension_type()
+	pub fn dimensions_type(&self) -> ImageDimensionsType {
+		ImageViewType::from(*self).dimensions_type()
 	}
 
 	/// Returns true if these dimensions are not over
@@ -384,41 +384,41 @@ impl ImageViewType {
 		}
 	}
 
-	/// Returns the ImageDimensionType this type has.
-	pub fn dimension_type(&self) -> ImageDimensionType { ImageDimensionType::from(*self) }
+	/// Returns the ImageDimensionsType this type has.
+	pub fn dimensions_type(&self) -> ImageDimensionsType { ImageDimensionsType::from(*self) }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ImageDimensionType {
+pub enum ImageDimensionsType {
 	D1,
 	D2,
 	Cube,
 	D3
 }
-impl ImageDimensionType {
+impl ImageDimensionsType {
 	/// Returns the number of dimensions.
 	pub fn number(&self) -> u32 {
 		match self {
-			ImageDimensionType::D1 => 1,
-			ImageDimensionType::D2 | ImageDimensionType::Cube => 2,
-			ImageDimensionType::D3 => 3
+			ImageDimensionsType::D1 => 1,
+			ImageDimensionsType::D2 | ImageDimensionsType::Cube => 2,
+			ImageDimensionsType::D3 => 3
 		}
 	}
 }
-impl From<ImageViewType> for ImageDimensionType {
+impl From<ImageViewType> for ImageDimensionsType {
 	fn from(view_type: ImageViewType) -> Self {
 		match view_type {
-			ImageViewType::Dim1D | ImageViewType::Dim1DArray => ImageDimensionType::D1,
-			ImageViewType::Dim2D | ImageViewType::Dim2DArray => ImageDimensionType::D2,
-			ImageViewType::Cubemap | ImageViewType::CubemapArray => ImageDimensionType::Cube,
-			ImageViewType::Dim3D => ImageDimensionType::D3
+			ImageViewType::Dim1D | ImageViewType::Dim1DArray => ImageDimensionsType::D1,
+			ImageViewType::Dim2D | ImageViewType::Dim2DArray => ImageDimensionsType::D2,
+			ImageViewType::Cubemap | ImageViewType::CubemapArray => ImageDimensionsType::Cube,
+			ImageViewType::Dim3D => ImageDimensionsType::D3
 		}
 	}
 }
-impl From<ImageDimensions> for ImageDimensionType {
-	fn from(dims: ImageDimensions) -> Self { ImageDimensionType::from(ImageViewType::from(dims)) }
+impl From<ImageDimensions> for ImageDimensionsType {
+	fn from(dims: ImageDimensions) -> Self { ImageDimensionsType::from(ImageViewType::from(dims)) }
 }
-impl Into<u32> for ImageDimensionType {
+impl Into<u32> for ImageDimensionsType {
 	fn into(self) -> u32 { self.number() }
 }
 
@@ -438,6 +438,16 @@ pub struct ImageSubresourceRange {
 	pub mipmap_levels_offset: u32
 }
 impl ImageSubresourceRange {
+	pub fn whole_image(image: &impl ImageAccess) -> Self {
+		ImageSubresourceRange {
+			array_layers: image.dimensions().array_layers(),
+			array_layers_offset: 0,
+
+			mipmap_levels: image.mipmap_levels(),
+			mipmap_levels_offset: 0
+		}
+	}
+
 	pub fn array_layers_end(&self) -> NonZeroU32 {
 		unsafe {
 			// Safe because NonZeroU32 + anything non-negative > 0

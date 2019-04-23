@@ -190,7 +190,7 @@ impl<P> SyncCommandBuffer<P> {
 				KeyTy::Image => {
 					let cmd = &commands_lock[command_id];
 					let img = cmd.image(resource_index);
-					let trans = if val.final_layout != val.initial_layout {
+					let trans = if ImageLayout::from(val.final_layout) != val.initial_layout {
 						Some(val.final_layout)
 					} else {
 						None
@@ -229,9 +229,9 @@ impl<P> SyncCommandBuffer<P> {
 		// TODO: check the queue family
 
 		if let Some(value) = self.resources.get(&CbKey::ImageRef(image)) {
-			if layout != ImageLayout::Undefined && value.final_layout != layout {
+			if layout != ImageLayout::Undefined && ImageLayout::from(value.final_layout) != layout {
 				return Err(AccessCheckError::Denied(AccessError::ImageLayoutMismatch {
-					actual: value.final_layout,
+					actual: value.final_layout.into(),
 					requested: layout
 				}))
 			}

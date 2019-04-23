@@ -69,7 +69,7 @@ macro_rules! descriptors_count {
 
         impl DescriptorsCount {
             /// Returns a `DescriptorsCount` object with all fields set to 0.
-                        pub fn zero() -> DescriptorsCount {
+			pub fn zero() -> DescriptorsCount {
                 DescriptorsCount {
                     $(
                         $name: 0,
@@ -78,7 +78,7 @@ macro_rules! descriptors_count {
             }
 
             /// Adds one descriptor of the given type to the count.
-                        pub fn add_one(&mut self, ty: DescriptorType) {
+			pub fn add_one(&mut self, ty: DescriptorType) {
                 match ty {
                     DescriptorType::Sampler => self.sampler += 1,
                     DescriptorType::CombinedImageSampler => self.combined_image_sampler += 1,
@@ -96,7 +96,7 @@ macro_rules! descriptors_count {
         }
 
         impl cmp::PartialEq for DescriptorsCount {
-                        fn eq(&self, other: &DescriptorsCount) -> bool {
+			fn eq(&self, other: &DescriptorsCount) -> bool {
                 self.partial_cmp(other) == Some(cmp::Ordering::Equal)
             }
         }
@@ -129,7 +129,7 @@ macro_rules! descriptors_count {
         impl ops::Sub for DescriptorsCount {
             type Output = DescriptorsCount;
 
-                        fn sub(self, rhs: DescriptorsCount) -> DescriptorsCount {
+			fn sub(self, rhs: DescriptorsCount) -> DescriptorsCount {
                 DescriptorsCount {
                     $(
                         $name: self.$name - rhs.$name,
@@ -139,7 +139,7 @@ macro_rules! descriptors_count {
         }
 
         impl ops::SubAssign for DescriptorsCount {
-                        fn sub_assign(&mut self, rhs: DescriptorsCount) {
+			fn sub_assign(&mut self, rhs: DescriptorsCount) {
                 $(
                     self.$name -= rhs.$name;
                 )+
@@ -149,7 +149,7 @@ macro_rules! descriptors_count {
         impl ops::Add for DescriptorsCount {
             type Output = DescriptorsCount;
 
-                        fn add(self, rhs: DescriptorsCount) -> DescriptorsCount {
+			fn add(self, rhs: DescriptorsCount) -> DescriptorsCount {
                 DescriptorsCount {
                     $(
                         $name: self.$name + rhs.$name,
@@ -159,7 +159,7 @@ macro_rules! descriptors_count {
         }
 
         impl ops::AddAssign for DescriptorsCount {
-                        fn add_assign(&mut self, rhs: DescriptorsCount) {
+			fn add_assign(&mut self, rhs: DescriptorsCount) {
                 $(
                     self.$name += rhs.$name;
                 )+
@@ -169,7 +169,7 @@ macro_rules! descriptors_count {
         impl ops::Mul<u32> for DescriptorsCount {
             type Output = DescriptorsCount;
 
-                        fn mul(self, rhs: u32) -> DescriptorsCount {
+			fn mul(self, rhs: u32) -> DescriptorsCount {
                 DescriptorsCount {
                     $(
                         $name: self.$name * rhs,
@@ -179,7 +179,7 @@ macro_rules! descriptors_count {
         }
 
         impl ops::MulAssign<u32> for DescriptorsCount {
-                        fn mul_assign(&mut self, rhs: u32) {
+			fn mul_assign(&mut self, rhs: u32) {
                 $(
                     self.$name *= rhs;
                 )+
@@ -746,7 +746,10 @@ impl DescriptorWrite {
 			binding,
 			first_array_element: array_element,
 			inner: smallvec!({
-				let layout = image.required_layout_descriptor_storage() as u32;
+				let layout = image.required_layouts().storage.expect(&format!(
+					"This image view wasn't created to be used as a storage image: {:?}",
+					image
+				)) as u32;
 				DescriptorWriteInner::StorageImage(image.inner().internal_object(), layout)
 			})
 		}
@@ -768,7 +771,11 @@ impl DescriptorWrite {
 			binding,
 			first_array_element: array_element,
 			inner: smallvec!({
-				let layout = image.required_layout_descriptor_sampled() as u32;
+				let layout = image
+					.required_layouts()
+					.sampled
+					.expect(&format!("This image view wasn't created to be sampled from: {:?}", image))
+					as u32;
 				DescriptorWriteInner::SampledImage(image.inner().internal_object(), layout)
 			})
 		}
@@ -784,7 +791,10 @@ impl DescriptorWrite {
 			binding,
 			first_array_element: array_element,
 			inner: smallvec!({
-				let layout = image.required_layout_descriptor_combined() as u32;
+				let layout = image.required_layouts().combined.expect(&format!(
+					"This image view wasn't created to be used as a combined image sampler: {:?}",
+					image
+				)) as u32;
 				DescriptorWriteInner::CombinedImageSampler(
 					sampler.internal_object(),
 					image.inner().internal_object(),
@@ -944,7 +954,10 @@ impl DescriptorWrite {
 			binding,
 			first_array_element: array_element,
 			inner: smallvec!({
-				let layout = image.required_layout_descriptor_input_attachment() as u32;
+				let layout = image.required_layouts().input_attachment.expect(&format!(
+					"This image view wasn't created to be used as an input attachment: {:?}",
+					image
+				)) as u32;
 				DescriptorWriteInner::InputAttachment(image.inner().internal_object(), layout)
 			})
 		}

@@ -12,7 +12,7 @@ use std::{error, fmt};
 use crate::{
 	device::Device,
 	format::{FormatTy, PossibleCompressedFormatDesc},
-	image::{ImageDimensionType, ImageViewAccess},
+	image::{ImageDimensionsType, ImageViewAccess},
 	VulkanObject
 };
 
@@ -123,8 +123,8 @@ where
 		return Err(CheckCopyImageError::DestinationCoordinatesOutOfRange)
 	}
 
-	match source_dimensions.dimension_type() {
-		ImageDimensionType::D1 => {
+	match source_dimensions.dimensions_type() {
+		ImageDimensionsType::D1 => {
 			if source_offset[1] != 0 || extent[1] != 1 {
 				return Err(CheckCopyImageError::IncompatibleRangeForImageType)
 			}
@@ -132,16 +132,16 @@ where
 				return Err(CheckCopyImageError::IncompatibleRangeForImageType)
 			}
 		}
-		ImageDimensionType::D2 | ImageDimensionType::Cube => {
+		ImageDimensionsType::D2 | ImageDimensionsType::Cube => {
 			if source_offset[2] != 0 || extent[2] != 1 {
 				return Err(CheckCopyImageError::IncompatibleRangeForImageType)
 			}
 		}
-		ImageDimensionType::D3 => {}
+		ImageDimensionsType::D3 => {}
 	}
 
-	match destination_dimensions.dimension_type() {
-		ImageDimensionType::D1 => {
+	match destination_dimensions.dimensions_type() {
+		ImageDimensionsType::D1 => {
 			if destination_offset[1] != 0 || extent[1] != 1 {
 				return Err(CheckCopyImageError::IncompatibleRangeForImageType)
 			}
@@ -149,12 +149,12 @@ where
 				return Err(CheckCopyImageError::IncompatibleRangeForImageType)
 			}
 		}
-		ImageDimensionType::D2 | ImageDimensionType::Cube => {
+		ImageDimensionsType::D2 | ImageDimensionsType::Cube => {
 			if destination_offset[2] != 0 || extent[2] != 1 {
 				return Err(CheckCopyImageError::IncompatibleRangeForImageType)
 			}
 		}
-		ImageDimensionType::D3 => {}
+		ImageDimensionsType::D3 => {}
 	}
 
 	Ok(())

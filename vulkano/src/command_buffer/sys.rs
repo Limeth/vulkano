@@ -33,7 +33,10 @@ use crate::{
 		Subpass,
 		SubpassContents
 	},
-	image::{ImageLayout, ImageViewAccess},
+	image::{
+		layout::{ImageLayout, ImageLayoutEnd, ImageLayoutImageDst, ImageLayoutImageSrc},
+		ImageViewAccess
+	},
 	instance::QueueFamily,
 	pipeline::{
 		input_assembly::IndexType,
@@ -528,8 +531,8 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 	/// Does nothing if the list of regions is empty, as it would be a no-op and isn't a valid
 	/// usage of the command anyway.
 	pub unsafe fn copy_image<S, D, R>(
-		&mut self, source: &S, source_layout: ImageLayout, destination: &D,
-		destination_layout: ImageLayout, regions: R
+		&mut self, source: &S, source_layout: ImageLayoutImageSrc, destination: &D,
+		destination_layout: ImageLayoutImageDst, regions: R
 	) where
 		S: ?Sized + ImageViewAccess,
 		D: ?Sized + ImageViewAccess,
@@ -551,16 +554,8 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 
 		debug_assert_eq!(source.parent().samples(), destination.parent().samples());
 		debug_assert!(source.usage().transfer_source);
-		debug_assert!(
-			source_layout == ImageLayout::General
-				|| source_layout == ImageLayout::TransferSrcOptimal
-		);
 
 		debug_assert!(destination.usage().transfer_destination);
-		debug_assert!(
-			destination_layout == ImageLayout::General
-				|| destination_layout == ImageLayout::TransferDstOptimal
-		);
 
 		let regions: SmallVec<[_; 8]> = regions
 			.filter_map(|copy| {
@@ -641,8 +636,8 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 	/// Does nothing if the list of regions is empty, as it would be a no-op and isn't a valid
 	/// usage of the command anyway.
 	pub unsafe fn blit_image<S, D, R>(
-		&mut self, source: &S, source_layout: ImageLayout, destination: &D,
-		destination_layout: ImageLayout, regions: R, filter: Filter
+		&mut self, source: &S, source_layout: ImageLayoutImageSrc, destination: &D,
+		destination_layout: ImageLayoutImageDst, regions: R, filter: Filter
 	) where
 		S: ?Sized + ImageViewAccess,
 		D: ?Sized + ImageViewAccess,
@@ -665,18 +660,10 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 		debug_assert_eq!(source.parent().samples().get(), 1);
 		debug_assert!(source.parent().supports_blit_source());
 		debug_assert!(source.usage().transfer_source);
-		debug_assert!(
-			source_layout == ImageLayout::General
-				|| source_layout == ImageLayout::TransferSrcOptimal
-		);
 
 		debug_assert_eq!(destination.parent().samples().get(), 1);
 		debug_assert!(destination.parent().supports_blit_destination());
 		debug_assert!(destination.usage().transfer_destination);
-		debug_assert!(
-			destination_layout == ImageLayout::General
-				|| destination_layout == ImageLayout::TransferDstOptimal
-		);
 
 		let regions: SmallVec<[_; 8]> = regions
 			.filter_map(|blit| {
@@ -790,7 +777,7 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 	/// usage of the command anyway.
 	// TODO: ClearValue could be more precise
 	pub unsafe fn clear_color_image<I, R>(
-		&mut self, image: &I, layout: ImageLayout, color: ClearValue, regions: R
+		&mut self, image: &I, layout: ImageLayoutImageDst, color: ClearValue, regions: R
 	) where
 		I: ?Sized + ImageViewAccess,
 		R: Iterator<Item = UnsafeCommandBufferBuilderColorImageClear>
@@ -802,7 +789,6 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 		);
 
 		debug_assert!(image.usage().transfer_destination);
-		debug_assert!(layout == ImageLayout::General || layout == ImageLayout::TransferDstOptimal);
 
 		let color = match color {
 			ClearValue::Float(val) => vk::ClearColorValue { float32: val },
@@ -902,7 +888,7 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 	/// Does nothing if the list of regions is empty, as it would be a no-op and isn't a valid
 	/// usage of the command anyway.
 	pub unsafe fn copy_buffer_to_image<S, D, R>(
-		&mut self, source: &S, destination: &D, destination_layout: ImageLayout, regions: R
+		&mut self, source: &S, destination: &D, destination_layout: ImageLayoutImageDst, regions: R
 	) where
 		S: ?Sized + BufferAccess,
 		D: ?Sized + ImageViewAccess,
@@ -914,10 +900,6 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 
 		debug_assert_eq!(destination.parent().samples().get(), 1);
 		debug_assert!(destination.usage().transfer_destination);
-		debug_assert!(
-			destination_layout == ImageLayout::General
-				|| destination_layout == ImageLayout::TransferDstOptimal
-		);
 
 		let regions: SmallVec<[_; 8]> = regions
 			.map(|copy| {
@@ -975,7 +957,7 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 	/// Does nothing if the list of regions is empty, as it would be a no-op and isn't a valid
 	/// usage of the command anyway.
 	pub unsafe fn copy_image_to_buffer<S, D, R>(
-		&mut self, source: &S, source_layout: ImageLayout, destination: &D, regions: R
+		&mut self, source: &S, source_layout: ImageLayoutImageSrc, destination: &D, regions: R
 	) where
 		S: ?Sized + ImageViewAccess,
 		D: ?Sized + BufferAccess,
@@ -983,10 +965,6 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 	{
 		debug_assert_eq!(source.parent().samples().get(), 1);
 		debug_assert!(source.usage().transfer_source);
-		debug_assert!(
-			source_layout == ImageLayout::General
-				|| source_layout == ImageLayout::TransferSrcOptimal
-		);
 
 		let destination = destination.inner();
 		debug_assert!(destination.offset < destination.buffer.size());
@@ -1848,7 +1826,8 @@ impl UnsafeCommandBufferBuilderPipelineBarrier {
 	pub unsafe fn add_image_memory_barrier<I>(
 		&mut self, image_view: &I, source_stage: PipelineStages, source_access: AccessFlagBits,
 		destination_stage: PipelineStages, destination_access: AccessFlagBits, by_region: bool,
-		queue_transfer: Option<(u32, u32)>, current_layout: ImageLayout, new_layout: ImageLayout
+		queue_transfer: Option<(u32, u32)>, current_layout: ImageLayout,
+		new_layout: ImageLayoutEnd
 	) where
 		I: ?Sized + ImageViewAccess
 	{
@@ -1856,9 +1835,6 @@ impl UnsafeCommandBufferBuilderPipelineBarrier {
 		debug_assert!(destination_access.is_compatible_with(&destination_stage));
 
 		self.add_execution_dependency(source_stage, destination_stage, by_region);
-
-		debug_assert_ne!(new_layout, ImageLayout::Undefined);
-		debug_assert_ne!(new_layout, ImageLayout::Preinitialized);
 
 		let (src_queue, dest_queue) = if let Some((src_queue, dest_queue)) = queue_transfer {
 			(src_queue, dest_queue)

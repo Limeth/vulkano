@@ -12,7 +12,7 @@ use std::{error, fmt};
 use crate::{
 	device::Device,
 	format::FormatTy,
-	image::{ImageDimensionType, ImageViewAccess},
+	image::{ImageDimensionsType, ImageViewAccess},
 	sampler::Filter,
 	VulkanObject
 };
@@ -165,8 +165,8 @@ where
 		return Err(CheckBlitImageError::DestinationCoordinatesOutOfRange)
 	}
 
-	match source_dimensions.dimension_type() {
-		ImageDimensionType::D1 => {
+	match source_dimensions.dimensions_type() {
+		ImageDimensionsType::D1 => {
 			if source_top_left[1] != 0 || source_bottom_right[1] != 1 {
 				return Err(CheckBlitImageError::IncompatibleRangeForImageType)
 			}
@@ -174,16 +174,16 @@ where
 				return Err(CheckBlitImageError::IncompatibleRangeForImageType)
 			}
 		}
-		ImageDimensionType::D2 | ImageDimensionType::Cube => {
+		ImageDimensionsType::D2 | ImageDimensionsType::Cube => {
 			if source_top_left[2] != 0 || source_bottom_right[2] != 1 {
 				return Err(CheckBlitImageError::IncompatibleRangeForImageType)
 			}
 		}
-		ImageDimensionType::D3 => {}
+		ImageDimensionsType::D3 => {}
 	}
 
-	match destination_dimensions.dimension_type() {
-		ImageDimensionType::D1 => {
+	match destination_dimensions.dimensions_type() {
+		ImageDimensionsType::D1 => {
 			if destination_top_left[1] != 0 || destination_bottom_right[1] != 1 {
 				return Err(CheckBlitImageError::IncompatibleRangeForImageType)
 			}
@@ -191,12 +191,12 @@ where
 				return Err(CheckBlitImageError::IncompatibleRangeForImageType)
 			}
 		}
-		ImageDimensionType::D2 | ImageDimensionType::Cube => {
+		ImageDimensionsType::D2 | ImageDimensionsType::Cube => {
 			if destination_top_left[2] != 0 || destination_bottom_right[2] != 1 {
 				return Err(CheckBlitImageError::IncompatibleRangeForImageType)
 			}
 		}
-		ImageDimensionType::D3 => {}
+		ImageDimensionsType::D3 => {}
 	}
 
 	Ok(())

@@ -33,7 +33,7 @@ use crate::{
 	},
 	device::{Device, DeviceOwned},
 	format::Format,
-	image::{ImageDimensionType, ImageViewAccess},
+	image::{ImageDimensionsType, ImageViewAccess},
 	sampler::Sampler,
 	OomError,
 	VulkanObject
@@ -45,10 +45,11 @@ use crate::{
 /// You are therefore encouraged to create them at initialization and not the during
 /// performance-critical paths.
 ///
-/// > **Note**: You can control of the pool that is used to create the descriptor set, if you wish
+/// > **Note**: You can control what pool is used to create the descriptor set, if you wish
 /// > so. By creating a implementation of the `DescriptorPool` trait that doesn't perform any
 /// > actual allocation, you can skip this allocation and make it acceptable to use a persistent
-/// > descriptor set in performance-critical paths..
+/// > descriptor set in performance-critical paths.
+/// TODO: Not yet
 ///
 /// The template parameter of the `PersistentDescriptorSet` is complex, and you shouldn't try to
 /// express it explicitly. If you want to store your descriptor set in a struct or in a `Vec` for
@@ -810,7 +811,7 @@ where
 		return Err(PersistentDescriptorSetError::MissingImageUsage(MissingImageUsage::Storage))
 	}
 
-	let image_view_ty = ImageDimensionType::from(image_view.dimensions());
+	let image_view_ty = ImageDimensionsType::from(image_view.dimensions());
 	if image_view_ty != desc.dimensions_type {
 		return Err(PersistentDescriptorSetError::ImageViewTypeMismatch {
 			expected: desc.dimensions_type,
@@ -1058,9 +1059,9 @@ pub enum PersistentDescriptorSetError {
 	/// The type of an image view doesn't match what was expected.
 	ImageViewTypeMismatch {
 		/// Expected type.
-		expected: ImageDimensionType,
+		expected: ImageDimensionsType,
 		/// Type of the image view that was passed.
-		obtained: ImageDimensionType
+		obtained: ImageDimensionsType
 	}
 }
 impl fmt::Display for PersistentDescriptorSetError {

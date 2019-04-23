@@ -66,7 +66,7 @@ use crate::{
 		Subpass,
 		SubpassContents
 	},
-	image::{ImageLayout, ImageViewAccess},
+	image::{ImageLayout, ImageLayoutImageDst, ImageLayoutImageSrc, ImageViewAccess},
 	instance::QueueFamily,
 	pipeline::{
 		input_assembly::Index,
@@ -617,9 +617,9 @@ impl<P> AutoCommandBufferBuilder<P> {
 			// valid.
 			self.inner.copy_image(
 				source,
-				ImageLayout::TransferSrcOptimal,
+				ImageLayoutImageSrc::TransferSrcOptimal,
 				destination,
-				ImageLayout::TransferDstOptimal,
+				ImageLayoutImageDst::TransferDstOptimal,
 				iter::once(copy)
 			)?;
 			Ok(self)
@@ -714,9 +714,9 @@ impl<P> AutoCommandBufferBuilder<P> {
 
 			self.inner.blit_image(
 				source,
-				ImageLayout::TransferSrcOptimal,
+				ImageLayoutImageSrc::TransferSrcOptimal,
 				destination, // TODO: let choose layout
-				ImageLayout::TransferDstOptimal,
+				ImageLayoutImageDst::TransferDstOptimal,
 				iter::once(blit),
 				filter
 			)?;
@@ -784,7 +784,7 @@ impl<P> AutoCommandBufferBuilder<P> {
 			// TODO: let choose layout
 			self.inner.clear_color_image(
 				image,
-				ImageLayout::TransferDstOptimal,
+				ImageLayoutImageDst::TransferDstOptimal,
 				color,
 				iter::once(region)
 			)?;
@@ -890,7 +890,7 @@ impl<P> AutoCommandBufferBuilder<P> {
 			self.inner.copy_buffer_to_image(
 				source,
 				destination,
-				ImageLayout::TransferDstOptimal, // TODO: let choose layout
+				ImageLayoutImageDst::TransferDstOptimal, // TODO: let choose layout
 				iter::once(copy)
 			)?;
 			Ok(self)
@@ -963,7 +963,7 @@ impl<P> AutoCommandBufferBuilder<P> {
 
 			self.inner.copy_image_to_buffer(
 				source,
-				ImageLayout::TransferSrcOptimal,
+				ImageLayoutImageSrc::TransferSrcOptimal,
 				destination, // TODO: let choose layout
 				iter::once(copy)
 			)?;

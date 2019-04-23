@@ -43,7 +43,7 @@
 
 use crate::{
 	format::Format,
-	image::ImageDimensionType,
+	image::ImageDimensionsType,
 	sync::{AccessFlagBits, PipelineStages}
 };
 use std::{cmp, error, fmt, ops::BitOr};
@@ -324,7 +324,7 @@ pub struct DescriptorImageDesc {
 	/// `sampled` usage can be attached to the descriptor.
 	pub sampled: bool,
 	/// The kind of image: one-dimensional, two-dimensional, cube or three-dimensional.
-	pub dimensions_type: ImageDimensionType,
+	pub dimensions_type: ImageDimensionsType,
 	/// The format of the image, or `None` if the format is unknown. If `Some`, only images with
 	/// exactly that format can be attached.
 	pub format: Option<Format>,
@@ -464,8 +464,8 @@ pub enum DescriptorDescSupersetError {
 	ShaderStagesNotSuperset,
 
 	ImageDimensionsMismatch {
-		obtained: ImageDimensionType,
-		expected: ImageDimensionType
+		obtained: ImageDimensionsType,
+		expected: ImageDimensionsType
 	},
 
 	FormatMismatch {

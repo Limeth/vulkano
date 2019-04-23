@@ -87,27 +87,27 @@ macro_rules! ordered_passes_renderpass {
 
             #[allow(unsafe_code)]
             unsafe impl RenderPassDesc for CustomRenderPassDesc {
-                                fn num_attachments(&self) -> usize {
+				fn num_attachments(&self) -> usize {
                     num_attachments()
                 }
 
-                                fn attachment_desc(&self, id: usize) -> Option<AttachmentDescription> {
+				fn attachment_desc(&self, id: usize) -> Option<AttachmentDescription> {
                     attachment(self, id)
                 }
 
-                                fn num_subpasses(&self) -> usize {
+				fn num_subpasses(&self) -> usize {
                     num_subpasses()
                 }
 
-                                fn subpass_desc(&self, id: usize) -> Option<PassDescription> {
+				fn subpass_desc(&self, id: usize) -> Option<PassDescription> {
                     subpass(id)
                 }
 
-                                fn num_dependencies(&self) -> usize {
+				fn num_dependencies(&self) -> usize {
                     num_dependencies()
                 }
 
-                                fn dependency_desc(&self, id: usize) -> Option<PassDependencyDescription> {
+				fn dependency_desc(&self, id: usize) -> Option<PassDependencyDescription> {
                     dependency(id)
                 }
             }
@@ -119,7 +119,7 @@ macro_rules! ordered_passes_renderpass {
                 }
             }
 
-                        fn num_attachments() -> usize {
+			fn num_attachments() -> usize {
                 #![allow(unused_assignments)]
                 #![allow(unused_mut)]
                 #![allow(unused_variables)]
@@ -128,7 +128,7 @@ macro_rules! ordered_passes_renderpass {
                 num
             }
 
-                        fn attachment(desc: &CustomRenderPassDesc, id: usize) -> Option<AttachmentDescription> {
+			fn attachment(desc: &CustomRenderPassDesc, id: usize) -> Option<AttachmentDescription> {
                 #![allow(unused_assignments)]
                 #![allow(unused_mut)]
 
@@ -156,7 +156,7 @@ macro_rules! ordered_passes_renderpass {
                 None
             }
 
-                        fn num_subpasses() -> usize {
+			fn num_subpasses() -> usize {
                 #![allow(unused_assignments)]
                 #![allow(unused_mut)]
                 #![allow(unused_variables)]
@@ -165,7 +165,7 @@ macro_rules! ordered_passes_renderpass {
                 num
             }
 
-                        fn subpass(id: usize) -> Option<PassDescription> {
+			fn subpass(id: usize) -> Option<PassDescription> {
                 #![allow(unused_assignments)]
                 #![allow(unused_mut)]
                 #![allow(unused_variables)]
@@ -222,11 +222,11 @@ macro_rules! ordered_passes_renderpass {
                 None
             }
 
-                        fn num_dependencies() -> usize {
+			fn num_dependencies() -> usize {
                 num_subpasses().saturating_sub(1)
             }
 
-                        fn dependency(id: usize) -> Option<PassDependencyDescription> {
+			fn dependency(id: usize) -> Option<PassDependencyDescription> {
                 let num_passes = num_subpasses();
 
                 if id + 1 >= num_passes {
@@ -236,11 +236,11 @@ macro_rules! ordered_passes_renderpass {
                 Some(PassDependencyDescription {
                     source_subpass: id,
                     destination_subpass: id + 1,
-                    source_stages: PipelineStages { all_graphics: true, .. PipelineStages::none() },         // TODO: correct values
-                    destination_stages: PipelineStages { all_graphics: true, .. PipelineStages::none() },         // TODO: correct values
-                    source_access: AccessFlagBits::all(),         // TODO: correct values
-                    destination_access: AccessFlagBits::all(),         // TODO: correct values
-                    by_region: true,            // TODO: correct values
+                    source_stages: PipelineStages { all_graphics: true, .. PipelineStages::none() }, // TODO: correct values
+                    destination_stages: PipelineStages { all_graphics: true, .. PipelineStages::none() }, // TODO: correct values
+                    source_access: AccessFlagBits::all(), // TODO: correct values
+                    destination_access: AccessFlagBits::all(), // TODO: correct values
+                    by_region: true, // TODO: correct values
                 })
             }
 
