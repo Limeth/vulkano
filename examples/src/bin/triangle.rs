@@ -16,6 +16,12 @@
 // and that you want to learn Vulkan. This means that for example it won't go into details about
 // what a vertex or a shader is.
 
+use std::{num::NonZeroU32, sync::Arc};
+
+use winit::{Event, EventsLoop, Window, WindowBuilder, WindowEvent};
+
+use vulkano_win::VkSurfaceBuild;
+
 use vulkano::{
 	buffer::{BufferUsage, CpuAccessibleBuffer},
 	command_buffer::{AutoCommandBufferBuilder, DynamicState},
@@ -34,12 +40,6 @@ use vulkano::{
 	},
 	sync::{self, FlushError, GpuFuture}
 };
-
-use vulkano_win::VkSurfaceBuild;
-
-use winit::{Event, EventsLoop, Window, WindowBuilder, WindowEvent};
-
-use std::sync::Arc;
 
 fn main() {
 	// The first step of any Vulkan program is to create an instance.
@@ -173,7 +173,8 @@ fn main() {
 		let initial_dimensions = if let Some(dimensions) = window.get_inner_size() {
 			// convert to physical pixels
 			let dimensions: (u32, u32) = dimensions.to_physical(window.get_hidpi_factor()).into();
-			[dimensions.0, dimensions.1]
+
+			[NonZeroU32::new(dimensions.0).unwrap(), NonZeroU32::new(dimensions.1).unwrap()]
 		} else {
 			// The window no longer exists so exit the application.
 			return
@@ -185,8 +186,8 @@ fn main() {
 			surface.clone(),
 			&queue,
 			initial_dimensions,
-			1,
-			caps.min_image_count,
+			NonZeroU32::new(1).unwrap(),
+			NonZeroU32::new(caps.min_image_count).unwrap(),
 			format,
 			color_space,
 			usage,
@@ -372,7 +373,7 @@ void main() {
 			let dimensions = if let Some(dimensions) = window.get_inner_size() {
 				let dimensions: (u32, u32) =
 					dimensions.to_physical(window.get_hidpi_factor()).into();
-				[dimensions.0, dimensions.1]
+				[NonZeroU32::new(dimensions.0).unwrap(), NonZeroU32::new(dimensions.1).unwrap()]
 			} else {
 				return
 			};
@@ -508,7 +509,7 @@ fn window_size_dependent_setup(
 
 	let viewport = Viewport {
 		origin: [0.0, 0.0],
-		dimensions: [dimensions[0] as f32, dimensions[1] as f32],
+		dimensions: [dimensions[0].get() as f32, dimensions[1].get() as f32],
 		depth_range: 0.0 .. 1.0
 	};
 	dynamic_state.viewports = Some(vec![viewport]);

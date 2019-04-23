@@ -3,7 +3,9 @@ members = [
     "vk-sys",
     "vulkano",
     "vulkano-shaders",
-    "vulkano-win"
+    "vulkano-win",
+
+	"examples"
 ]
 
 exclude = [

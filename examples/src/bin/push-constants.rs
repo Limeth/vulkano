@@ -26,7 +26,8 @@ fn main() {
 		None,
 		&InstanceExtensions::none(),
 		vec!["VK_LAYER_LUNARG_standard_validation"]
-	).unwrap();
+	)
+	.unwrap();
 	let physical = PhysicalDevice::enumerate(&instance).next().unwrap();
 	let queue_family = physical.queue_families().find(|&q| q.supports_compute()).unwrap();
 	let (device, mut queues) = Device::new(

@@ -9,6 +9,8 @@
 
 // TODO: Give a paragraph about what specialization are and what problems they solve
 
+use std::sync::Arc;
+
 use vulkano::{
 	buffer::{BufferUsage, CpuAccessibleBuffer},
 	command_buffer::AutoCommandBufferBuilder,
@@ -18,8 +20,6 @@ use vulkano::{
 	pipeline::ComputePipeline,
 	sync::{self, GpuFuture}
 };
-
-use std::sync::Arc;
 
 fn main() {
 	let instance = Instance::new(

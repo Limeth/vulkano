@@ -7,12 +7,32 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use vulkano::device::{ Device, DeviceExtensions };
-use vulkano::format::Format;
-use vulkano::image::{ ImmutableImage, ImageDimensions };
-use vulkano::instance;
-use vulkano::instance::{ Instance, InstanceExtensions, PhysicalDevice };
-use vulkano::instance::debug::{ DebugCallback, MessageTypes };
+use std::{num::NonZeroU32, sync::Arc};
+
+use vulkano::{
+	buffer::{BufferUsage, CpuAccessibleBuffer},
+	command_buffer::{AutoCommandBufferBuilder, CommandBuffer},
+	device::{Device, DeviceExtensions},
+	format::Format,
+	image::{
+		ImageDimensions,
+		ImageSubresourceRange,
+		ImageUsage,
+		ImageView,
+		MipmapsCount,
+		RequiredLayouts,
+		Swizzle,
+		SyncImage
+	},
+	instance::{
+		self,
+		debug::{DebugCallback, MessageTypes},
+		Instance,
+		InstanceExtensions,
+		PhysicalDevice
+	},
+	sync::GpuFuture
+};
 
 fn main() {
 	// Vulkano Debugging Example Code
@@ -24,10 +44,7 @@ fn main() {
 	//
 	// .. but if you just want a template of code that has everything ready to go then follow
 	// this example. First, enable debugging using this extension: VK_EXT_debug_report
-	let extensions = InstanceExtensions {
-		ext_debug_report: true,
-		..InstanceExtensions::none()
-	};
+	let extensions = InstanceExtensions { ext_debug_report: true, ..InstanceExtensions::none() };
 
 	// You also need to specify (unless you've used the methods linked above) which debugging layers
 	// your code should use. Each layer is a bunch of checks or messages that provide information of
@@ -50,7 +67,8 @@ fn main() {
 	let layers = vec![layer];
 
 	// Important: pass the extension(s) and layer(s) when creating the vulkano instance
-	let instance = Instance::new(None, &extensions, layers).expect("failed to create Vulkan instance");
+	let instance =
+		Instance::new(None, &extensions, layers).expect("failed to create Vulkan instance");
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// After creating the instance we must register the debugging callback.                                      //
@@ -64,7 +82,7 @@ fn main() {
 		warning: true,
 		performance_warning: true,
 		information: true,
-		debug: true,
+		debug: true
 	};
 
 	let _debug_callback = DebugCallback::new(&instance, all, |msg| {
@@ -82,7 +100,8 @@ fn main() {
 			panic!("no-impl");
 		};
 		println!("{} {}: {}", msg.layer_prefix, ty, msg.description);
-	}).ok();
+	})
+	.ok();
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Create Vulkan objects in the same way as the other examples                                               //
@@ -90,15 +109,72 @@ fn main() {
 
 	let physical = PhysicalDevice::enumerate(&instance).next().expect("no device available");
 	let queue_family = physical.queue_families().next().expect("couldn't find a queue family");
-	let (_, mut queues) = Device::new(physical, physical.supported_features(), &DeviceExtensions::none(), vec![(queue_family, 0.5)]).expect("failed to create device");
+	let (device, mut queues) = Device::new(
+		physical,
+		physical.supported_features(),
+		&DeviceExtensions::none(),
+		vec![(queue_family, 0.5)]
+	)
+	.expect("failed to create device");
 	let queue = queues.next().unwrap();
 
-	// Create an image in order to generate some additional logging:
+	// Create an image and upload some data in order to generate some additional logging:
 	let pixel_format = Format::R8G8B8A8Uint;
-	let dimensions =ImageDimensions::Dim2D { width: 4096, height: 4096 };
-	const DATA: [[u8; 4]; 4096*4096] = [[0; 4]; 4096 * 4096];
-	ImmutableImage::from_iter(DATA.iter().cloned(), dimensions, pixel_format,
-											   queue.clone()).unwrap();
+	let dimensions = ImageDimensions::Dim2D {
+		width: NonZeroU32::new(4096).unwrap(),
+		height: NonZeroU32::new(4096).unwrap()
+	};
+	const DATA: [[u8; 4]; 4096 * 4096] = [[0; 4]; 4096 * 4096];
+
+	let image: Arc<SyncImage> = Arc::new(
+		SyncImage::new(
+			device.clone(),
+			ImageUsage { transfer_destination: true, ..ImageUsage::default() },
+			pixel_format,
+			dimensions,
+			NonZeroU32::new(1).unwrap(),
+			MipmapsCount::One
+		)
+		.unwrap()
+	);
+	let view = Arc::new(
+		ImageView::new(
+			image.clone(),
+			None,
+			None::<Format>,
+			Swizzle::default(),
+			ImageSubresourceRange::whole_image(&image),
+			RequiredLayouts::default()
+		)
+		.unwrap()
+	);
+
+	let staging_buffer = CpuAccessibleBuffer::from_iter(
+		device.clone(),
+		BufferUsage::transfer_source(),
+		DATA.iter().cloned()
+	)
+	.unwrap();
+
+	let cb = AutoCommandBufferBuilder::new(device.clone(), queue.family())
+		.unwrap()
+		.copy_buffer_to_image_dimensions(
+			staging_buffer,
+			view,
+			[0, 0, 0],
+			[dimensions.width().get(), dimensions.height().get(), dimensions.depth().get()],
+			0,
+			dimensions.array_layers_with_cube().get(),
+			0
+		)
+		.unwrap()
+		.build()
+		.unwrap();
+
+	// We wait because why not.
+	let future = cb.execute(queue).unwrap().then_signal_fence_and_flush().unwrap();
+	future.wait(None).unwrap();
 
 	// (At this point you should see a bunch of messages printed to the terminal window - have fun debugging!)
+	eprintln!("Done");
 }
