@@ -133,12 +133,15 @@ impl<F> ImmutableImage<F> {
 
 			UnsafeImage::new(
 				device.clone(),
+				sharing,
+
 				usage,
 				format.format(),
+				
 				dimensions,
 				1,
 				mipmaps,
-				sharing,
+				
 				false,
 				false
 			)?
@@ -343,13 +346,13 @@ where
 
 	fn inner(&self) -> &UnsafeImageView { &self.view }
 
-	fn descriptor_set_storage_image_layout(&self) -> ImageLayout { self.layout }
+	fn required_layout_descriptor_storage(&self) -> ImageLayout { self.layout }
 
-	fn descriptor_set_combined_image_sampler_layout(&self) -> ImageLayout { self.layout }
+	fn required_layout_descriptor_combined(&self) -> ImageLayout { self.layout }
 
-	fn descriptor_set_sampled_image_layout(&self) -> ImageLayout { self.layout }
+	fn required_layout_descriptor_sampled(&self) -> ImageLayout { self.layout }
 
-	fn descriptor_set_input_attachment_layout(&self) -> ImageLayout { self.layout }
+	fn required_layout_descriptor_input_attachment(&self) -> ImageLayout { self.layout }
 
 	fn identity_swizzle(&self) -> bool { true }
 }

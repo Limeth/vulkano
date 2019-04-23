@@ -8,6 +8,7 @@ use crate::{
 			ImageLayoutEnd,
 			ImageLayoutInputAttachment,
 			ImageLayoutSampledImage,
+			ImageLayoutStorageImage,
 			RequiredLayouts
 		},
 		ImageAccess,
@@ -40,21 +41,44 @@ impl<I: ImageAccess> ImageView<I> {
 			_ => false
 		};
 
-		let (global_layout, sampled_layout, combined_layout, input_layout) = if is_depth_or_stencil
-		{
-			(
-				ImageLayoutEnd::DepthStencilAttachmentOptimal,
-				ImageLayoutSampledImage::DepthStencilReadOnlyOptimal,
-				ImageLayoutCombinedImage::DepthStencilReadOnlyOptimal,
-				ImageLayoutInputAttachment::DepthStencilReadOnlyOptimal
-			)
-		} else {
-			(
-				ImageLayoutEnd::ColorAttachmentOptimal,
-				ImageLayoutSampledImage::ShaderReadOnlyOptimal,
-				ImageLayoutCombinedImage::ShaderReadOnlyOptimal,
-				ImageLayoutInputAttachment::ShaderReadOnlyOptimal
-			)
+		macro_rules! check_required_layout {
+			($thing: expr) => {
+				if $thing.valid_for_usage(image.usage()).is_ok() {
+					Some($thing)
+				} else {
+					None
+					}
+			};
+		}
+
+		let required_layouts = {
+			if is_depth_or_stencil {
+				RequiredLayouts {
+					global: Some(ImageLayoutEnd::DepthStencilAttachmentOptimal),
+					storage: check_required_layout!(ImageLayoutStorageImage::General),
+					sampled: check_required_layout!(
+						ImageLayoutSampledImage::DepthStencilReadOnlyOptimal
+					),
+					combined: check_required_layout!(
+						ImageLayoutCombinedImage::DepthStencilReadOnlyOptimal
+					),
+					input_attachment: check_required_layout!(
+						ImageLayoutInputAttachment::DepthStencilReadOnlyOptimal
+					)
+				}
+			} else {
+				RequiredLayouts {
+					global: Some(ImageLayoutEnd::ColorAttachmentOptimal),
+					storage: check_required_layout!(ImageLayoutStorageImage::General),
+					sampled: check_required_layout!(ImageLayoutSampledImage::ShaderReadOnlyOptimal),
+					combined: check_required_layout!(
+						ImageLayoutCombinedImage::ShaderReadOnlyOptimal
+					),
+					input_attachment: check_required_layout!(
+						ImageLayoutInputAttachment::ShaderReadOnlyOptimal
+					)
+				}
+			}
 		};
 
 		Ok(ImageView::new(
@@ -63,13 +87,7 @@ impl<I: ImageAccess> ImageView<I> {
 			format,
 			Swizzle::identity(),
 			subresource_range,
-			RequiredLayouts {
-				global: Some(global_layout),
-				storage: None,
-				sampled: Some(sampled_layout),
-				combined: Some(combined_layout),
-				input_attachment: Some(input_layout)
-			}
+			required_layouts
 		)?)
 	}
 }

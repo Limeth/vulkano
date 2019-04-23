@@ -266,13 +266,13 @@ where
 
 	fn inner(&self) -> &UnsafeImageView { &self.view }
 
-	fn descriptor_set_storage_image_layout(&self) -> ImageLayout { ImageLayout::General }
+	fn required_layout_descriptor_storage(&self) -> ImageLayout { ImageLayout::General }
 
-	fn descriptor_set_combined_image_sampler_layout(&self) -> ImageLayout { ImageLayout::General }
+	fn required_layout_descriptor_combined(&self) -> ImageLayout { ImageLayout::General }
 
-	fn descriptor_set_sampled_image_layout(&self) -> ImageLayout { ImageLayout::General }
+	fn required_layout_descriptor_sampled(&self) -> ImageLayout { ImageLayout::General }
 
-	fn descriptor_set_input_attachment_layout(&self) -> ImageLayout { ImageLayout::General }
+	fn required_layout_descriptor_input_attachment(&self) -> ImageLayout { ImageLayout::General }
 
 	fn identity_swizzle(&self) -> bool { true }
 }

@@ -49,7 +49,7 @@ use std::{error, fmt, num::NonZeroU32};
 use vk_sys as vk;
 
 mod dimensions;
-pub use dimensions::{ImageDimensionsType, ImageDimensions, ImageSubresourceRange, ImageViewType};
+pub use dimensions::{ImageDimensions, ImageDimensionsType, ImageSubresourceRange, ImageViewType};
 
 pub mod layout;
 pub use layout::*;

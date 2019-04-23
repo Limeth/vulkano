@@ -7,171 +7,178 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use vulkano::buffer::BufferUsage;
-use vulkano::buffer::CpuAccessibleBuffer;
-use vulkano::command_buffer::AutoCommandBuffer;
-use vulkano::command_buffer::AutoCommandBufferBuilder;
-use vulkano::command_buffer::DynamicState;
-use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
-use vulkano::device::Queue;
-use vulkano::framebuffer::RenderPassAbstract;
-use vulkano::framebuffer::Subpass;
-use vulkano::image::ImageViewAccess;
-use vulkano::pipeline::blend::AttachmentBlend;
-use vulkano::pipeline::blend::BlendFactor;
-use vulkano::pipeline::blend::BlendOp;
-use vulkano::pipeline::GraphicsPipeline;
-use vulkano::pipeline::GraphicsPipelineAbstract;
-use vulkano::pipeline::viewport::Viewport;
-use cgmath::Matrix4;
-use cgmath::Vector3;
+use cgmath::{Matrix4, Vector3};
+use vulkano::{
+	buffer::{BufferUsage, CpuAccessibleBuffer},
+	command_buffer::{AutoCommandBuffer, AutoCommandBufferBuilder, DynamicState},
+	descriptor::descriptor_set::PersistentDescriptorSet,
+	device::Queue,
+	framebuffer::{RenderPassAbstract, Subpass},
+	image::ImageViewAccess,
+	pipeline::{
+		blend::{AttachmentBlend, BlendFactor, BlendOp},
+		viewport::Viewport,
+		GraphicsPipeline,
+		GraphicsPipelineAbstract
+	}
+};
 
 use std::sync::Arc;
 
 pub struct PointLightingSystem {
-    gfx_queue: Arc<Queue>,
-    vertex_buffer: Arc<CpuAccessibleBuffer<[Vertex]>>,
-    pipeline: Arc<GraphicsPipelineAbstract + Send + Sync>,
+	gfx_queue: Arc<Queue>,
+	vertex_buffer: Arc<CpuAccessibleBuffer<[Vertex]>>,
+	pipeline: Arc<GraphicsPipelineAbstract + Send + Sync>
 }
 
 impl PointLightingSystem {
-    /// Initializes the point lighting system.
-    pub fn new<R>(gfx_queue: Arc<Queue>, subpass: Subpass<R>) -> PointLightingSystem
-        where R: RenderPassAbstract + Send + Sync + 'static
-    {
-        // TODO: vulkano doesn't allow us to draw without a vertex buffer, otherwise we could
-        //       hard-code these values in the shader
-        let vertex_buffer = {
-            CpuAccessibleBuffer::from_iter(gfx_queue.device().clone(), BufferUsage::all(), [
-                Vertex { position: [-1.0, -1.0] },
-                Vertex { position: [-1.0, 3.0] },
-                Vertex { position: [3.0, -1.0] }
-            ].iter().cloned()).expect("failed to create buffer")
-        };
+	/// Initializes the point lighting system.
+	pub fn new<R>(gfx_queue: Arc<Queue>, subpass: Subpass<R>) -> PointLightingSystem
+	where
+		R: RenderPassAbstract + Send + Sync + 'static
+	{
+		// TODO: vulkano doesn't allow us to draw without a vertex buffer, otherwise we could
+		//       hard-code these values in the shader
+		let vertex_buffer = {
+			CpuAccessibleBuffer::from_iter(
+				gfx_queue.device().clone(),
+				BufferUsage::all(),
+				[
+					Vertex { position: [-1.0, -1.0] },
+					Vertex { position: [-1.0, 3.0] },
+					Vertex { position: [3.0, -1.0] }
+				]
+				.iter()
+				.cloned()
+			)
+			.expect("failed to create buffer")
+		};
 
-        let pipeline = {
-            let vs = vs::Shader::load(gfx_queue.device().clone())
-                .expect("failed to create shader module");
-            let fs = fs::Shader::load(gfx_queue.device().clone())
-                .expect("failed to create shader module");
+		let pipeline = {
+			let vs = vs::Shader::load(gfx_queue.device().clone())
+				.expect("failed to create shader module");
+			let fs = fs::Shader::load(gfx_queue.device().clone())
+				.expect("failed to create shader module");
 
-            Arc::new(GraphicsPipeline::start()
-                .vertex_input_single_buffer::<Vertex>()
-                .vertex_shader(vs.main_entry_point(), ())
-                .triangle_list()
-                .viewports_dynamic_scissors_irrelevant(1)
-                .fragment_shader(fs.main_entry_point(), ())
-                .blend_collective(AttachmentBlend {
-                    enabled: true,
-                    color_op: BlendOp::Add,
-                    color_source: BlendFactor::One,
-                    color_destination: BlendFactor::One,
-                    alpha_op: BlendOp::Max,
-                    alpha_source: BlendFactor::One,
-                    alpha_destination: BlendFactor::One,
-                    mask_red: true,
-                    mask_green: true,
-                    mask_blue: true,
-                    mask_alpha: true,
-                })
-                .render_pass(subpass)
-                .build(gfx_queue.device().clone())
-                .unwrap()) as Arc<_>
-        };
+			Arc::new(
+				GraphicsPipeline::start()
+					.vertex_input_single_buffer::<Vertex>()
+					.vertex_shader(vs.main_entry_point(), ())
+					.triangle_list()
+					.viewports_dynamic_scissors_irrelevant(1)
+					.fragment_shader(fs.main_entry_point(), ())
+					.blend_collective(AttachmentBlend {
+						enabled: true,
+						color_op: BlendOp::Add,
+						color_source: BlendFactor::One,
+						color_destination: BlendFactor::One,
+						alpha_op: BlendOp::Max,
+						alpha_source: BlendFactor::One,
+						alpha_destination: BlendFactor::One,
+						mask_red: true,
+						mask_green: true,
+						mask_blue: true,
+						mask_alpha: true
+					})
+					.render_pass(subpass)
+					.build(gfx_queue.device().clone())
+					.unwrap()
+			) as Arc<_>
+		};
 
-        PointLightingSystem {
-            gfx_queue: gfx_queue,
-            vertex_buffer: vertex_buffer,
-            pipeline: pipeline,
-        }
-    }
+		PointLightingSystem { gfx_queue, vertex_buffer, pipeline }
+	}
 
-    /// Builds a secondary command buffer that applies a point lighting.
-    ///
-    /// This secondary command buffer will read `depth_input` and rebuild the world position of the
-    /// pixel currently being processed (modulo rounding errors). It will then compare this
-    /// position with `position`, and process the lighting based on the distance and orientation
-    /// (similar to the directional lighting system).
-    ///
-    /// It then writes the output to the current framebuffer with additive blending (in other words
-    /// the value will be added to the existing value in the framebuffer, and not replace the
-    /// existing value).
-    ///
-    /// Note that in a real-world application, you probably want to pass additional parameters
-    /// such as some way to indicate the distance at which the lighting decrease. In this example
-    /// this value is hardcoded in the shader.
-    ///
-    /// - `viewport_dimensions` contains the dimensions of the current framebuffer.
-    /// - `color_input` is an image containing the albedo of each object of the scene. It is the
-    ///   result of the deferred pass.
-    /// - `normals_input` is an image containing the normals of each object of the scene. It is the
-    ///   result of the deferred pass.
-    /// - `depth_input` is an image containing the depth value of each pixel of the scene. It is
-    ///   the result of the deferred pass.
-    /// - `screen_to_world` is a matrix that turns coordinates from framebuffer space into world
-    ///   space. This matrix is used alongside with `depth_input` to determine the world
-    ///   coordinates of each pixel being processed.
-    /// - `position` is the position of the spot light in world coordinates.
-    /// - `color` is the color of the light.
-    ///
-    pub fn draw<C, N, D>(&self, viewport_dimensions: [u32; 2], color_input: C, normals_input: N,
-                         depth_input: D, screen_to_world: Matrix4<f32>, position: Vector3<f32>,
-                         color: [f32; 3]) -> AutoCommandBuffer
-        where C: ImageViewAccess + Send + Sync + 'static,
-              N: ImageViewAccess + Send + Sync + 'static,
-              D: ImageViewAccess + Send + Sync + 'static,
-    {
-        let push_constants = fs::ty::PushConstants {
-            screen_to_world: screen_to_world.into(),
-            color: [color[0], color[1], color[2], 1.0],
-            position: position.extend(0.0).into(),
-        };
+	/// Builds a secondary command buffer that applies a point lighting.
+	///
+	/// This secondary command buffer will read `depth_input` and rebuild the world position of the
+	/// pixel currently being processed (modulo rounding errors). It will then compare this
+	/// position with `position`, and process the lighting based on the distance and orientation
+	/// (similar to the directional lighting system).
+	///
+	/// It then writes the output to the current framebuffer with additive blending (in other words
+	/// the value will be added to the existing value in the framebuffer, and not replace the
+	/// existing value).
+	///
+	/// Note that in a real-world application, you probably want to pass additional parameters
+	/// such as some way to indicate the distance at which the lighting decrease. In this example
+	/// this value is hardcoded in the shader.
+	///
+	/// - `viewport_dimensions` contains the dimensions of the current framebuffer.
+	/// - `color_input` is an image containing the albedo of each object of the scene. It is the
+	///   result of the deferred pass.
+	/// - `normals_input` is an image containing the normals of each object of the scene. It is the
+	///   result of the deferred pass.
+	/// - `depth_input` is an image containing the depth value of each pixel of the scene. It is
+	///   the result of the deferred pass.
+	/// - `screen_to_world` is a matrix that turns coordinates from framebuffer space into world
+	///   space. This matrix is used alongside with `depth_input` to determine the world
+	///   coordinates of each pixel being processed.
+	/// - `position` is the position of the spot light in world coordinates.
+	/// - `color` is the color of the light.
+	pub fn draw<C, N, D>(
+		&self, viewport_dimensions: [u32; 2], color_input: C, normals_input: N, depth_input: D,
+		screen_to_world: Matrix4<f32>, position: Vector3<f32>, color: [f32; 3]
+	) -> AutoCommandBuffer
+	where
+		C: ImageViewAccess + Send + Sync + 'static,
+		N: ImageViewAccess + Send + Sync + 'static,
+		D: ImageViewAccess + Send + Sync + 'static
+	{
+		let push_constants = fs::ty::PushConstants {
+			screen_to_world: screen_to_world.into(),
+			color: [color[0], color[1], color[2], 1.0],
+			position: position.extend(0.0).into()
+		};
 
-        let descriptor_set = PersistentDescriptorSet::start(self.pipeline.clone(), 0)
-            .add_image(color_input)
-            .unwrap()
-            .add_image(normals_input)
-            .unwrap()
-            .add_image(depth_input)
-            .unwrap()
-            .build()
-            .unwrap();
+		let descriptor_set = PersistentDescriptorSet::start(self.pipeline.clone(), 0)
+			.add_image(color_input)
+			.unwrap()
+			.add_image(normals_input)
+			.unwrap()
+			.add_image(depth_input)
+			.unwrap()
+			.build()
+			.unwrap();
 
-        let dynamic_state = DynamicState {
-            viewports: Some(vec![Viewport {
-                origin: [0.0, 0.0],
-                dimensions: [viewport_dimensions[0] as f32,
-                            viewport_dimensions[1] as f32],
-                depth_range: 0.0 .. 1.0,
-            }]),
-            .. DynamicState::none()
-        };
+		let dynamic_state = DynamicState {
+			viewports: Some(vec![Viewport {
+				origin: [0.0, 0.0],
+				dimensions: [viewport_dimensions[0] as f32, viewport_dimensions[1] as f32],
+				depth_range: 0.0 .. 1.0
+			}]),
+			..DynamicState::none()
+		};
 
-        AutoCommandBufferBuilder::secondary_graphics(self.gfx_queue.device().clone(),
-                                                     self.gfx_queue.family(),
-                                                     self.pipeline.clone().subpass())
-            .unwrap()
-            .draw(self.pipeline.clone(),
-                  &dynamic_state,
-                  vec![self.vertex_buffer.clone()],
-                  descriptor_set,
-                  push_constants)
-            .unwrap()
-            .build()
-            .unwrap()
-    }
+		AutoCommandBufferBuilder::secondary_graphics(
+			self.gfx_queue.device().clone(),
+			self.gfx_queue.family(),
+			self.pipeline.clone().subpass()
+		)
+		.unwrap()
+		.draw(
+			self.pipeline.clone(),
+			&dynamic_state,
+			vec![self.vertex_buffer.clone()],
+			descriptor_set,
+			push_constants
+		)
+		.unwrap()
+		.build()
+		.unwrap()
+	}
 }
 
 #[derive(Debug, Clone)]
 struct Vertex {
-    position: [f32; 2]
+	position: [f32; 2]
 }
 vulkano::impl_vertex!(Vertex, position);
 
 mod vs {
-    vulkano_shaders::shader!{
-        ty: "vertex",
-        src: "
+	vulkano_shaders::shader! {
+		ty: "vertex",
+		src: "
 #version 450
 
 layout(location = 0) in vec2 position;
@@ -181,13 +188,13 @@ void main() {
     v_screen_coords = position;
     gl_Position = vec4(position, 0.0, 1.0);
 }"
-    }
+	}
 }
 
 mod fs {
-    vulkano_shaders::shader!{
-        ty: "fragment",
-        src: "
+	vulkano_shaders::shader! {
+		ty: "fragment",
+		src: "
 #version 450
 
 // The `color_input` parameter of the `draw` method.
@@ -234,5 +241,5 @@ void main() {
     f_color.rgb = push_constants.color.rgb * light_percent * in_diffuse;
     f_color.a = 1.0;
 }"
-    }
+	}
 }

@@ -21,13 +21,13 @@ use vulkano::{
 	framebuffer::{Framebuffer, FramebufferAbstract, RenderPassAbstract, Subpass},
 	image::{
 		ImageDimensions,
+		ImageLayoutCombinedImage,
+		ImageLayoutSampledImage,
 		ImageSubresourceRange,
 		ImageUsage,
 		ImageView,
 		MipmapsCount,
 		RequiredLayouts,
-		ImageLayoutSampledImage,
-		ImageLayoutCombinedImage,
 		SwapchainImage,
 		Swizzle,
 		SyncImage
@@ -157,7 +157,7 @@ fn main() {
 			width: NonZeroU32::new(93).unwrap(),
 			height: NonZeroU32::new(93).unwrap()
 		};
-		
+
 		let image: Arc<SyncImage> = Arc::new(
 			SyncImage::new(
 				device.clone(),
@@ -185,10 +185,12 @@ fn main() {
 			.unwrap()
 		);
 
-		let image_bytes =
-			image::load_from_memory_with_format(include_bytes!("image_img.png"), image::ImageFormat::PNG)
-				.unwrap()
-				.to_rgba();
+		let image_bytes = image::load_from_memory_with_format(
+			include_bytes!("image_img.png"),
+			image::ImageFormat::PNG
+		)
+		.unwrap()
+		.to_rgba();
 		let image_data = image_bytes.into_raw().clone();
 		let staging_buffer = CpuAccessibleBuffer::from_iter(
 			device.clone(),
@@ -203,7 +205,11 @@ fn main() {
 				staging_buffer,
 				view.clone(),
 				[0, 0, 0],
-				[texture_dimensions.width().get(), texture_dimensions.height().get(), texture_dimensions.depth().get()],
+				[
+					texture_dimensions.width().get(),
+					texture_dimensions.height().get(),
+					texture_dimensions.depth().get()
+				],
 				0,
 				texture_dimensions.array_layers_with_cube().get(),
 				0

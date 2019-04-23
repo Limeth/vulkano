@@ -45,6 +45,10 @@ such as `UnsafeBuffer`, `UnsafeImage`, etc. which have zero overhead and do not 
 checks, and are the tools used by the safe implementations of the traits. Vulkano also provides
 some safe implementations for convenience such as `CpuAccessibleBuffer` or `AttachmentImage`.
 
+// TODO
+Not true. The `UsageImage` struct for instance performs a lot of checks and actually returns an
+error if it fails.
+
 # Runtime vs compile-time checks
 
 The second category of objects described above are objects that describe to the Vulkan
@@ -227,6 +231,9 @@ the `Undefined` or `Preinitialized` layout. This is done by making the user pass
 builder in the constructor of images, and the constructor adds a transition command to it. The
 image implementation is responsible for making sure that the transition command has been submitted
 before any further command that uses the image.
+
+// TODO
+This whole section is outdated.
 
 # Inter-queue synchronization
 

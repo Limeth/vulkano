@@ -45,10 +45,8 @@ pub struct SwapchainImage<W> {
 	view: UnsafeImageView
 }
 impl<W> SwapchainImage<W> {
-	const REQUIRED_LAYOUTS: RequiredLayouts = RequiredLayouts {
-		global: Some(ImageLayoutEnd::PresentSrc),
-		..RequiredLayouts::none()
-	};
+	const REQUIRED_LAYOUTS: RequiredLayouts =
+		RequiredLayouts { global: Some(ImageLayoutEnd::PresentSrc), ..RequiredLayouts::none() };
 
 	/// Builds a `SwapchainImage` from raw components.
 	///

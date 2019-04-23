@@ -771,11 +771,10 @@ impl DescriptorWrite {
 			binding,
 			first_array_element: array_element,
 			inner: smallvec!({
-				let layout = image
-					.required_layouts()
-					.sampled
-					.expect(&format!("This image view wasn't created to be sampled from: {:?}", image))
-					as u32;
+				let layout = image.required_layouts().sampled.expect(&format!(
+					"This image view wasn't created to be sampled from: {:?}",
+					image
+				)) as u32;
 				DescriptorWriteInner::SampledImage(image.inner().internal_object(), layout)
 			})
 		}

@@ -10,7 +10,6 @@
 use crossbeam::queue::SegQueue;
 use fnv::FnvHashMap;
 use std::{
-	collections::hash_map::Entry,
 	marker::PhantomData,
 	mem::ManuallyDrop,
 	ptr,
@@ -71,7 +70,6 @@ impl StandardCommandPool {
 	/// Builds a new pool.
 	///
 	/// # Panic
-	///
 	/// - Panics if the device and the queue family don't belong to the same physical device.
 	pub fn new(device: Arc<Device>, queue_family: QueueFamily) -> StandardCommandPool {
 		assert_eq!(
@@ -95,16 +93,16 @@ unsafe impl CommandPool for Arc<StandardCommandPool> {
 	fn alloc(&self, secondary: bool, count: u32) -> Result<Self::Iter, OomError> {
 		// Find the correct `StandardCommandPoolPerThread` structure.
 		let mut hashmap = self.per_thread.lock().unwrap();
+
 		// TODO: meh for iterating everything every time
-		hashmap.retain(|_, w| w.upgrade().is_some());
+		// But we don't need to?
+		// hashmap.retain(|_, w| w.upgrade().is_some());
 
 		// Get an appropriate `Arc<StandardCommandPoolPerThread>`.
-		let per_thread = match hashmap.entry(thread::current().id()) {
-			Entry::Occupied(entry) => {
-				// The `unwrap()` can't fail, since we retained only valid members earlier.
-				entry.get().upgrade().unwrap()
-			}
-			Entry::Vacant(entry) => {
+		let thread_id = thread::current().id();
+		let per_thread = match hashmap.get(&thread_id).and_then(|p| p.upgrade()) {
+			Some(pt) => pt,
+			None => {
 				let new_pool =
 					UnsafeCommandPool::new(self.device.clone(), self.queue_family(), false, true)?;
 				let pt = Arc::new(StandardCommandPoolPerThread {
@@ -113,7 +111,7 @@ unsafe impl CommandPool for Arc<StandardCommandPool> {
 					available_secondary_command_buffers: SegQueue::new()
 				});
 
-				entry.insert(Arc::downgrade(&pt));
+				hashmap.insert(thread_id, Arc::downgrade(&pt));
 				pt
 			}
 		};
@@ -259,6 +257,7 @@ mod tests {
 	};
 	use std::sync::Arc;
 
+	// TODO: Rewrite the way memory pools are handled.
 	#[test]
 	fn reuse_command_buffers() {
 		let (device, _) = gfx_dev_and_queue!();
