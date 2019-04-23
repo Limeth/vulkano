@@ -35,11 +35,11 @@ without vulkano), but many people are unaware of that and install the SDK thinki
 required. However, macOS and iOS platforms do require a little more Vulkan setup since it is not
 natively supported. See below for more details.
 
-## Development status
+## Development status and this fork
 
-Vulkano is still in heavy development and doesn't yet meet its goals of being very robust. However
-the general structure of the library is most likely definitive, and all future breaking changes
-will likely be straight-forward to fix in user code.
+Since the original author of Vulkano tomaka is no longer around, there hasn't been a lot of activity in Vulkano. While I don't want to blame rukai or anyone else, the fact remains that the original repo is just piling up pull requests and isn't moving anywhere. The reason for this fork is that making breaking changes to fix what is wrong with Vulkano right now is not really possible when pull requests are reviewed once a month if at all.
+
+Currently the main difference of this fork from the base repo is the image rework. It solves lots of issues with the original design and brings back the flexibility of Vulkan without compromising safety. Hopefully, more fixes and new features will come Soon™.
 
 ## Documentation
 
