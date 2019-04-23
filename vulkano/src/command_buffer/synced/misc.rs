@@ -9,7 +9,7 @@ use std::{
 use crate::{
 	buffer::BufferAccess,
 	command_buffer::sys::UnsafeCommandBufferBuilder,
-	image::{ImageLayout, ImageViewAccess},
+	image::{ImageLayout, ImageLayoutEnd, ImageViewAccess},
 	sync::{AccessFlagBits, PipelineStages}
 };
 
@@ -24,12 +24,11 @@ pub(super) struct ResourceFinalState {
 	// True if the resource is used in exclusive mode.
 	pub exclusive: bool,
 
-	// Layout that an image must be in at the start of the command buffer. Can be `Undefined` if we
-	// don't care.
+	// Layout that an image must be in at the start of the command buffer. Can be `Undefined` if we  don't care.
 	pub initial_layout: ImageLayout,
 
 	// Layout the image will be in at the end of the command buffer.
-	pub final_layout: ImageLayout /* TODO: maybe wrap in an Option to mean that the layout doesn't change? because of buffers? */
+	pub final_layout: ImageLayoutEnd /* TODO: maybe wrap in an Option to mean that the layout doesn't change? because of buffers? */
 }
 
 /// Equivalent to `Command`, but with less methods. Typically contains less things than the
@@ -289,6 +288,33 @@ pub enum KeyTy {
 	Image
 }
 
+/// Describes resource type and its info.
+///
+/// This enum is used as a parameter for the `prev_cmd_resource` function.
+pub(super) enum ResourceTypeInfo {
+	/// Resource is a buffer.
+	///
+	/// Buffers don't care about image layouts.
+	Buffer,
+	/// Resource is an image and it will possibly change layouts.
+	///
+	/// This means that if the current layout of the image doesn't
+	/// match the first field of this enum, a barrier will be inserted
+	/// to transfer it to that layout. A value of `None` means that the
+	/// command doesn't care.
+	///
+	/// The image will be in the second layout after the command ends.
+	Image(ImageLayout, ImageLayoutEnd)
+}
+impl ResourceTypeInfo {
+	pub(super) fn resource_type(&self) -> KeyTy {
+		match self {
+			ResourceTypeInfo::Buffer => KeyTy::Buffer,
+			ResourceTypeInfo::Image(_, _) => KeyTy::Image
+		}
+	}
+}
+
 // Key that identifies a resource. Implements `PartialEq`, `Eq` and `Hash` so that two resources
 // that conflict with each other compare equal.
 //
@@ -300,7 +326,7 @@ pub(super) struct BuilderKey<P> {
 	// Index of the command that holds the resource within `commands`.
 	pub command_id: usize,
 	// Type of the resource.
-	pub resource_ty: KeyTy,
+	pub resource_type: KeyTy,
 	// Index of the resource within the command.
 	pub resource_index: usize
 }
@@ -314,14 +340,14 @@ impl<P> BuilderKey<P> {
 		CbKey::Command {
 			commands: final_commands,
 			command_id: self.command_id,
-			resource_ty: self.resource_ty,
+			resource_ty: self.resource_type,
 			resource_index: self.resource_index
 		}
 	}
 
 	fn conflicts_buffer(&self, commands_lock: &Commands<P>, buf: &BufferAccess) -> bool {
 		// TODO: put the conflicts_* methods directly on the Command trait to avoid an indirect call?
-		match self.resource_ty {
+		match self.resource_type {
 			KeyTy::Buffer => {
 				let c = &commands_lock.commands[self.command_id];
 				c.buffer(self.resource_index).conflicts_buffer(buf)
@@ -335,7 +361,7 @@ impl<P> BuilderKey<P> {
 
 	fn conflicts_image(&self, commands_lock: &Commands<P>, img: &ImageViewAccess) -> bool {
 		// TODO: put the conflicts_* methods directly on the Command trait to avoid an indirect call?
-		match self.resource_ty {
+		match self.resource_type {
 			KeyTy::Buffer => {
 				let c = &commands_lock.commands[self.command_id];
 				c.buffer(self.resource_index).conflicts_image(img)
@@ -353,7 +379,7 @@ impl<P> PartialEq for BuilderKey<P> {
 		debug_assert!(Arc::ptr_eq(&self.commands, &other.commands));
 		let commands_lock = self.commands.lock().unwrap();
 
-		match other.resource_ty {
+		match other.resource_type {
 			KeyTy::Buffer => {
 				let c = &commands_lock.commands[other.command_id];
 				self.conflicts_buffer(&commands_lock, c.buffer(other.resource_index))
@@ -372,7 +398,7 @@ impl<P> Hash for BuilderKey<P> {
 	fn hash<H: Hasher>(&self, state: &mut H) {
 		let commands_lock = self.commands.lock().unwrap();
 
-		match self.resource_ty {
+		match self.resource_type {
 			KeyTy::Buffer => {
 				let c = &commands_lock.commands[self.command_id];
 				c.buffer(self.resource_index).conflict_key().hash(state)
@@ -405,7 +431,7 @@ pub(super) struct ResourceState {
 	pub initial_layout: ImageLayout,
 
 	// Current layout at this stage of the building.
-	pub current_layout: ImageLayout
+	pub current_layout: ImageLayoutEnd
 }
 
 impl ResourceState {

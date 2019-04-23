@@ -7,15 +7,16 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use smallvec::SmallVec;
 use std::{any::Any, borrow::Cow, mem, ptr, sync::Arc};
+
+use smallvec::SmallVec;
 
 use crate::{
 	buffer::BufferAccess,
 	command_buffer::{
 		synced::{
 			builder::SyncCommandBufferBuilder,
-			misc::{Command, FinalCommand, KeyTy, SyncCommandBufferBuilderError}
+			misc::{Command, FinalCommand, ResourceTypeInfo, SyncCommandBufferBuilderError}
 		},
 		sys::{
 			UnsafeCommandBufferBuilder,
@@ -35,7 +36,7 @@ use crate::{
 	},
 	format::ClearValue,
 	framebuffer::{FramebufferAbstract, SubpassContents},
-	image::{ImageLayout, ImageViewAccess},
+	image::{layout::typesafety::*, ImageViewAccess},
 	pipeline::{
 		input_assembly::IndexType,
 		viewport::{Scissor, Viewport},
@@ -118,20 +119,32 @@ impl<P> SyncCommandBufferBuilder<P> {
 		});
 
 		for (atch, desc) in atch_desc.into_iter().enumerate() {
-			self.prev_cmd_resource(KeyTy::Image, atch, true,        // TODO: suboptimal ; note: remember to always pass true if desc.initial_layout != desc.final_layout
-                                   PipelineStages {
-                                       all_commands: true,
-                                       .. PipelineStages::none()
-                                   },       // TODO: wrong!
-                                   AccessFlagBits {
-                                       input_attachment_read: true,
-                                       color_attachment_read: true,
-                                       color_attachment_write: true,
-                                       depth_stencil_attachment_read: true,
-                                       depth_stencil_attachment_write: true,
-                                       .. AccessFlagBits::none()
-                                   },       // TODO: suboptimal
-                                   desc.initial_layout, desc.final_layout)?;
+			self.prev_cmd_resource(
+				atch,
+				true, // TODO: suboptimal; note: remember to always pass true if desc.initial_layout != desc.final_layout
+				PipelineStages {
+					all_commands: true,
+					.. PipelineStages::none()
+				}, // TODO: wrong!
+				AccessFlagBits {
+					input_attachment_read: true,
+					color_attachment_read: true,
+					color_attachment_write: true,
+					depth_stencil_attachment_read: true,
+					depth_stencil_attachment_write: true,
+					.. AccessFlagBits::none()
+				}, // TODO: suboptimal
+				ResourceTypeInfo::Image(
+					desc.initial_layout,
+					ImageLayoutEnd::try_from_image_layout(desc.final_layout)
+					.expect(
+						&format!(
+							"Final render pass attachment layout cannot be {:?}",
+							desc.final_layout
+						)
+					)
+				)
+			)?;
 		}
 
 		self.prev_cmd_entered_render_pass();
@@ -194,13 +207,11 @@ impl<P> SyncCommandBufferBuilder<P> {
 
 		self.append_command(Cmd { buffer, index_ty });
 		self.prev_cmd_resource(
-			KeyTy::Buffer,
 			0,
 			false,
 			PipelineStages { vertex_input: true, ..PipelineStages::none() },
 			AccessFlagBits { index_read: true, ..AccessFlagBits::none() },
-			ImageLayout::Undefined,
-			ImageLayout::Undefined
+			ResourceTypeInfo::Buffer
 		)?;
 		Ok(())
 	}
@@ -294,8 +305,8 @@ impl<P> SyncCommandBufferBuilder<P> {
 	/// Does nothing if the list of regions is empty, as it would be a no-op and isn't a valid
 	/// usage of the command anyway.
 	pub unsafe fn copy_image<S, D, R>(
-		&mut self, source: S, source_layout: ImageLayout, destination: D,
-		destination_layout: ImageLayout, regions: R
+		&mut self, source: S, source_layout: ImageLayoutImageSrc, destination: D,
+		destination_layout: ImageLayoutImageDst, regions: R
 	) -> Result<(), SyncCommandBufferBuilderError>
 	where
 		S: ImageViewAccess + Send + Sync + 'static,
@@ -304,9 +315,9 @@ impl<P> SyncCommandBufferBuilder<P> {
 	{
 		struct Cmd<S, D, R> {
 			source: Option<S>,
-			source_layout: ImageLayout,
+			source_layout: ImageLayoutImageSrc,
 			destination: Option<D>,
-			destination_layout: ImageLayout,
+			destination_layout: ImageLayoutImageDst,
 			regions: Option<R>
 		}
 
@@ -392,22 +403,18 @@ impl<P> SyncCommandBufferBuilder<P> {
 			regions: Some(regions)
 		});
 		self.prev_cmd_resource(
-			KeyTy::Image,
 			0,
 			false,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_read: true, ..AccessFlagBits::none() },
-			source_layout,
-			source_layout
+			ResourceTypeInfo::Image(source_layout.into(), source_layout.into())
 		)?;
 		self.prev_cmd_resource(
-			KeyTy::Image,
 			1,
 			true,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_write: true, ..AccessFlagBits::none() },
-			destination_layout,
-			destination_layout
+			ResourceTypeInfo::Image(destination_layout.into(), destination_layout.into())
 		)?;
 		Ok(())
 	}
@@ -417,8 +424,8 @@ impl<P> SyncCommandBufferBuilder<P> {
 	/// Does nothing if the list of regions is empty, as it would be a no-op and isn't a valid
 	/// usage of the command anyway.
 	pub unsafe fn blit_image<S, D, R>(
-		&mut self, source: S, source_layout: ImageLayout, destination: D,
-		destination_layout: ImageLayout, regions: R, filter: Filter
+		&mut self, source: S, source_layout: ImageLayoutImageSrc, destination: D,
+		destination_layout: ImageLayoutImageDst, regions: R, filter: Filter
 	) -> Result<(), SyncCommandBufferBuilderError>
 	where
 		S: ImageViewAccess + Send + Sync + 'static,
@@ -427,9 +434,9 @@ impl<P> SyncCommandBufferBuilder<P> {
 	{
 		struct Cmd<S, D, R> {
 			source: Option<S>,
-			source_layout: ImageLayout,
+			source_layout: ImageLayoutImageSrc,
 			destination: Option<D>,
-			destination_layout: ImageLayout,
+			destination_layout: ImageLayoutImageDst,
 			regions: Option<R>,
 			filter: Filter
 		}
@@ -518,22 +525,18 @@ impl<P> SyncCommandBufferBuilder<P> {
 			filter
 		});
 		self.prev_cmd_resource(
-			KeyTy::Image,
 			0,
 			false,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_read: true, ..AccessFlagBits::none() },
-			source_layout,
-			source_layout
+			ResourceTypeInfo::Image(source_layout.into(), source_layout.into())
 		)?;
 		self.prev_cmd_resource(
-			KeyTy::Image,
 			1,
 			true,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_write: true, ..AccessFlagBits::none() },
-			destination_layout,
-			destination_layout
+			ResourceTypeInfo::Image(destination_layout.into(), destination_layout.into())
 		)?;
 		Ok(())
 	}
@@ -543,7 +546,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 	/// Does nothing if the list of regions is empty, as it would be a no-op and isn't a valid
 	/// usage of the command anyway.
 	pub unsafe fn clear_color_image<I, R>(
-		&mut self, image: I, layout: ImageLayout, color: ClearValue, regions: R
+		&mut self, image: I, layout: ImageLayoutImageDst, color: ClearValue, regions: R
 	) -> Result<(), SyncCommandBufferBuilderError>
 	where
 		I: ImageViewAccess + Send + Sync + 'static,
@@ -551,7 +554,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 	{
 		struct Cmd<I, R> {
 			image: Option<I>,
-			layout: ImageLayout,
+			layout: ImageLayoutImageDst,
 			color: ClearValue,
 			regions: Option<R>
 		}
@@ -608,13 +611,11 @@ impl<P> SyncCommandBufferBuilder<P> {
 
 		self.append_command(Cmd { image: Some(image), layout, color, regions: Some(regions) });
 		self.prev_cmd_resource(
-			KeyTy::Image,
 			0,
 			true,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_write: true, ..AccessFlagBits::none() },
-			layout,
-			layout
+			ResourceTypeInfo::Image(layout.into(), layout.into())
 		)?;
 		Ok(())
 	}
@@ -706,22 +707,18 @@ impl<P> SyncCommandBufferBuilder<P> {
 			regions: Some(regions)
 		});
 		self.prev_cmd_resource(
-			KeyTy::Buffer,
 			0,
 			false,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_read: true, ..AccessFlagBits::none() },
-			ImageLayout::Undefined,
-			ImageLayout::Undefined
+			ResourceTypeInfo::Buffer
 		)?;
 		self.prev_cmd_resource(
-			KeyTy::Buffer,
 			1,
 			true,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_write: true, ..AccessFlagBits::none() },
-			ImageLayout::Undefined,
-			ImageLayout::Undefined
+			ResourceTypeInfo::Buffer
 		)?;
 		Ok(())
 	}
@@ -731,7 +728,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 	/// Does nothing if the list of regions is empty, as it would be a no-op and isn't a valid
 	/// usage of the command anyway.
 	pub unsafe fn copy_buffer_to_image<S, D, R>(
-		&mut self, source: S, destination: D, destination_layout: ImageLayout, regions: R
+		&mut self, source: S, destination: D, destination_layout: ImageLayoutImageDst, regions: R
 	) -> Result<(), SyncCommandBufferBuilderError>
 	where
 		S: BufferAccess + Send + Sync + 'static,
@@ -741,7 +738,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 		struct Cmd<S, D, R> {
 			source: Option<S>,
 			destination: Option<D>,
-			destination_layout: ImageLayout,
+			destination_layout: ImageLayoutImageDst,
 			regions: Option<R>
 		}
 
@@ -825,22 +822,18 @@ impl<P> SyncCommandBufferBuilder<P> {
 			regions: Some(regions)
 		});
 		self.prev_cmd_resource(
-			KeyTy::Buffer,
 			0,
 			false,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_read: true, ..AccessFlagBits::none() },
-			ImageLayout::Undefined,
-			ImageLayout::Undefined
+			ResourceTypeInfo::Buffer
 		)?;
 		self.prev_cmd_resource(
-			KeyTy::Image,
 			0,
 			true,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_write: true, ..AccessFlagBits::none() },
-			destination_layout,
-			destination_layout
+			ResourceTypeInfo::Image(destination_layout.into(), destination_layout.into())
 		)?;
 		Ok(())
 	}
@@ -850,7 +843,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 	/// Does nothing if the list of regions is empty, as it would be a no-op and isn't a valid
 	/// usage of the command anyway.
 	pub unsafe fn copy_image_to_buffer<S, D, R>(
-		&mut self, source: S, source_layout: ImageLayout, destination: D, regions: R
+		&mut self, source: S, source_layout: ImageLayoutImageSrc, destination: D, regions: R
 	) -> Result<(), SyncCommandBufferBuilderError>
 	where
 		S: ImageViewAccess + Send + Sync + 'static,
@@ -859,7 +852,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 	{
 		struct Cmd<S, D, R> {
 			source: Option<S>,
-			source_layout: ImageLayout,
+			source_layout: ImageLayoutImageSrc,
 			destination: Option<D>,
 			regions: Option<R>
 		}
@@ -944,22 +937,18 @@ impl<P> SyncCommandBufferBuilder<P> {
 			regions: Some(regions)
 		});
 		self.prev_cmd_resource(
-			KeyTy::Image,
 			0,
 			false,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_read: true, ..AccessFlagBits::none() },
-			source_layout,
-			source_layout
+			ResourceTypeInfo::Image(source_layout.into(), source_layout.into())
 		)?;
 		self.prev_cmd_resource(
-			KeyTy::Buffer,
 			0,
 			true,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_write: true, ..AccessFlagBits::none() },
-			ImageLayout::Undefined,
-			ImageLayout::Undefined
+			ResourceTypeInfo::Buffer
 		)?;
 		Ok(())
 	}
@@ -1040,7 +1029,6 @@ impl<P> SyncCommandBufferBuilder<P> {
 
 		self.append_command(Cmd { buffer });
 		self.prev_cmd_resource(
-			KeyTy::Buffer,
 			0,
 			false,
 			PipelineStages {
@@ -1051,8 +1039,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 				indirect_command_read: true,
 				..AccessFlagBits::none()
 			},
-			ImageLayout::Undefined,
-			ImageLayout::Undefined
+			ResourceTypeInfo::Buffer
 		)?;
 		Ok(())
 	}
@@ -1185,13 +1172,11 @@ impl<P> SyncCommandBufferBuilder<P> {
 
 		self.append_command(Cmd { buffer, draw_count, stride });
 		self.prev_cmd_resource(
-			KeyTy::Buffer,
 			0,
 			false,
 			PipelineStages { draw_indirect: true, ..PipelineStages::none() },
 			AccessFlagBits { indirect_command_read: true, ..AccessFlagBits::none() },
-			ImageLayout::Undefined,
-			ImageLayout::Undefined
+			ResourceTypeInfo::Buffer
 		)?;
 		Ok(())
 	}
@@ -1253,13 +1238,11 @@ impl<P> SyncCommandBufferBuilder<P> {
 
 		self.append_command(Cmd { buffer, draw_count, stride });
 		self.prev_cmd_resource(
-			KeyTy::Buffer,
 			0,
 			false,
 			PipelineStages { draw_indirect: true, ..PipelineStages::none() },
 			AccessFlagBits { indirect_command_read: true, ..AccessFlagBits::none() },
-			ImageLayout::Undefined,
-			ImageLayout::Undefined
+			ResourceTypeInfo::Buffer
 		)?;
 		Ok(())
 	}
@@ -1342,13 +1325,11 @@ impl<P> SyncCommandBufferBuilder<P> {
 
 		self.append_command(Cmd { buffer, data });
 		self.prev_cmd_resource(
-			KeyTy::Buffer,
 			0,
 			true,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_write: true, ..AccessFlagBits::none() },
-			ImageLayout::Undefined,
-			ImageLayout::Undefined
+			ResourceTypeInfo::Buffer
 		)
 		.unwrap();
 	}
@@ -1677,13 +1658,11 @@ impl<P> SyncCommandBufferBuilder<P> {
 
 		self.append_command(Cmd { buffer, data });
 		self.prev_cmd_resource(
-			KeyTy::Buffer,
 			0,
 			true,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_write: true, ..AccessFlagBits::none() },
-			ImageLayout::Undefined,
-			ImageLayout::Undefined
+			ResourceTypeInfo::Buffer
 		)
 		.unwrap();
 	}
@@ -1859,16 +1838,41 @@ impl<'b, P> SyncCommandBufferBuilderBindDescriptorSets<'b, P> {
 					let desc = ds.descriptor(desc_num as usize).unwrap();
 					let write = !desc.readonly;
 					let (stages, access) = desc.pipeline_stages_and_access();
-					let mut ignore_me_hack = false;
-					let layout = match desc.ty {
-						DescriptorDescTy::CombinedImageSampler(_) => {
-							image_view.required_layout_descriptor_combined()
-						}
+
+					let layout: Option<ImageLayoutEnd> = match desc.ty {
+						DescriptorDescTy::CombinedImageSampler(_) => Some(
+							image_view
+								.required_layouts()
+								.combined
+								.expect(&format!(
+										"This image view wasn't created to be used as a combined image sampler: {:?}",
+										image_view
+									))
+								.into()
+						),
 						DescriptorDescTy::Image(ref img) => {
 							if img.sampled {
-								image_view.required_layout_descriptor_sampled()
+								Some(
+									image_view
+										.required_layouts()
+										.sampled
+										.expect(&format!(
+											"This image view wasn't created to be sampled from: {:?}",
+											image_view
+										))
+										.into()
+								)
 							} else {
-								image_view.required_layout_descriptor_storage()
+								Some(
+									image_view
+										.required_layouts()
+										.storage
+										.expect(&format!(
+											"This image view wasn't created to be used as a storage image: {:?}",
+											image_view
+										))
+										.into()
+								)
 							}
 						}
 						DescriptorDescTy::InputAttachment { .. } => {
@@ -1877,12 +1881,20 @@ impl<'b, P> SyncCommandBufferBuilderBindDescriptorSets<'b, P> {
 							// vulkano will think that it needs to put a pipeline barrier and will
 							// return a `Conflict` error. For now as a work-around we simply ignore
 							// input attachments.
-							ignore_me_hack = true;
-							image_view.required_layout_descriptor_input_attachment()
+
+							None
+							// Some(
+							// 	image_view.required_layouts().input_attachment.expect(
+							// 		&format!(
+							// 			"This image view wasn't created to be used as an input attachment: {:?}",
+							// 			image_view
+							// 		)
+							// 	).into()
+							// )
 						}
 						_ => panic!("Tried to bind an image to a non-image descriptor")
 					};
-					all_images.push((write, stages, access, layout, ignore_me_hack));
+					all_images.push((write, stages, access, layout));
 				}
 			}
 			all_images
@@ -1897,31 +1909,21 @@ impl<'b, P> SyncCommandBufferBuilderBindDescriptorSets<'b, P> {
 		});
 
 		for (n, (write, stages, access)) in all_buffers.into_iter().enumerate() {
-			self.builder.prev_cmd_resource(
-				KeyTy::Buffer,
-				n,
-				write,
-				stages,
-				access,
-				ImageLayout::Undefined,
-				ImageLayout::Undefined
-			)?;
+			self.builder.prev_cmd_resource(n, write, stages, access, ResourceTypeInfo::Buffer)?;
 		}
 
-		for (n, (write, stages, access, layout, ignore_me_hack)) in
-			all_images.into_iter().enumerate()
-		{
-			if ignore_me_hack {
-				continue
-			}
+		for (n, (write, stages, access, layout)) in all_images.into_iter().enumerate() {
+			// TODO: For now we use None as a skip-hack value
+			let layout = match layout {
+				None => continue,
+				Some(l) => l
+			};
 			self.builder.prev_cmd_resource(
-				KeyTy::Image,
 				n,
 				write,
 				stages,
 				access,
-				layout,
-				layout
+				ResourceTypeInfo::Image(layout.into(), layout)
 			)?;
 		}
 
@@ -1991,13 +1993,11 @@ impl<'a, P> SyncCommandBufferBuilderBindVertexBuffer<'a, P> {
 
 		for n in 0 .. num_buffers {
 			self.builder.prev_cmd_resource(
-				KeyTy::Buffer,
 				n,
 				false,
 				PipelineStages { vertex_input: true, ..PipelineStages::none() },
 				AccessFlagBits { vertex_attribute_read: true, ..AccessFlagBits::none() },
-				ImageLayout::Undefined,
-				ImageLayout::Undefined
+				ResourceTypeInfo::Buffer
 			)?;
 		}
 
