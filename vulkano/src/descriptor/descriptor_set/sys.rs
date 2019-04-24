@@ -740,7 +740,7 @@ macro_rules! smallvec {
 impl DescriptorWrite {
 	pub fn storage_image<I>(binding: u32, array_element: u32, image: &I) -> DescriptorWrite
 	where
-		I: ImageViewAccess
+		I: ImageViewAccess + std::fmt::Debug
 	{
 		DescriptorWrite {
 			binding,
@@ -765,7 +765,7 @@ impl DescriptorWrite {
 
 	pub fn sampled_image<I>(binding: u32, array_element: u32, image: &I) -> DescriptorWrite
 	where
-		I: ImageViewAccess
+		I: ImageViewAccess + std::fmt::Debug
 	{
 		DescriptorWrite {
 			binding,
@@ -784,7 +784,7 @@ impl DescriptorWrite {
 		binding: u32, array_element: u32, sampler: &Arc<Sampler>, image: &I
 	) -> DescriptorWrite
 	where
-		I: ImageViewAccess
+		I: ImageViewAccess + std::fmt::Debug
 	{
 		DescriptorWrite {
 			binding,
@@ -947,7 +947,7 @@ impl DescriptorWrite {
 
 	pub fn input_attachment<I>(binding: u32, array_element: u32, image: &I) -> DescriptorWrite
 	where
-		I: ImageViewAccess
+		I: ImageViewAccess + std::fmt::Debug
 	{
 		DescriptorWrite {
 			binding,

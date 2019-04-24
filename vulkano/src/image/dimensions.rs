@@ -425,7 +425,7 @@ impl Into<u32> for ImageDimensionsType {
 // TODO: Aspects flags? Do we need them here? vk_sys doesn't even define most of them.
 // For that small subset, it's probably not worth it.
 /// Describes an image subresource (mipmap levels and array layers) range.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)] // derive Hash because `SubresourceImageResourceLocker`
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ImageSubresourceRange {
 	/// Number of array layers.
 	pub array_layers: NonZeroU32,

@@ -35,9 +35,15 @@ impl<I: ImageAccess> ImageView<I> {
 	/// TODO: `format` parameter currently doesn't do anything, the image format is used instead.
 	pub fn new<F: FormatDesc>(
 		image: I, view_type: Option<ImageViewType>, format: Option<F>, swizzle: Swizzle,
-		subresource_range: ImageSubresourceRange, required_layouts: RequiredLayouts
+		subresource_range: Option<ImageSubresourceRange>, mut required_layouts: RequiredLayouts
 	) -> Result<ImageView<I>, ImageViewCreationError> {
 		required_layouts.valid_for_usage(image.usage())?;
+		required_layouts.infer_mut(image.usage());
+
+		let subresource_range = match subresource_range {
+			Some(r) => r,
+			None => ImageSubresourceRange::whole_image(&image)
+		};
 
 		let view = unsafe {
 			UnsafeImageView::new(
@@ -51,6 +57,9 @@ impl<I: ImageAccess> ImageView<I> {
 
 		Ok(ImageView { image, view, required_layouts })
 	}
+
+	/// Borrows the inner image.
+	pub fn borrow_image(&self) -> &I { &self.image }
 }
 unsafe impl<I: ImageAccess> ImageViewAccess for ImageView<I> {
 	fn parent(&self) -> &dyn ImageAccess { &self.image }

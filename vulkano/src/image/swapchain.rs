@@ -143,12 +143,7 @@ unsafe impl<W> ImageViewAccess for SwapchainImage<W> {
 
 	fn inner(&self) -> &UnsafeImageView { &self.view }
 
-	fn dimensions(&self) -> ImageDimensions {
-		let dims = self.swapchain.dimensions();
-		ImageDimensions::Dim2D { width: dims[0], height: dims[1] }
-	}
-
-	fn identity_swizzle(&self) -> bool { true }
+	fn dimensions(&self) -> ImageDimensions { self.view.dimensions() }
 
 	fn conflicts_buffer(&self, other: &dyn BufferAccess) -> bool { false }
 
