@@ -4,13 +4,7 @@ use crate::{
 	buffer::BufferAccess,
 	device::Device,
 	format::{
-		Format,
-		PossibleDepthFormatDesc,
-		PossibleDepthStencilFormatDesc,
-		PossibleFloatFormatDesc,
-		PossibleSintFormatDesc,
-		PossibleStencilFormatDesc,
-		PossibleUintFormatDesc
+		Format
 	},
 	image::{
 		layout::{ImageLayout, ImageLayoutEnd},
@@ -36,21 +30,6 @@ pub unsafe trait ImageAccess: std::fmt::Debug {
 
 	/// Returns the format of this image.
 	fn format(&self) -> Format { self.inner().format() }
-	/// Returns true if the image is a color image.
-	fn has_color(&self) -> bool {
-		let format = self.format();
-		format.is_float() || format.is_uint() || format.is_sint()
-	}
-	/// Returns true if the image has a depth component.
-	fn has_depth(&self) -> bool {
-		let format = self.format();
-		format.is_depth() || format.is_depth_stencil()
-	}
-	/// Returns true if the image has a stencil component.
-	fn has_stencil(&self) -> bool {
-		let format = self.format();
-		format.is_stencil() || format.is_depth_stencil()
-	}
 
 
 	/// Returns the dimensions of the image.

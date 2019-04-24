@@ -1,13 +1,7 @@
 use crate::{
 	buffer::BufferAccess,
 	format::{
-		Format,
-		PossibleDepthFormatDesc,
-		PossibleDepthStencilFormatDesc,
-		PossibleFloatFormatDesc,
-		PossibleSintFormatDesc,
-		PossibleStencilFormatDesc,
-		PossibleUintFormatDesc
+		Format
 	},
 	image::{
 		layout::{ImageLayout, ImageLayoutEnd},
@@ -55,21 +49,6 @@ pub unsafe trait ImageViewAccess: std::fmt::Debug {
 
 	/// Returns the format of this view. This can be different from the parent's format.
 	fn format(&self) -> Format { self.inner().format() }
-	/// Returns true if this view format is color.
-	fn has_color(&self) -> bool {
-		let format = self.format();
-		format.is_float() || format.is_uint() || format.is_sint()
-	}
-	/// Returns true if this view format is depth or depth_stencil.
-	fn has_depth(&self) -> bool {
-		let format = self.format();
-		format.is_depth() || format.is_depth_stencil()
-	}
-	/// Returns true if this view format is stencil or depth_stencil.
-	fn has_stencil(&self) -> bool {
-		let format = self.format();
-		format.is_stencil() || format.is_depth_stencil()
-	}
 
 	/// Returns the dimensions of the image view.
 	fn dimensions(&self) -> ImageDimensions { self.inner().dimensions() }

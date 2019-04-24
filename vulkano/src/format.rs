@@ -228,14 +228,6 @@ macro_rules! formats {
 				val.into()
 			}
 		}
-		unsafe impl PossibleFloatFormatDesc for $name {
-			#[inline(always)]
-			fn is_float(&self) -> bool { true }
-		}
-		unsafe impl PossibleFloatOrCompressedFormatDesc for $name {
-			#[inline(always)]
-			fn is_float_or_compressed(&self) -> bool { true }
-		}
 	};
 
 	(__inner_impl__ $name:ident uint=$num:expr) => {
@@ -249,11 +241,6 @@ macro_rules! formats {
 			fn decode_clear_value(&self, val: Self::ClearValue) -> ClearValue {
 				val.into()
 			}
-		}
-
-		unsafe impl PossibleUintFormatDesc for $name {
-			#[inline(always)]
-			fn is_uint(&self) -> bool { true }
 		}
 	};
 
@@ -269,11 +256,6 @@ macro_rules! formats {
 				val.into()
 			}
 		}
-
-		unsafe impl PossibleSintFormatDesc for $name {
-			#[inline(always)]
-			fn is_sint(&self) -> bool { true }
-		}
 	};
 
 	(__inner_impl__ $name:ident depth) => {
@@ -288,16 +270,11 @@ macro_rules! formats {
 				val.into()
 			}
 		}
-
-		unsafe impl PossibleDepthFormatDesc for $name {
-			#[inline(always)]
-			fn is_depth(&self) -> bool { true }
-		}
 	};
 
 	(__inner_impl__ $name:ident stencil) => {
 		unsafe impl FormatDesc for $name {
-			type ClearValue = u32;      // FIXME: shouldn't stencil be i32?
+			type ClearValue = u32; // FIXME: shouldn't stencil be i32?
 
 			fn format(&self) -> Format {
 				Format::$name
@@ -306,17 +283,12 @@ macro_rules! formats {
 			fn decode_clear_value(&self, val: Self::ClearValue) -> ClearValue {
 				val.into()
 			}
-		}
-
-		unsafe impl PossibleStencilFormatDesc for $name {
-			#[inline(always)]
-			fn is_stencil(&self) -> bool { true }
 		}
 	};
 
 	(__inner_impl__ $name:ident depthstencil) => {
 		unsafe impl FormatDesc for $name {
-			type ClearValue = (f32, u32);       // FIXME: shouldn't stencil be i32?
+			type ClearValue = (f32, u32); // FIXME: shouldn't stencil be i32?
 
 			fn format(&self) -> Format {
 				Format::$name
@@ -325,11 +297,6 @@ macro_rules! formats {
 			fn decode_clear_value(&self, val: Self::ClearValue) -> ClearValue {
 				val.into()
 			}
-		}
-
-		unsafe impl PossibleDepthStencilFormatDesc for $name {
-			#[inline(always)]
-			fn is_depth_stencil(&self) -> bool { true }
 		}
 	};
 
@@ -344,15 +311,6 @@ macro_rules! formats {
 			fn decode_clear_value(&self, val: Self::ClearValue) -> ClearValue {
 				val.into()
 			}
-		}
-
-		unsafe impl PossibleCompressedFormatDesc for $name {
-			#[inline(always)]
-			fn is_compressed(&self) -> bool { true }
-		}
-		unsafe impl PossibleFloatOrCompressedFormatDesc for $name {
-			#[inline(always)]
-			fn is_float_or_compressed(&self) -> bool { true }
 		}
 	};
 
@@ -580,6 +538,18 @@ pub unsafe trait FormatDesc {
 	fn format(&self) -> Format;
 
 	fn decode_clear_value(&self, value: Self::ClearValue) -> ClearValue;
+
+	fn is_float(&self) -> bool { self.format().ty() == FormatTy::Float }
+	fn is_uint(&self) -> bool { self.format().ty() == FormatTy::Uint }
+	fn is_sint(&self) -> bool { self.format().ty() == FormatTy::Sint }
+	fn has_color(&self) -> bool { self.is_float() || self.is_uint() || self.is_sint() } // TODO: Is this enough?
+
+	fn is_depth(&self) -> bool { self.format().ty() == FormatTy::Depth }
+	fn is_stencil(&self) -> bool { self.format().ty() == FormatTy::Stencil }
+	fn is_depth_stencil(&self) -> bool { self.format().ty() == FormatTy::DepthStencil }
+	fn has_depth_or_stencil(&self) -> bool { self.is_depth() || self.is_stencil() || self.is_depth_stencil() }
+
+	fn is_compressed(&self) -> bool { self.format().ty() == FormatTy::Compressed }
 }
 
 unsafe impl FormatDesc for Format {
@@ -598,69 +568,6 @@ unsafe impl FormatDesc for Format {
 			(FormatTy::DepthStencil, ClearValue::DepthStencil(_)) => value,
 			_ => panic!("Wrong clear value")
 		}
-	}
-}
-
-/// Trait for types that can possibly describe a float attachment.
-pub unsafe trait PossibleFloatFormatDesc: FormatDesc {
-	/// Returns true if the format is a float format.
-	fn is_float(&self) -> bool;
-}
-unsafe impl PossibleFloatFormatDesc for Format {
-	fn is_float(&self) -> bool { self.ty() == FormatTy::Float }
-}
-
-pub unsafe trait PossibleUintFormatDesc: FormatDesc {
-	fn is_uint(&self) -> bool;
-}
-unsafe impl PossibleUintFormatDesc for Format {
-	fn is_uint(&self) -> bool { self.ty() == FormatTy::Uint }
-}
-
-pub unsafe trait PossibleSintFormatDesc: FormatDesc {
-	fn is_sint(&self) -> bool;
-}
-unsafe impl PossibleSintFormatDesc for Format {
-	fn is_sint(&self) -> bool { self.ty() == FormatTy::Sint }
-}
-
-pub unsafe trait PossibleDepthFormatDesc: FormatDesc {
-	fn is_depth(&self) -> bool;
-}
-unsafe impl PossibleDepthFormatDesc for Format {
-	fn is_depth(&self) -> bool { self.ty() == FormatTy::Depth }
-}
-
-pub unsafe trait PossibleStencilFormatDesc: FormatDesc {
-	fn is_stencil(&self) -> bool;
-}
-
-unsafe impl PossibleStencilFormatDesc for Format {
-	fn is_stencil(&self) -> bool { self.ty() == FormatTy::Stencil }
-}
-
-pub unsafe trait PossibleDepthStencilFormatDesc: FormatDesc {
-	fn is_depth_stencil(&self) -> bool;
-}
-unsafe impl PossibleDepthStencilFormatDesc for Format {
-	fn is_depth_stencil(&self) -> bool { self.ty() == FormatTy::DepthStencil }
-}
-
-pub unsafe trait PossibleCompressedFormatDesc: FormatDesc {
-	fn is_compressed(&self) -> bool;
-}
-unsafe impl PossibleCompressedFormatDesc for Format {
-	fn is_compressed(&self) -> bool { self.ty() == FormatTy::Compressed }
-}
-
-/// Trait for types that can possibly describe a float or compressed attachment.
-pub unsafe trait PossibleFloatOrCompressedFormatDesc: FormatDesc {
-	/// Returns true if the format is a float or compressed format.
-	fn is_float_or_compressed(&self) -> bool;
-}
-unsafe impl PossibleFloatOrCompressedFormatDesc for Format {
-	fn is_float_or_compressed(&self) -> bool {
-		self.ty() == FormatTy::Float || self.ty() == FormatTy::Compressed
 	}
 }
 

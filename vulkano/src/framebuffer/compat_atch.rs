@@ -10,7 +10,7 @@
 //! This module contains the `ensure_image_view_compatible` function, which verifies whether
 //! an image view can be used as a render pass attachment.
 
-use crate::{format::Format, framebuffer::RenderPassDesc, image::ImageViewAccess};
+use crate::{format::{Format, FormatDesc}, framebuffer::RenderPassDesc, image::ImageViewAccess};
 use std::{error, fmt};
 
 /// Checks whether the given image view is allowed to be the nth attachment of the given render
@@ -55,7 +55,7 @@ where
 			.expect("Subpass num out of range ; wrong RenderPassDesc trait impl");
 
 		if subpass.color_attachments.iter().any(|&(n, _)| n == attachment_num) {
-			debug_assert!(image.parent().has_color()); // Was normally checked by the render pass.
+			debug_assert!(image.parent().format().has_color()); // Was normally checked by the render pass.
 			if !image.usage().color_attachment {
 				return Err(IncompatibleRenderPassAttachmentError::MissingColorAttachmentUsage)
 			}
@@ -64,7 +64,7 @@ where
 		if let Some((ds, _)) = subpass.depth_stencil {
 			if ds == attachment_num {
 				// Was normally checked by the render pass.
-				debug_assert!(image.parent().has_depth() || image.parent().has_stencil());
+				debug_assert!(image.parent().format().has_depth_or_stencil());
 				if !image.usage().depth_stencil_attachment {
 					return Err(
 						IncompatibleRenderPassAttachmentError::MissingDepthStencilAttachmentUsage

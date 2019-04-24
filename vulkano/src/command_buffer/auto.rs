@@ -597,12 +597,8 @@ impl<P> AutoCommandBufferBuilder<P> {
 			let copy = UnsafeCommandBufferBuilderImageCopy {
 				// TODO: Allowing choosing a subset of the image aspects, but note that if color
 				// is included, neither depth nor stencil may.
-				aspect: UnsafeCommandBufferBuilderImageAspect {
-					color: source.has_color(),
-					depth: !source.has_color() && source.has_depth() && destination.has_depth(),
-					stencil: !source.has_color()
-						&& source.has_stencil() && destination.has_stencil()
-				},
+				aspect: UnsafeCommandBufferBuilderImageAspect::from_format(source.format())
+				& UnsafeCommandBufferBuilderImageAspect::from_format(destination.format()),
 				source_mip_level,
 				destination_mip_level,
 				source_base_array_layer,
@@ -692,15 +688,8 @@ impl<P> AutoCommandBufferBuilder<P> {
 
 			let blit = UnsafeCommandBufferBuilderImageBlit {
 				// TODO:
-				aspect: if source.has_color() {
-					UnsafeCommandBufferBuilderImageAspect {
-						color: true,
-						depth: false,
-						stencil: false
-					}
-				} else {
-					unimplemented!()
-				},
+				aspect: UnsafeCommandBufferBuilderImageAspect::from_format(source.format())
+				& UnsafeCommandBufferBuilderImageAspect::from_format(destination.format()),
 				source_mip_level,
 				destination_mip_level,
 				source_base_array_layer,
@@ -866,20 +855,7 @@ impl<P> AutoCommandBufferBuilder<P> {
 				buffer_image_height: 0,
 
 				// TODO: What does this change break?
-				image_aspect: UnsafeCommandBufferBuilderImageAspect {
-					color: destination.has_color(),
-					depth: destination.has_depth(),
-					stencil: destination.has_stencil()
-				},
-				// image_aspect: if destination.has_color() {
-				//     UnsafeCommandBufferBuilderImageAspect {
-				//         color: true,
-				//         depth: false,
-				//         stencil: false,
-				//     }
-				// } else {
-				//     unimplemented!()
-				// },
+				image_aspect: UnsafeCommandBufferBuilderImageAspect::from_format(destination.format()),
 				image_mip_level: mipmap,
 				image_base_array_layer: first_layer,
 				image_layer_count: num_layers,
@@ -949,11 +925,7 @@ impl<P> AutoCommandBufferBuilder<P> {
 				buffer_offset: 0,
 				buffer_row_length: 0,
 				buffer_image_height: 0,
-				image_aspect: UnsafeCommandBufferBuilderImageAspect {
-					color: source.has_color(),
-					depth: source.has_depth(),
-					stencil: source.has_stencil()
-				},
+				image_aspect: UnsafeCommandBufferBuilderImageAspect::from_format(source.format()),
 				image_mip_level: mipmap,
 				image_base_array_layer: first_layer,
 				image_layer_count: num_layers,
