@@ -544,7 +544,6 @@ impl UnsafeImage {
 		(self.format_features & vk::FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) != 0
 	}
 }
-
 unsafe impl VulkanObject for UnsafeImage {
 	type Object = vk::Image;
 
@@ -552,13 +551,11 @@ unsafe impl VulkanObject for UnsafeImage {
 
 	fn internal_object(&self) -> vk::Image { self.image }
 }
-
 impl fmt::Debug for UnsafeImage {
 	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
 		write!(fmt, "<Vulkan image {:?}>", self.image)
 	}
 }
-
 impl Drop for UnsafeImage {
 	fn drop(&mut self) {
 		if self.needs_destruction {
@@ -575,7 +572,7 @@ impl Drop for UnsafeImage {
 pub enum UnsafeImageCreationError {
 	/// Allocating memory failed.
 	AllocError(DeviceMemoryAllocError),
-	/// The dimensions are too large, or one of the dimensions is 0.
+	/// The requested dimensions are not supported.
 	UnsupportedDimensions(ImageDimensions),
 	/// A wrong number of mipmaps was provided.
 	InvalidMipmapsCount { requested: u32, valid_range: Range<u32> },

@@ -103,19 +103,19 @@ pub struct RequiredLayouts {
 
 	/// Layout in descriptor sets as storage image.
 	///
-	/// None means that this view cannot be used in such descriptors.
+	/// None means to attempt to infer at view creation.
 	pub storage: Option<ImageLayoutStorageImage>,
 	/// Layout in descriptor sets as sampled image.
 	///
-	/// None means that this view cannot be used in such descriptors.
+	/// None means to attempt to infer at view creation.
 	pub sampled: Option<ImageLayoutSampledImage>,
 	/// Layout in descriptor sets as combined image and sampler.
 	///
-	/// None means that this view cannot be used in such descriptors.
+	/// None means to attempt to infer at view creation.
 	pub combined: Option<ImageLayoutCombinedImage>,
 	/// Layout in descriptor sets as input attachment.
 	///
-	/// None means that this view cannot be used in such descriptors.
+	/// None means to attempt to infer at view creation.
 	/// TODO: currently is ignored in descriptor set logic
 	pub input_attachment: Option<ImageLayoutInputAttachment>
 }
@@ -124,6 +124,18 @@ impl RequiredLayouts {
 	pub const fn none() -> Self {
 		RequiredLayouts {
 			global: None,
+
+			storage: None,
+			sampled: None,
+			combined: None,
+			input_attachment: None
+		}
+	}
+
+	/// Only sets the global and leaves the rest as None.
+	pub const fn global(layout: ImageLayoutEnd) -> Self {
+		RequiredLayouts {
+			global: Some(layout),
 
 			storage: None,
 			sampled: None,
@@ -151,6 +163,44 @@ impl RequiredLayouts {
 		}
 
 		Ok(())
+	}
+
+	/// Uses the image usage to infer storage, sampled, combined and input_attachment.
+	pub fn infer_mut(&mut self, usage: ImageUsage) {
+		macro_rules! check_required_layout {
+			($thing: expr) => {
+				if $thing.valid_for_usage(usage).is_ok() {
+					Some($thing)
+				} else {
+					None
+					}
+			};
+		}
+
+		if self.storage == None {
+			self.storage = check_required_layout!(ImageLayoutStorageImage::General);
+		}
+
+		if self.sampled == None {
+			self.sampled =
+				check_required_layout!(ImageLayoutSampledImage::DepthStencilReadOnlyOptimal)
+					.or(check_required_layout!(ImageLayoutSampledImage::ShaderReadOnlyOptimal))
+					.or(check_required_layout!(ImageLayoutSampledImage::General));
+		}
+
+		if self.combined == None {
+			self.combined =
+				check_required_layout!(ImageLayoutCombinedImage::DepthStencilReadOnlyOptimal)
+					.or(check_required_layout!(ImageLayoutCombinedImage::ShaderReadOnlyOptimal))
+					.or(check_required_layout!(ImageLayoutCombinedImage::General));
+		}
+
+		if self.input_attachment == None {
+			self.input_attachment =
+				check_required_layout!(ImageLayoutInputAttachment::DepthStencilReadOnlyOptimal)
+					.or(check_required_layout!(ImageLayoutInputAttachment::ShaderReadOnlyOptimal))
+					.or(check_required_layout!(ImageLayoutInputAttachment::General));
+		}
 	}
 }
 

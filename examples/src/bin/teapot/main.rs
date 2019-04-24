@@ -22,14 +22,7 @@ use vulkano::{
 	device::{Device, DeviceExtensions},
 	format::Format,
 	framebuffer::{Framebuffer, FramebufferAbstract, RenderPassAbstract, Subpass},
-	image::{
-		ImageDimensions,
-		ImageSubresourceRange,
-		ImageUsage,
-		ImageView,
-		SwapchainImage,
-		SyncImage
-	},
+	image::{ImageDimensions, ImageUsage, ImageView, SwapchainImage, SyncImage},
 	instance::{Instance, PhysicalDevice},
 	pipeline::{
 		vertex::TwoBuffersDefinition,
@@ -327,10 +320,7 @@ fn window_size_dependent_setup(
 
 		// Then create the view. It will keep the image alive.
 		let depth_buffer = Arc::new(depth_buffer);
-		let subresource_range = ImageSubresourceRange::whole_image(&depth_buffer);
-		Arc::new(
-			ImageView::new_attachment(depth_buffer, None::<Format>, subresource_range).unwrap()
-		)
+		Arc::new(ImageView::new_attachment(depth_buffer, None::<Format>, None).unwrap())
 	};
 
 	let framebuffers = images

@@ -73,15 +73,7 @@ use vulkano::{
 	device::{Device, DeviceExtensions},
 	format::{ClearValue, Format},
 	framebuffer::{Framebuffer, Subpass},
-	image::{
-		layout::RequiredLayouts,
-		ImageDimensions,
-		ImageSubresourceRange,
-		ImageUsage,
-		ImageView,
-		Swizzle,
-		SyncImage
-	},
+	image::{layout::RequiredLayouts, ImageDimensions, ImageUsage, ImageView, Swizzle, SyncImage},
 	instance::{Instance, InstanceExtensions, PhysicalDevice},
 	pipeline::{viewport::Viewport, GraphicsPipeline},
 	sync::GpuFuture
@@ -125,8 +117,7 @@ fn main() {
 			.unwrap()
 		);
 
-		let subresource_range = ImageSubresourceRange::whole_image(&image);
-		Arc::new(ImageView::new_attachment(image, None::<Format>, subresource_range).unwrap())
+		Arc::new(ImageView::new_attachment(image, None::<Format>, None).unwrap())
 	};
 
 	// This is the final image that will receive the anti-aliased triangle.
@@ -146,14 +137,13 @@ fn main() {
 			.unwrap()
 		);
 
-		let subresource_range = ImageSubresourceRange::whole_image(&image);
 		Arc::new(
 			ImageView::new(
 				image,
 				None,
 				None::<Format>,
 				Swizzle::default(),
-				subresource_range,
+				None,
 				RequiredLayouts::none()
 			)
 			.unwrap()

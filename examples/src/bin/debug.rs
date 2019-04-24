@@ -16,7 +16,6 @@ use vulkano::{
 	format::Format,
 	image::{
 		ImageDimensions,
-		ImageSubresourceRange,
 		ImageUsage,
 		ImageView,
 		MipmapsCount,
@@ -143,7 +142,7 @@ fn main() {
 			None,
 			None::<Format>,
 			Swizzle::default(),
-			ImageSubresourceRange::whole_image(&image),
+			None,
 			RequiredLayouts::default()
 		)
 		.unwrap()

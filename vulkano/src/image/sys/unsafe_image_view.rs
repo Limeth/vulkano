@@ -208,7 +208,6 @@ impl UnsafeImageView {
 	/// Swizzle getter.
 	pub fn swizzle(&self) -> Swizzle { self.swizzle }
 }
-
 unsafe impl VulkanObject for UnsafeImageView {
 	type Object = vk::ImageView;
 
@@ -216,13 +215,11 @@ unsafe impl VulkanObject for UnsafeImageView {
 
 	fn internal_object(&self) -> vk::ImageView { self.view }
 }
-
 impl fmt::Debug for UnsafeImageView {
 	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
 		write!(fmt, "<Vulkan image view {:?}>", self.view)
 	}
 }
-
 impl Drop for UnsafeImageView {
 	fn drop(&mut self) {
 		unsafe {

@@ -3,14 +3,7 @@ use std::{error, fmt};
 use crate::{
 	format::{FormatDesc, FormatTy},
 	image::{
-		layout::{
-			ImageLayoutCombinedImage,
-			ImageLayoutEnd,
-			ImageLayoutInputAttachment,
-			ImageLayoutSampledImage,
-			ImageLayoutStorageImage,
-			RequiredLayouts
-		},
+		layout::{ImageLayoutEnd, RequiredLayouts},
 		ImageAccess,
 		ImageSubresourceRange,
 		ImageViewCreationError,
@@ -29,7 +22,7 @@ impl<I: ImageAccess> ImageView<I> {
 	///
 	/// TODO: `format` parameter currently doesn't do anything, the image format is used instead.
 	pub fn new_attachment<F: FormatDesc>(
-		image: I, format: Option<F>, subresource_range: ImageSubresourceRange
+		image: I, format: Option<F>, subresource_range: Option<ImageSubresourceRange>
 	) -> Result<ImageView<I>, AttachmentImageViewCreationError> {
 		let is_depth_or_stencil = match image.format().ty() {
 			FormatTy::Depth => true,
@@ -41,43 +34,11 @@ impl<I: ImageAccess> ImageView<I> {
 			_ => false
 		};
 
-		macro_rules! check_required_layout {
-			($thing: expr) => {
-				if $thing.valid_for_usage(image.usage()).is_ok() {
-					Some($thing)
-				} else {
-					None
-					}
-			};
-		}
-
 		let required_layouts = {
 			if is_depth_or_stencil {
-				RequiredLayouts {
-					global: Some(ImageLayoutEnd::DepthStencilAttachmentOptimal),
-					storage: check_required_layout!(ImageLayoutStorageImage::General),
-					sampled: check_required_layout!(
-						ImageLayoutSampledImage::DepthStencilReadOnlyOptimal
-					),
-					combined: check_required_layout!(
-						ImageLayoutCombinedImage::DepthStencilReadOnlyOptimal
-					),
-					input_attachment: check_required_layout!(
-						ImageLayoutInputAttachment::DepthStencilReadOnlyOptimal
-					)
-				}
+				RequiredLayouts::global(ImageLayoutEnd::DepthStencilAttachmentOptimal)
 			} else {
-				RequiredLayouts {
-					global: Some(ImageLayoutEnd::ColorAttachmentOptimal),
-					storage: check_required_layout!(ImageLayoutStorageImage::General),
-					sampled: check_required_layout!(ImageLayoutSampledImage::ShaderReadOnlyOptimal),
-					combined: check_required_layout!(
-						ImageLayoutCombinedImage::ShaderReadOnlyOptimal
-					),
-					input_attachment: check_required_layout!(
-						ImageLayoutInputAttachment::ShaderReadOnlyOptimal
-					)
-				}
+				RequiredLayouts::global(ImageLayoutEnd::ColorAttachmentOptimal)
 			}
 		};
 

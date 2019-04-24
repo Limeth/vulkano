@@ -19,7 +19,6 @@ use vulkano::{
 	image::{
 		ImageAccess,
 		ImageDimensions,
-		ImageSubresourceRange,
 		ImageUsage,
 		ImageView,
 		ImageViewAccess,
@@ -206,8 +205,7 @@ impl FrameSystem {
 				.unwrap()
 			);
 
-			let subresource_range = ImageSubresourceRange::whole_image(&image);
-			Arc::new(ImageView::new_attachment(image, None::<Format>, subresource_range).unwrap())
+			Arc::new(ImageView::new_attachment(image, None::<Format>, None).unwrap())
 		};
 
 		let normals_buffer = {
@@ -228,8 +226,7 @@ impl FrameSystem {
 				.unwrap()
 			);
 
-			let subresource_range = ImageSubresourceRange::whole_image(&image);
-			Arc::new(ImageView::new_attachment(image, None::<Format>, subresource_range).unwrap())
+			Arc::new(ImageView::new_attachment(image, None::<Format>, None).unwrap())
 		};
 
 		let depth_buffer = {
@@ -250,8 +247,7 @@ impl FrameSystem {
 				.unwrap()
 			);
 
-			let subresource_range = ImageSubresourceRange::whole_image(&image);
-			Arc::new(ImageView::new_attachment(image, None::<Format>, subresource_range).unwrap())
+			Arc::new(ImageView::new_attachment(image, None::<Format>, None).unwrap())
 		};
 
 		[diffuse_buffer, normals_buffer, depth_buffer]

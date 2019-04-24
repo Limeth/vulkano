@@ -23,7 +23,6 @@ use vulkano::{
 		ImageDimensions,
 		ImageLayoutCombinedImage,
 		ImageLayoutSampledImage,
-		ImageSubresourceRange,
 		ImageUsage,
 		ImageView,
 		MipmapsCount,
@@ -175,7 +174,7 @@ fn main() {
 				None,
 				None::<Format>,
 				Swizzle::default(),
-				ImageSubresourceRange::whole_image(&image),
+				None,
 				RequiredLayouts {
 					sampled: Some(ImageLayoutSampledImage::ShaderReadOnlyOptimal),
 					combined: Some(ImageLayoutCombinedImage::ShaderReadOnlyOptimal),
