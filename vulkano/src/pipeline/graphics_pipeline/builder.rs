@@ -157,150 +157,82 @@ where
 	pub fn build(
 		self, device: Arc<Device>
 	) -> Result<
-		GraphicsPipeline<Vdef, Box<PipelineLayoutAbstract + Send + Sync>, Rp>,
+		GraphicsPipeline<Vdef, Arc<PipelineLayoutAbstract + Send + Sync>, Rp>,
 		GraphicsPipelineCreationError
 	> {
 		self.with_auto_layout(device, &[])
 	}
 
-	/// Builds the graphics pipeline, using an inferred pipeline layout with some dynamic buffers.
-	///
-	/// Configures the inferred layout for each descriptor `(set, binding)` in `dynamic_buffers` to accept dynamic
-	/// buffers.
-	pub fn with_auto_layout(
-		self, device: Arc<Device>, dynamic_buffers: &[(usize, usize)]
-	) -> Result<
-		GraphicsPipeline<Vdef, Box<PipelineLayoutAbstract + Send + Sync>, Rp>,
-		GraphicsPipelineCreationError
-	> {
-		let pipeline_layout;
-
-		if let Some(ref tess) = self.tessellation {
+	pub fn construct_layout_desc(&self, dynamic_buffers: &[(usize, usize)]) -> Result<Arc<dyn PipelineLayoutDesc + Send + Sync>, GraphicsPipelineCreationError> {
+		Ok(if let Some(ref tess) = self.tessellation {
 			if let Some(ref gs) = self.geometry_shader {
-				if let Err(err) = tess
-					.tessellation_control_shader
+				if let Err(err) = tess.tessellation_control_shader
 					.0
 					.input()
 					.matches(self.vertex_shader.as_ref().unwrap().0.output())
-				{
-					return Err(GraphicsPipelineCreationError::VertexTessControlStagesMismatch(err))
-				}
-				if let Err(err) = tess
-					.tessellation_evaluation_shader
+					{
+						return Err(GraphicsPipelineCreationError::VertexTessControlStagesMismatch(err));
+					}
+				if let Err(err) = tess.tessellation_evaluation_shader
 					.0
 					.input()
 					.matches(tess.tessellation_control_shader.0.output())
-				{
-					return Err(GraphicsPipelineCreationError::TessControlTessEvalStagesMismatch(
-						err
-					))
-				}
-				if let Err(err) =
-					gs.0.input().matches(tess.tessellation_evaluation_shader.0.output())
-				{
-					return Err(GraphicsPipelineCreationError::TessEvalGeometryStagesMismatch(err))
-				}
-				if let Err(err) =
-					self.fragment_shader.as_ref().unwrap().0.input().matches(gs.0.output())
-				{
-					return Err(GraphicsPipelineCreationError::GeometryFragmentStagesMismatch(err))
-				}
-
-				pipeline_layout = Box::new(
-					PipelineLayoutDescTweaks::new(
-						self.vertex_shader
-							.as_ref()
-							.unwrap()
-							.0
-							.layout()
-							.clone()
-							.union(self.fragment_shader.as_ref().unwrap().0.layout().clone())
-							.union(
-								self.tessellation
-									.as_ref()
-									.unwrap()
-									.tessellation_control_shader
-									.0
-									.layout()
-									.clone()
-							) // FIXME: unwrap()
-							.union(
-								self.tessellation
-									.as_ref()
-									.unwrap()
-									.tessellation_evaluation_shader
-									.0
-									.layout()
-									.clone()
-							) // FIXME: unwrap()
-							.union(self.geometry_shader.as_ref().unwrap().0.layout().clone()), /* FIXME: unwrap() */
-						dynamic_buffers.into_iter().cloned()
-					)
-					.build(device.clone())
+					{
+						return Err(GraphicsPipelineCreationError::TessControlTessEvalStagesMismatch(err));
+					}
+				if let Err(err) = gs.0
+					.input()
+					.matches(tess.tessellation_evaluation_shader.0.output())
+					{
+						return Err(GraphicsPipelineCreationError::TessEvalGeometryStagesMismatch(err));
+					}
+				if let Err(err) = self.fragment_shader
+					.as_ref()
 					.unwrap()
-				) as Box<_>; // TODO: error
+					.0
+					.input()
+					.matches(gs.0.output())
+					{
+						return Err(GraphicsPipelineCreationError::GeometryFragmentStagesMismatch(err));
+					}
+
+				Arc::new(PipelineLayoutDescTweaks::new(self.vertex_shader.as_ref().unwrap().0.layout().clone()
+					.union(self.fragment_shader.as_ref().unwrap().0.layout().clone())
+					.union(self.tessellation.as_ref().unwrap().tessellation_control_shader.0.layout().clone())    // FIXME: unwrap()
+					.union(self.tessellation.as_ref().unwrap().tessellation_evaluation_shader.0.layout().clone())    // FIXME: unwrap()
+					.union(self.geometry_shader.as_ref().unwrap().0.layout().clone()),    // FIXME: unwrap()
+					dynamic_buffers.into_iter().cloned())
+				)
 			} else {
-				if let Err(err) = tess
-					.tessellation_control_shader
+				if let Err(err) = tess.tessellation_control_shader
 					.0
 					.input()
 					.matches(self.vertex_shader.as_ref().unwrap().0.output())
-				{
-					return Err(GraphicsPipelineCreationError::VertexTessControlStagesMismatch(err))
-				}
-				if let Err(err) = tess
-					.tessellation_evaluation_shader
+					{
+						return Err(GraphicsPipelineCreationError::VertexTessControlStagesMismatch(err));
+					}
+				if let Err(err) = tess.tessellation_evaluation_shader
 					.0
 					.input()
 					.matches(tess.tessellation_control_shader.0.output())
-				{
-					return Err(GraphicsPipelineCreationError::TessControlTessEvalStagesMismatch(
-						err
-					))
-				}
-				if let Err(err) = self
-					.fragment_shader
+					{
+						return Err(GraphicsPipelineCreationError::TessControlTessEvalStagesMismatch(err));
+					}
+				if let Err(err) = self.fragment_shader
 					.as_ref()
 					.unwrap()
 					.0
 					.input()
 					.matches(tess.tessellation_evaluation_shader.0.output())
-				{
-					return Err(GraphicsPipelineCreationError::TessEvalFragmentStagesMismatch(err))
-				}
+					{
+						return Err(GraphicsPipelineCreationError::TessEvalFragmentStagesMismatch(err));
+					}
 
-				pipeline_layout = Box::new(
-					PipelineLayoutDescTweaks::new(
-						self.vertex_shader
-							.as_ref()
-							.unwrap()
-							.0
-							.layout()
-							.clone()
-							.union(self.fragment_shader.as_ref().unwrap().0.layout().clone())
-							.union(
-								self.tessellation
-									.as_ref()
-									.unwrap()
-									.tessellation_control_shader
-									.0
-									.layout()
-									.clone()
-							) // FIXME: unwrap()
-							.union(
-								self.tessellation
-									.as_ref()
-									.unwrap()
-									.tessellation_evaluation_shader
-									.0
-									.layout()
-									.clone()
-							), // FIXME: unwrap()
-						dynamic_buffers.into_iter().cloned()
-					)
-					.build(device.clone())
-					.unwrap()
-				) as Box<_>; // TODO: error
+				Arc::new(PipelineLayoutDescTweaks::new(self.vertex_shader.as_ref().unwrap().0.layout().clone()
+					.union(self.fragment_shader.as_ref().unwrap().0.layout().clone())
+					.union(self.tessellation.as_ref().unwrap().tessellation_control_shader.0.layout().clone())    // FIXME: unwrap()
+					.union(self.tessellation.as_ref().unwrap().tessellation_evaluation_shader.0.layout().clone()),    // FIXME: unwrap()
+					dynamic_buffers.into_iter().cloned()))
 			}
 		} else {
 			if let Some(ref geometry_shader) = self.geometry_shader {
@@ -308,63 +240,52 @@ where
 					.0
 					.input()
 					.matches(self.vertex_shader.as_ref().unwrap().0.output())
-				{
-					return Err(GraphicsPipelineCreationError::VertexGeometryStagesMismatch(err))
-				}
-				if let Err(err) = self
-					.fragment_shader
+					{
+						return Err(GraphicsPipelineCreationError::VertexGeometryStagesMismatch(err));
+					}
+				if let Err(err) = self.fragment_shader
 					.as_ref()
 					.unwrap()
 					.0
 					.input()
 					.matches(geometry_shader.0.output())
-				{
-					return Err(GraphicsPipelineCreationError::GeometryFragmentStagesMismatch(err))
-				}
+					{
+						return Err(GraphicsPipelineCreationError::GeometryFragmentStagesMismatch(err));
+					}
 
-				pipeline_layout = Box::new(
-					PipelineLayoutDescTweaks::new(
-						self.vertex_shader
-							.as_ref()
-							.unwrap()
-							.0
-							.layout()
-							.clone()
-							.union(self.fragment_shader.as_ref().unwrap().0.layout().clone())
-							.union(self.geometry_shader.as_ref().unwrap().0.layout().clone()), /* FIXME: unwrap() */
-						dynamic_buffers.into_iter().cloned()
-					)
-					.build(device.clone())
-					.unwrap()
-				) as Box<_>; // TODO: error
+				Arc::new(PipelineLayoutDescTweaks::new(self.vertex_shader.as_ref().unwrap().0.layout().clone()
+					.union(self.fragment_shader.as_ref().unwrap().0.layout().clone())
+					.union(self.geometry_shader.as_ref().unwrap().0.layout().clone()),    // FIXME: unwrap()
+					dynamic_buffers.into_iter().cloned()))
 			} else {
-				if let Err(err) = self
-					.fragment_shader
+				if let Err(err) = self.fragment_shader
 					.as_ref()
 					.unwrap()
 					.0
 					.input()
 					.matches(self.vertex_shader.as_ref().unwrap().0.output())
-				{
-					return Err(GraphicsPipelineCreationError::VertexFragmentStagesMismatch(err))
-				}
+					{
+						return Err(GraphicsPipelineCreationError::VertexFragmentStagesMismatch(err));
+					}
 
-				pipeline_layout = Box::new(
-					PipelineLayoutDescTweaks::new(
-						self.vertex_shader
-							.as_ref()
-							.unwrap()
-							.0
-							.layout()
-							.clone()
-							.union(self.fragment_shader.as_ref().unwrap().0.layout().clone()),
-						dynamic_buffers.into_iter().cloned()
-					)
-					.build(device.clone())
-					.unwrap()
-				) as Box<_>; // TODO: error
+				Arc::new(PipelineLayoutDescTweaks::new(self.vertex_shader.as_ref().unwrap().0.layout().clone()
+					.union(self.fragment_shader.as_ref().unwrap().0.layout().clone()),
+					dynamic_buffers.into_iter().cloned()))
 			}
-		}
+		})
+	}
+
+	/// Builds the graphics pipeline, using an inferred pipeline layout with some dynamic buffers.
+	///
+	/// Configures the inferred layout for each descriptor `(set, binding)` in `dynamic_buffers` to accept dynamic
+	/// buffers.
+	pub fn with_auto_layout(self, device: Arc<Device>, dynamic_buffers: &[(usize, usize)])
+		-> Result<GraphicsPipeline<Vdef, Arc<PipelineLayoutAbstract + Send + Sync>, Rp>,
+		GraphicsPipelineCreationError>
+	{
+		let pipeline_layout = Arc::new(
+			self.construct_layout_desc(dynamic_buffers)?.build(device.clone()).unwrap()
+		);
 
 		self.with_pipeline_layout(device, pipeline_layout)
 	}
