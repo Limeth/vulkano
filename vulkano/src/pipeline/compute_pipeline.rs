@@ -221,29 +221,6 @@ where
 	}
 }
 
-unsafe impl<Pl> PipelineLayoutDesc for ComputePipeline<Pl>
-where
-	Pl: PipelineLayoutDesc
-{
-	fn num_sets(&self) -> usize { self.pipeline_layout.num_sets() }
-
-	fn num_bindings_in_set(&self, set: usize) -> Option<usize> {
-		self.pipeline_layout.num_bindings_in_set(set)
-	}
-
-	fn descriptor(&self, set: usize, binding: usize) -> Option<DescriptorDesc> {
-		self.pipeline_layout.descriptor(set, binding)
-	}
-
-	fn num_push_constants_ranges(&self) -> usize {
-		self.pipeline_layout.num_push_constants_ranges()
-	}
-
-	fn push_constants_range(&self, num: usize) -> Option<PipelineLayoutDescPcRange> {
-		self.pipeline_layout.push_constants_range(num)
-	}
-}
-
 unsafe impl<Pl> DeviceOwned for ComputePipeline<Pl> {
 	fn device(&self) -> &Arc<Device> { self.device() }
 }
@@ -395,6 +372,9 @@ mod tests {
 		let shader = unsafe {
 			#[derive(Debug, Copy, Clone)]
 			struct Layout;
+
+                        impl_pipeline_layout_desc_requirements!(Layout);
+
 			unsafe impl PipelineLayoutDesc for Layout {
 				fn num_sets(&self) -> usize { 1 }
 

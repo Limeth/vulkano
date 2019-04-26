@@ -16,10 +16,15 @@ use fnv::FnvHashSet;
 /// Transforms a `PipelineLayoutDesc`.
 ///
 /// Used to adjust automatically inferred `PipelineLayoutDesc`s with information that cannot be inferred.
-pub struct PipelineLayoutDescTweaks<T> {
+pub struct PipelineLayoutDescTweaks<T>
+where
+	T: PipelineLayoutDesc
+{
 	inner: T,
 	dynamic_buffers: FnvHashSet<(usize, usize)>
 }
+
+impl_pipeline_layout_desc_requirements!(<T: {PipelineLayoutDesc}> PipelineLayoutDescTweaks<T>);
 
 impl<T> PipelineLayoutDescTweaks<T>
 where

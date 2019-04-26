@@ -68,10 +68,11 @@ pub use self::{
 
 pub(crate) use self::tweaks::PipelineLayoutDescTweaks;
 
+#[macro_use]
+mod traits;
 mod empty;
 mod limits_check;
 mod runtime_desc;
 mod sys;
-mod traits;
 mod tweaks;
 mod union;

@@ -27,6 +27,8 @@ use crate::descriptor::{
 #[derive(Debug, Copy, Clone)]
 pub struct EmptyPipelineDesc;
 
+impl_pipeline_layout_desc_requirements!(EmptyPipelineDesc);
+
 unsafe impl PipelineLayoutDesc for EmptyPipelineDesc {
 	fn num_sets(&self) -> usize { 0 }
 

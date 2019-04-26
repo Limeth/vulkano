@@ -23,6 +23,8 @@ pub struct PipelineLayoutDescUnion<A, B> {
 	b: B
 }
 
+impl_pipeline_layout_desc_requirements!(<A: {PipelineLayoutDesc}, B: {PipelineLayoutDesc}> PipelineLayoutDescUnion<A, B>);
+
 impl<A, B> PipelineLayoutDescUnion<A, B> {
 	// FIXME: check collisions
 	pub fn new(a: A, b: B) -> PipelineLayoutDescUnion<A, B> { PipelineLayoutDescUnion { a, b } }

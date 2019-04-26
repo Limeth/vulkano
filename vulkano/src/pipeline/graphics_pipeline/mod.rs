@@ -168,27 +168,6 @@ where
 	}
 }
 
-unsafe impl<Mv, L, Rp> PipelineLayoutDesc for GraphicsPipeline<Mv, L, Rp>
-where
-	L: PipelineLayoutDesc
-{
-	fn num_sets(&self) -> usize { self.layout.num_sets() }
-
-	fn num_bindings_in_set(&self, set: usize) -> Option<usize> {
-		self.layout.num_bindings_in_set(set)
-	}
-
-	fn descriptor(&self, set: usize, binding: usize) -> Option<DescriptorDesc> {
-		self.layout.descriptor(set, binding)
-	}
-
-	fn num_push_constants_ranges(&self) -> usize { self.layout.num_push_constants_ranges() }
-
-	fn push_constants_range(&self, num: usize) -> Option<PipelineLayoutDescPcRange> {
-		self.layout.push_constants_range(num)
-	}
-}
-
 unsafe impl<Mv, L, Rp> DeviceOwned for GraphicsPipeline<Mv, L, Rp> {
 	fn device(&self) -> &Arc<Device> { &self.inner.device }
 }

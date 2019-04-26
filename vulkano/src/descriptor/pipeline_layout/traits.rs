@@ -7,7 +7,7 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use std::{cmp, error, fmt, sync::Arc};
+use std::{cmp, error, fmt, sync::Arc, hash::Hash};
 
 use crate::{
 	descriptor::{
@@ -53,7 +53,7 @@ where
 }
 
 /// Trait for objects that describe the layout of the descriptors and push constants of a pipeline.
-pub unsafe trait PipelineLayoutDesc {
+pub unsafe trait PipelineLayoutDesc: PartialEq + Eq + Hash {
 	/// Returns the number of sets in the layout. Includes possibly empty sets.
 	///
 	/// In other words, this should be equal to the highest set number plus one.
@@ -112,6 +112,70 @@ pub unsafe trait PipelineLayoutDesc {
 	}
 }
 
+#[macro_export]
+macro_rules! impl_pipeline_layout_desc_requirements {
+	{
+		$(<$($generic_ty:ident$(: {$($generic_bounds:tt)+})?),*>)?
+		$target_ty:ident
+		$(<$($generic_ty_rhs:ident),*>)?
+		$(where $($where_ty:ty$(: {$($where_bounds:tt)+})?),*)?
+	} => {
+		impl$(<$($generic_ty$(: $($generic_bounds)+)?),*>)? std::cmp::PartialEq for $target_ty$(<$($generic_ty_rhs),*>)? $(where $($where_ty$(: $($where_bounds)+)?),*)? {
+			fn eq(&self, other: &Self) -> bool {
+				if self.num_sets() != other.num_sets() {
+					return false;
+				}
+
+				for set in 0..self.num_sets() {
+					if self.num_bindings_in_set(set) != other.num_bindings_in_set(set) {
+						return false;
+					}
+
+					// `num_bindings_in_set` returns `None` when `set` is out of range, that should never
+					// happen here.
+					for binding in 0..self.num_bindings_in_set(set).unwrap() {
+						if self.descriptor(set, binding) != other.descriptor(set, binding) {
+							return false;
+						}
+					}
+				}
+
+				if self.num_push_constants_ranges() != other.num_push_constants_ranges() {
+					return false;
+				}
+
+				for push_constants_range in 0..self.num_push_constants_ranges() {
+					if self.push_constants_range(push_constants_range) != other.push_constants_range(push_constants_range) {
+						return false;
+					}
+				}
+
+				true
+			}
+		}
+
+		impl$(<$($generic_ty$(: $($generic_bounds)+)?),*>)? std::cmp::Eq for $target_ty$(<$($generic_ty_rhs),*>)? $(where $($where_ty$(: $($where_bounds)+)?),*)? {}
+
+		impl$(<$($generic_ty$(: $($generic_bounds)+)?),*>)? std::hash::Hash for $target_ty$(<$($generic_ty_rhs),*>)? $(where $($where_ty$(: $($where_bounds)+)?),*)? {
+			fn hash<H>(&self, state: &mut H) where H: std::hash::Hasher {
+				for set in 0..self.num_sets() {
+					// `num_bindings_in_set` returns `None` when `set` is out of range, that should never
+					// happen here.
+					for binding in 0..self.num_bindings_in_set(set).unwrap() {
+						self.descriptor(set, binding).hash(state);
+					}
+				}
+
+				self.num_push_constants_ranges().hash(state);
+
+				for push_constants_range in 0..self.num_push_constants_ranges() {
+					self.push_constants_range(push_constants_range).hash(state);
+				}
+			}
+		}
+	};
+}
+
 /// Description of a range of the push constants of a pipeline layout.
 // TODO: should contain the layout as well
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -144,6 +208,8 @@ where
 		(**self).push_constants_range(num)
 	}
 }
+
+impl_pipeline_layout_desc_requirements!(<T> T where T: {SafeDeref}, T::Target: {PipelineLayoutDesc});
 
 /// Traits that allow determining whether a pipeline layout is a superset of another one.
 ///
