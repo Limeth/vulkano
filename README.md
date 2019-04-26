@@ -37,9 +37,11 @@ natively supported. See below for more details.
 
 ## Development status and this fork
 
-Since the original author of Vulkano tomaka is no longer around, there hasn't been a lot of activity in Vulkano. While I don't want to blame rukai or anyone else, the fact remains that the original repo is just piling up pull requests and isn't moving anywhere. The reason for this fork is that making breaking changes to fix what is wrong with Vulkano right now is not really possible when pull requests are reviewed once a month if at all.
+Since the original author of Vulkano, tomaka, is not longer developing this project, there hasn't been a lot of activity in Vulkano. The fact is that the original repo is just piling up pull requests and isn't moving anywhere. The reason for this fork is that making breaking changes to fix what is wrong with Vulkano right now is not really possible when pull requests are reviewed once a month if at all.
 
 Currently the main difference of this fork from the base repo is the image rework. It solves lots of issues with the original design and brings back the flexibility of Vulkan without compromising safety. Hopefully, more fixes and new features will come Soon™.
+
+The other "big" change is to the formatting style used in this fork and the `.rustfmt.toml` file. I agree that this is mostly an opinionated change, but I want to be able to read the code and edit the code as conveniently as possible and these are the settings that work for me. You can always change the formatting rules locally, run `cargo +nightly fmt`, edit the code your way and then format it back if you want to contribute.
 
 ## Documentation
 
