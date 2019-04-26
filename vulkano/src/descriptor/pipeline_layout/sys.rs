@@ -217,7 +217,7 @@ impl<L> Drop for PipelineLayout<L> {
 ///
 /// This object exists so that we can pass it around without having to be generic over the template
 /// parameter of the `PipelineLayout`.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct PipelineLayoutSys<'a>(&'a vk::PipelineLayout);
 
 unsafe impl<'a> VulkanObject for PipelineLayoutSys<'a> {

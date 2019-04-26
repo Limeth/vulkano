@@ -388,7 +388,7 @@ impl ImageViewType {
 	pub fn dimensions_type(&self) -> ImageDimensionsType { ImageDimensionsType::from(*self) }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ImageDimensionsType {
 	D1,
 	D2,

@@ -359,7 +359,7 @@ where
 }
 
 /// Opaque object that represents the inside of the graphics pipeline.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct GraphicsPipelineSys<'a>(vk::Pipeline, PhantomData<&'a ()>);
 
 unsafe impl<'a> VulkanObject for GraphicsPipelineSys<'a> {

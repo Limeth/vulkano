@@ -114,7 +114,7 @@ pub unsafe trait PipelineLayoutDesc {
 
 /// Description of a range of the push constants of a pipeline layout.
 // TODO: should contain the layout as well
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct PipelineLayoutDescPcRange {
 	/// Offset in bytes from the start of the push constants to this range.
 	pub offset: usize,

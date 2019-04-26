@@ -55,7 +55,7 @@ use vk_sys as vk;
 /// > will be checked when you create a pipeline layout, a descriptor set, or when you try to bind
 /// > a descriptor set.
 // TODO: add example
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DescriptorDesc {
 	/// Describes the content and layout of each array element of a descriptor.
 	pub ty: DescriptorDescTy,
@@ -158,7 +158,7 @@ impl DescriptorDesc {
 }
 
 /// Describes the content and layout of each array element of a descriptor.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DescriptorDescTy {
 	Sampler,                                   // TODO: the sampler has some restrictions as well
 	CombinedImageSampler(DescriptorImageDesc), // TODO: the sampler has some restrictions as well
@@ -318,7 +318,7 @@ impl DescriptorDescTy {
 }
 
 /// Additional description for descriptors that contain images.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct DescriptorImageDesc {
 	/// If `true`, the image can be sampled by the shader. Only images that were created with the
 	/// `sampled` usage can be attached to the descriptor.
@@ -413,14 +413,14 @@ impl DescriptorImageDesc {
 }
 
 // TODO: documentation
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum DescriptorImageDescArray {
 	NonArrayed,
 	Arrayed { max_layers: Option<u32> }
 }
 
 // TODO: documentation
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DescriptorBufferDesc {
 	pub dynamic: Option<bool>,
 	pub storage: bool
@@ -429,7 +429,7 @@ pub struct DescriptorBufferDesc {
 /// Describes what kind of resource may later be bound to a descriptor.
 ///
 /// This is mostly the same as a `DescriptorDescTy` but with less precise information.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum DescriptorType {
 	Sampler = vk::DESCRIPTOR_TYPE_SAMPLER,
@@ -446,7 +446,7 @@ pub enum DescriptorType {
 }
 
 /// Error when checking whether a descriptor is a superset of another one.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DescriptorDescSupersetError {
 	/// The number of array elements of the descriptor is smaller than expected.
 	ArrayTooSmall {
@@ -538,7 +538,7 @@ impl From<ShaderStagesSupersetError> for DescriptorDescSupersetError {
 
 /// Describes which shader stages have access to a descriptor.
 // TODO: add example with BitOr
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ShaderStages {
 	/// `True` means that the descriptor will be used by the vertex shader.
 	pub vertex: bool,
@@ -688,7 +688,7 @@ impl From<ShaderStages> for PipelineStages {
 }
 
 /// Error when checking whether some shader stages are superset of others.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ShaderStagesSupersetError {
 	NotSuperset
 }
