@@ -137,17 +137,7 @@ fn main() {
 			.unwrap()
 		);
 
-		Arc::new(
-			ImageView::new(
-				image,
-				None,
-				None::<Format>,
-				Swizzle::default(),
-				None,
-				RequiredLayouts::none()
-			)
-			.unwrap()
-		)
+		Arc::new(ImageView::whole_image(image).unwrap())
 	};
 
 	// In this example, we are going to perform the *resolve* (ie. turning a multisampled image
