@@ -68,7 +68,7 @@ mod swapchain;
 pub use swapchain::SwapchainImage;
 
 pub mod view;
-pub use view::{ImageView, ImageViewCreationError};
+pub use view::{AttachmentImageViewCreationError, ImageView, ImageViewCreationError};
 
 /// Specifies how many mipmaps must be allocated.
 ///

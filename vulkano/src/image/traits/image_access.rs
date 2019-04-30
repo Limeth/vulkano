@@ -3,9 +3,7 @@ use std::{num::NonZeroU32, sync::Arc};
 use crate::{
 	buffer::BufferAccess,
 	device::Device,
-	format::{
-		Format
-	},
+	format::Format,
 	image::{
 		layout::{ImageLayout, ImageLayoutEnd},
 		sys::UnsafeImage,

@@ -10,7 +10,11 @@
 //! This module contains the `ensure_image_view_compatible` function, which verifies whether
 //! an image view can be used as a render pass attachment.
 
-use crate::{format::{Format, FormatDesc}, framebuffer::RenderPassDesc, image::ImageViewAccess};
+use crate::{
+	format::{Format, FormatDesc},
+	framebuffer::RenderPassDesc,
+	image::ImageViewAccess
+};
 use std::{error, fmt};
 
 /// Checks whether the given image view is allowed to be the nth attachment of the given render

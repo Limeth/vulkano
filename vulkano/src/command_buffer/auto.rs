@@ -598,7 +598,7 @@ impl<P> AutoCommandBufferBuilder<P> {
 				// TODO: Allowing choosing a subset of the image aspects, but note that if color
 				// is included, neither depth nor stencil may.
 				aspect: UnsafeCommandBufferBuilderImageAspect::from_format(source.format())
-				& UnsafeCommandBufferBuilderImageAspect::from_format(destination.format()),
+					& UnsafeCommandBufferBuilderImageAspect::from_format(destination.format()),
 				source_mip_level,
 				destination_mip_level,
 				source_base_array_layer,
@@ -689,7 +689,7 @@ impl<P> AutoCommandBufferBuilder<P> {
 			let blit = UnsafeCommandBufferBuilderImageBlit {
 				// TODO:
 				aspect: UnsafeCommandBufferBuilderImageAspect::from_format(source.format())
-				& UnsafeCommandBufferBuilderImageAspect::from_format(destination.format()),
+					& UnsafeCommandBufferBuilderImageAspect::from_format(destination.format()),
 				source_mip_level,
 				destination_mip_level,
 				source_base_array_layer,
@@ -855,7 +855,9 @@ impl<P> AutoCommandBufferBuilder<P> {
 				buffer_image_height: 0,
 
 				// TODO: What does this change break?
-				image_aspect: UnsafeCommandBufferBuilderImageAspect::from_format(destination.format()),
+				image_aspect: UnsafeCommandBufferBuilderImageAspect::from_format(
+					destination.format()
+				),
 				image_mip_level: mipmap,
 				image_base_array_layer: first_layer,
 				image_layer_count: num_layers,

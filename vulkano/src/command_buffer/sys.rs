@@ -16,19 +16,14 @@ use vk_sys as vk;
 use crate::{
 	buffer::{BufferAccess, BufferInner},
 	check_errors,
-	command_buffer::{
-		pool::{CommandPool, CommandPoolAlloc, CommandPoolBuilderAlloc},
-	},
+	command_buffer::pool::{CommandPool, CommandPoolAlloc, CommandPoolBuilderAlloc},
 	descriptor::{
 		descriptor::ShaderStages,
 		descriptor_set::UnsafeDescriptorSet,
 		pipeline_layout::PipelineLayoutAbstract
 	},
 	device::{Device, DeviceOwned},
-	format::{ClearValue, FormatTy},
-	format::{
-		FormatDesc
-	},
+	format::{ClearValue, FormatDesc, FormatTy},
 	framebuffer::{
 		EmptySinglePassRenderPassDesc,
 		Framebuffer,

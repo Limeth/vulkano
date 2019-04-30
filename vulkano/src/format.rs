@@ -547,7 +547,9 @@ pub unsafe trait FormatDesc {
 	fn is_depth(&self) -> bool { self.format().ty() == FormatTy::Depth }
 	fn is_stencil(&self) -> bool { self.format().ty() == FormatTy::Stencil }
 	fn is_depth_stencil(&self) -> bool { self.format().ty() == FormatTy::DepthStencil }
-	fn has_depth_or_stencil(&self) -> bool { self.is_depth() || self.is_stencil() || self.is_depth_stencil() }
+	fn has_depth_or_stencil(&self) -> bool {
+		self.is_depth() || self.is_stencil() || self.is_depth_stencil()
+	}
 
 	fn is_compressed(&self) -> bool { self.format().ty() == FormatTy::Compressed }
 }
