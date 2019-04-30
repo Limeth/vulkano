@@ -50,7 +50,7 @@ use crate::{
 	},
 	descriptor::{
 		descriptor_set::DescriptorSetsCollection,
-		pipeline_layout::PipelineLayoutAbstract
+		pipeline_layout::PipelineLayout
 	},
 	device::{Device, DeviceOwned, Queue},
 	format::{AcceptsPixels, ClearValue, Format, FormatTy},
@@ -1334,11 +1334,9 @@ unsafe impl<P> DeviceOwned for AutoCommandBufferBuilder<P> {
 }
 
 // Shortcut function to set the push constants.
-unsafe fn push_constants<P, Pl, Pc>(
-	destination: &mut SyncCommandBufferBuilder<P>, pipeline: Pl, push_constants: Pc
-) where
-	Pl: PipelineLayoutAbstract + Send + Sync + Clone + 'static
-{
+unsafe fn push_constants<P, Pc>(
+	destination: &mut SyncCommandBufferBuilder<P>, pipeline: PipelineLayout, push_constants: Pc
+) {
 	for num_range in 0 .. pipeline.num_push_constants_ranges() {
 		let range = match pipeline.push_constants_range(num_range) {
 			Some(r) => r,
@@ -1405,12 +1403,11 @@ unsafe fn vertex_buffers<P>(
 	Ok(())
 }
 
-unsafe fn descriptor_sets<P, Pl, S>(
+unsafe fn descriptor_sets<P, S>(
 	destination: &mut SyncCommandBufferBuilder<P>, state_cacher: &mut StateCacher, gfx: bool,
-	pipeline: Pl, sets: S
+	pipeline: PipelineLayout, sets: S
 ) -> Result<(), SyncCommandBufferBuilderError>
 where
-	Pl: PipelineLayoutAbstract + Send + Sync + Clone + 'static,
 	S: DescriptorSetsCollection
 {
 	let sets = sets.into_vec();

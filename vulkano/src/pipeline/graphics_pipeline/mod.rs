@@ -14,7 +14,7 @@ use crate::{
 	descriptor::{
 		descriptor::DescriptorDesc,
 		descriptor_set::UnsafeDescriptorSetLayout,
-		pipeline_layout::{PipelineLayoutDesc, PipelineLayoutDescPcRange, PipelineLayoutSys},
+		pipeline_layout::{PipelineLayout, PipelineLayoutDesc, PipelineLayoutDescPcRange, PipelineLayoutSys},
 		PipelineLayoutAbstract
 	},
 	device::{Device, DeviceOwned},
@@ -54,9 +54,9 @@ mod creation_error;
 ///
 /// This object contains the shaders and the various fixed states that describe how the
 /// implementation should perform the various operations needed by a draw command.
-pub struct GraphicsPipeline<VertexDefinition, Layout, RenderP> {
+pub struct GraphicsPipeline<VertexDefinition, RenderP> {
 	inner: Inner,
-	layout: Layout,
+	layout: PipelineLayout,
 
 	render_pass: RenderP,
 	render_pass_subpass: u32,
@@ -81,7 +81,7 @@ struct Inner {
 	device: Arc<Device>
 }
 
-impl GraphicsPipeline<(), (), ()> {
+impl GraphicsPipeline<(), ()> {
 	/// Starts the building process of a graphics pipeline. Returns a builder object that you can
 	/// fill with the various parameters.
 	pub fn start<'a>() -> GraphicsPipelineBuilder<
@@ -102,23 +102,18 @@ impl GraphicsPipeline<(), (), ()> {
 	}
 }
 
-impl<Mv, L, Rp> GraphicsPipeline<Mv, L, Rp> {
+impl<Mv, Rp> GraphicsPipeline<Mv, Rp> {
 	/// Returns the vertex definition used in the constructor.
 	pub fn vertex_definition(&self) -> &Mv { &self.vertex_definition }
 
 	/// Returns the device used to create this pipeline.
 	pub fn device(&self) -> &Arc<Device> { &self.inner.device }
-}
 
-impl<Mv, L, Rp> GraphicsPipeline<Mv, L, Rp>
-where
-	L: PipelineLayoutAbstract
-{
 	/// Returns the pipeline layout used in the constructor.
-	pub fn layout(&self) -> &L { &self.layout }
+	pub fn layout(&self) -> &PipelineLayout { &self.layout }
 }
 
-impl<Mv, L, Rp> GraphicsPipeline<Mv, L, Rp>
+impl<Mv, Rp> GraphicsPipeline<Mv, Rp>
 where
 	Rp: RenderPassDesc
 {
@@ -128,7 +123,7 @@ where
 	}
 }
 
-impl<Mv, L, Rp> GraphicsPipeline<Mv, L, Rp> {
+impl<Mv, Rp> GraphicsPipeline<Mv, Rp> {
 	/// Returns the render pass used in the constructor.
 	pub fn render_pass(&self) -> &Rp { &self.render_pass }
 
@@ -157,35 +152,24 @@ impl<Mv, L, Rp> GraphicsPipeline<Mv, L, Rp> {
 	pub fn has_dynamic_stencil_reference(&self) -> bool { self.dynamic_stencil_reference }
 }
 
-unsafe impl<Mv, L, Rp> PipelineLayoutAbstract for GraphicsPipeline<Mv, L, Rp>
-where
-	L: PipelineLayoutAbstract
-{
-	fn sys(&self) -> PipelineLayoutSys { self.layout.sys() }
-
-	fn descriptor_set_layout(&self, index: usize) -> Option<&Arc<UnsafeDescriptorSetLayout>> {
-		self.layout.descriptor_set_layout(index)
-	}
-}
-
-unsafe impl<Mv, L, Rp> DeviceOwned for GraphicsPipeline<Mv, L, Rp> {
+unsafe impl<Mv, Rp> DeviceOwned for GraphicsPipeline<Mv, Rp> {
 	fn device(&self) -> &Arc<Device> { &self.inner.device }
 }
 
-impl<Mv, L, Rp> fmt::Debug for GraphicsPipeline<Mv, L, Rp> {
+impl<Mv, Rp> fmt::Debug for GraphicsPipeline<Mv, Rp> {
 	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
 		write!(fmt, "<Vulkan graphics pipeline {:?}>", self.inner.pipeline)
 	}
 }
 
-unsafe impl<Mv, L, Rp> RenderPassAbstract for GraphicsPipeline<Mv, L, Rp>
+unsafe impl<Mv, Rp> RenderPassAbstract for GraphicsPipeline<Mv, Rp>
 where
 	Rp: RenderPassAbstract
 {
 	fn inner(&self) -> RenderPassSys { self.render_pass.inner() }
 }
 
-unsafe impl<Mv, L, Rp> RenderPassDesc for GraphicsPipeline<Mv, L, Rp>
+unsafe impl<Mv, Rp> RenderPassDesc for GraphicsPipeline<Mv, Rp>
 where
 	Rp: RenderPassDesc
 {
@@ -208,7 +192,7 @@ where
 	}
 }
 
-unsafe impl<C, Mv, L, Rp> RenderPassDescClearValues<C> for GraphicsPipeline<Mv, L, Rp>
+unsafe impl<Mv, Rp, C> RenderPassDescClearValues<C> for GraphicsPipeline<Mv, Rp>
 where
 	Rp: RenderPassDescClearValues<C>
 {
@@ -217,7 +201,7 @@ where
 	}
 }
 
-unsafe impl<Mv, L, Rp> VulkanObject for GraphicsPipeline<Mv, L, Rp> {
+unsafe impl<Mv, Rp> VulkanObject for GraphicsPipeline<Mv, Rp> {
 	type Object = vk::Pipeline;
 
 	const TYPE: vk::DebugReportObjectTypeEXT = vk::DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT;
@@ -239,7 +223,7 @@ impl Drop for Inner {
 /// When using this trait `AutoCommandBufferBuilder::draw*` calls will need the buffers to be
 /// wrapped in a `vec!()`.
 pub unsafe trait GraphicsPipelineAbstract:
-	PipelineLayoutAbstract + RenderPassAbstract + VertexSource<Vec<Arc<BufferAccess + Send + Sync>>>
+	RenderPassAbstract + VertexSource<Vec<Arc<BufferAccess + Send + Sync>>>
 {
 	/// Returns an opaque object that represents the inside of the graphics pipeline.
 	fn inner(&self) -> GraphicsPipelineSys;
@@ -282,9 +266,8 @@ pub unsafe trait GraphicsPipelineAbstract:
 	fn has_dynamic_stencil_reference(&self) -> bool;
 }
 
-unsafe impl<Mv, L, Rp> GraphicsPipelineAbstract for GraphicsPipeline<Mv, L, Rp>
+unsafe impl<Mv, Rp> GraphicsPipelineAbstract for GraphicsPipeline<Mv, Rp>
 where
-	L: PipelineLayoutAbstract,
 	Rp: RenderPassAbstract,
 	Mv: VertexSource<Vec<Arc<BufferAccess + Send + Sync>>>
 {
@@ -349,7 +332,7 @@ unsafe impl<'a> VulkanObject for GraphicsPipelineSys<'a> {
 	fn internal_object(&self) -> vk::Pipeline { self.0 }
 }
 
-unsafe impl<Mv, L, Rp, I> VertexDefinition<I> for GraphicsPipeline<Mv, L, Rp>
+unsafe impl<Mv, Rp, I> VertexDefinition<I> for GraphicsPipeline<Mv, Rp>
 where
 	Mv: VertexDefinition<I>
 {
@@ -363,7 +346,7 @@ where
 	}
 }
 
-unsafe impl<Mv, L, Rp, S> VertexSource<S> for GraphicsPipeline<Mv, L, Rp>
+unsafe impl<Mv, Rp, S> VertexSource<S> for GraphicsPipeline<Mv, Rp>
 where
 	Mv: VertexSource<S>
 {

@@ -24,8 +24,6 @@ where
 	dynamic_buffers: FnvHashSet<(usize, usize)>
 }
 
-impl_pipeline_layout_desc_requirements!(<T: {PipelineLayoutDesc}> PipelineLayoutDescTweaks<T>);
-
 impl<T> PipelineLayoutDescTweaks<T>
 where
 	T: PipelineLayoutDesc

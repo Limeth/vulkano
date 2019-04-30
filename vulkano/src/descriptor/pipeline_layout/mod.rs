@@ -53,7 +53,7 @@ pub use self::{
 	empty::EmptyPipelineDesc,
 	limits_check::PipelineLayoutLimitsError,
 	runtime_desc::{RuntimePipelineDesc, RuntimePipelineDescError},
-	sys::{PipelineLayout, PipelineLayoutCreationError, PipelineLayoutSys},
+	sys::{PipelineLayout, PipelineLayoutCreationError, PipelineLayoutSys, PipelineLayoutDescAggregation},
 	traits::{
 		PipelineLayoutAbstract,
 		PipelineLayoutDesc,

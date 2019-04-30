@@ -23,8 +23,6 @@ pub struct PipelineLayoutDescUnion<A, B> {
 	b: B
 }
 
-impl_pipeline_layout_desc_requirements!(<A: {PipelineLayoutDesc}, B: {PipelineLayoutDesc}> PipelineLayoutDescUnion<A, B>);
-
 impl<A, B> PipelineLayoutDescUnion<A, B> {
 	// FIXME: check collisions
 	pub fn new(a: A, b: B) -> PipelineLayoutDescUnion<A, B> { PipelineLayoutDescUnion { a, b } }
@@ -59,10 +57,6 @@ where
 			(None, Some(b)) => Some(b),
 			(None, None) => None
 		}
-	}
-
-	fn provided_set_layout(&self, set: usize) -> Option<Arc<UnsafeDescriptorSetLayout>> {
-		self.a.provided_set_layout(set).or(self.b.provided_set_layout(set))
 	}
 
 	fn num_push_constants_ranges(&self) -> usize {

@@ -23,8 +23,6 @@ pub struct RuntimePipelineDesc {
 	push_constants: SmallVec<[PipelineLayoutDescPcRange; 6]>
 }
 
-impl_pipeline_layout_desc_requirements!(RuntimePipelineDesc);
-
 impl RuntimePipelineDesc {
 	/// Builds a new `RuntimePipelineDesc` from the descriptors and push constants descriptions.
 	pub fn new<TSetsIter, TPushConstsIter, TDescriptorsIter>(

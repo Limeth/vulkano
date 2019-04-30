@@ -58,10 +58,10 @@ use crate::{
 ///
 /// # Example
 // TODO:
-pub struct PersistentDescriptorSet<L, R, P = StdDescriptorPoolAlloc> {
+pub struct PersistentDescriptorSet<R, P = StdDescriptorPoolAlloc> {
 	inner: P,
 	resources: R,
-	pipeline_layout: L,
+	pipeline_layout: PipelineLayout,
 	set_id: usize,
 	layout: Arc<UnsafeDescriptorSetLayout>
 }

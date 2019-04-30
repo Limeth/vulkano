@@ -18,7 +18,8 @@ use crate::{
 			PipelineLayout,
 			PipelineLayoutCreationError,
 			PipelineLayoutDescUnion,
-			PipelineLayoutSys
+			PipelineLayoutSys,
+                        PipelineLayoutDescAggregation
 		}
 	},
 	device::{Device, DeviceOwned},
@@ -26,7 +27,7 @@ use crate::{
 };
 
 /// Trait for objects that describe the layout of the descriptors and push constants of a pipeline.
-pub unsafe trait PipelineLayoutAbstract: PipelineLayoutDesc + DeviceOwned {
+pub unsafe trait PipelineLayoutAbstract: DeviceOwned {
 	/// Returns an opaque object that allows internal access to the pipeline layout.
 	///
 	/// Can be obtained by calling `PipelineLayoutAbstract::sys()` on the pipeline layout.
@@ -53,7 +54,7 @@ where
 }
 
 /// Trait for objects that describe the layout of the descriptors and push constants of a pipeline.
-pub unsafe trait PipelineLayoutDesc: PartialEq + Eq + Hash {
+pub unsafe trait PipelineLayoutDesc {
 	/// Returns the number of sets in the layout. Includes possibly empty sets.
 	///
 	/// In other words, this should be equal to the highest set number plus one.
@@ -68,10 +69,6 @@ pub unsafe trait PipelineLayoutDesc: PartialEq + Eq + Hash {
 	///
 	/// Returns `None` if out of range or if the descriptor is empty.
 	fn descriptor(&self, set: usize, binding: usize) -> Option<DescriptorDesc>;
-
-	/// If the `PipelineLayoutDesc` implementation is able to provide an existing
-	/// `UnsafeDescriptorSetLayout` for a given set, it can do so by returning it here.
-	fn provided_set_layout(&self, _set: usize) -> Option<Arc<UnsafeDescriptorSetLayout>> { None }
 
 	/// Returns the number of push constant ranges of the layout.
 	fn num_push_constants_ranges(&self) -> usize;
@@ -101,79 +98,22 @@ pub unsafe trait PipelineLayoutDesc: PartialEq + Eq + Hash {
 		limits_check::check_desc_against_limits(self, device.physical_device().limits())
 	}
 
-	/// Turns the layout description into a `PipelineLayout` object that can be used by Vulkan.
-	///
-	/// > **Note**: This is just a shortcut for `PipelineLayout::new`.
-	fn build(self, device: Arc<Device>) -> Result<PipelineLayout<Self>, PipelineLayoutCreationError>
+	fn aggregate(self) -> PipelineLayoutDescAggregation
 	where
 		Self: Sized
 	{
-		PipelineLayout::new(device, self)
+		PipelineLayoutDescAggregation::from(self)
 	}
-}
 
-#[macro_export]
-macro_rules! impl_pipeline_layout_desc_requirements {
+	/// Turns the layout description into a `PipelineLayout` object that can be used by Vulkan.
+	///
+	/// > **Note**: This is just a shortcut for `PipelineLayout::new`.
+	fn build(self, device: Arc<Device>) -> Result<PipelineLayout, PipelineLayoutCreationError>
+	where
+		Self: Sized
 	{
-		$(<$($generic_ty:ident$(: {$($generic_bounds:tt)+})?),*>)?
-		$target_ty:ident
-		$(<$($generic_ty_rhs:ident),*>)?
-		$(where $($where_ty:ty$(: {$($where_bounds:tt)+})?),*)?
-	} => {
-		impl$(<$($generic_ty$(: $($generic_bounds)+)?),*>)? std::cmp::PartialEq for $target_ty$(<$($generic_ty_rhs),*>)? $(where $($where_ty$(: $($where_bounds)+)?),*)? {
-			fn eq(&self, other: &Self) -> bool {
-				if self.num_sets() != other.num_sets() {
-					return false;
-				}
-
-				for set in 0..self.num_sets() {
-					if self.num_bindings_in_set(set) != other.num_bindings_in_set(set) {
-						return false;
-					}
-
-					// `num_bindings_in_set` returns `None` when `set` is out of range, that should never
-					// happen here.
-					for binding in 0..self.num_bindings_in_set(set).unwrap() {
-						if self.descriptor(set, binding) != other.descriptor(set, binding) {
-							return false;
-						}
-					}
-				}
-
-				if self.num_push_constants_ranges() != other.num_push_constants_ranges() {
-					return false;
-				}
-
-				for push_constants_range in 0..self.num_push_constants_ranges() {
-					if self.push_constants_range(push_constants_range) != other.push_constants_range(push_constants_range) {
-						return false;
-					}
-				}
-
-				true
-			}
-		}
-
-		impl$(<$($generic_ty$(: $($generic_bounds)+)?),*>)? std::cmp::Eq for $target_ty$(<$($generic_ty_rhs),*>)? $(where $($where_ty$(: $($where_bounds)+)?),*)? {}
-
-		impl$(<$($generic_ty$(: $($generic_bounds)+)?),*>)? std::hash::Hash for $target_ty$(<$($generic_ty_rhs),*>)? $(where $($where_ty$(: $($where_bounds)+)?),*)? {
-			fn hash<H>(&self, state: &mut H) where H: std::hash::Hasher {
-				for set in 0..self.num_sets() {
-					// `num_bindings_in_set` returns `None` when `set` is out of range, that should never
-					// happen here.
-					for binding in 0..self.num_bindings_in_set(set).unwrap() {
-						self.descriptor(set, binding).hash(state);
-					}
-				}
-
-				self.num_push_constants_ranges().hash(state);
-
-				for push_constants_range in 0..self.num_push_constants_ranges() {
-					self.push_constants_range(push_constants_range).hash(state);
-				}
-			}
-		}
-	};
+		PipelineLayout::new(device, self.aggregate())
+	}
 }
 
 /// Description of a range of the push constants of a pipeline layout.
@@ -208,8 +148,6 @@ where
 		(**self).push_constants_range(num)
 	}
 }
-
-impl_pipeline_layout_desc_requirements!(<T> T where T: {SafeDeref}, T::Target: {PipelineLayoutDesc});
 
 /// Traits that allow determining whether a pipeline layout is a superset of another one.
 ///

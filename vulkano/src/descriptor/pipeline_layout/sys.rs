@@ -29,26 +29,20 @@ use crate::{
 
 /// Wrapper around the `PipelineLayout` Vulkan object. Describes to the Vulkan implementation the
 /// descriptor sets and push constants available to your shaders
-pub struct PipelineLayout<L> {
+pub struct PipelineLayout {
 	device: Arc<Device>,
 	layout: vk::PipelineLayout,
 	layouts: SmallVec<[Arc<UnsafeDescriptorSetLayout>; 16]>,
-	desc: L
+	desc: PipelineLayoutDescAggregation,
 }
 
-impl<L> PipelineLayout<L>
-where
-	L: PipelineLayoutDesc
+impl PipelineLayout
 {
 	/// Creates a new `PipelineLayout`.
-	///
-	/// # Panic
-	///
-	/// - Panics if one of the layout returned by `provided_set_layout()` belongs to a different
-	///   device than the one passed as parameter.
-	pub fn new(
+	pub fn new<L: PipelineLayoutDesc>(
 		device: Arc<Device>, desc: L
-	) -> Result<PipelineLayout<L>, PipelineLayoutCreationError> {
+	) -> Result<PipelineLayout, PipelineLayoutCreationError> {
+		let desc = desc.aggregate();
 		let vk = device.pointers();
 
 		desc.check_against_limits(&device)?;
@@ -57,17 +51,11 @@ where
 		let layouts = {
 			let mut layouts: SmallVec<[_; 16]> = SmallVec::new();
 			for num in 0 .. desc.num_sets() {
-				layouts.push(match desc.provided_set_layout(num) {
-					Some(l) => {
-						assert_eq!(l.device().internal_object(), device.internal_object());
-						l
-					}
-					None => {
-						let sets_iter = 0 .. desc.num_bindings_in_set(num).unwrap_or(0);
-						let desc_iter = sets_iter.map(|d| desc.descriptor(num, d));
-						Arc::new(UnsafeDescriptorSetLayout::new(device.clone(), desc_iter)?)
-					}
-				});
+				let sets_iter = 0 .. desc.num_bindings_in_set(num).unwrap_or(0);
+				let desc_iter = sets_iter.map(|d| desc.descriptor(num, d));
+				let layout = Arc::new(UnsafeDescriptorSetLayout::new(device.clone(), desc_iter)?);
+
+				layouts.push(layout);
 			}
 			layouts
 		};
@@ -145,19 +133,40 @@ where
 
 		Ok(PipelineLayout { device: device.clone(), layout, layouts, desc })
 	}
-}
 
-impl<L> PipelineLayout<L>
-where
-	L: PipelineLayoutDesc
-{
 	/// Returns the description of the pipeline layout.
-	pub fn desc(&self) -> &L { &self.desc }
+	pub fn desc(&self) -> &PipelineLayoutDescAggregation {
+		&self.desc
+	}
 }
 
-unsafe impl<D> PipelineLayoutAbstract for PipelineLayout<D>
-where
-	D: PipelineLayoutDesc
+unsafe impl PipelineLayoutDesc for PipelineLayout {
+	fn num_sets(&self) -> usize {
+		self.desc.num_sets()
+	}
+
+	fn num_bindings_in_set(&self, set: usize) -> Option<usize> {
+		self.desc.num_bindings_in_set(set)
+	}
+
+	fn descriptor(&self, set: usize, binding: usize) -> Option<DescriptorDesc> {
+		self.desc.descriptor(set, binding)
+	}
+
+	fn num_push_constants_ranges(&self) -> usize {
+		self.desc.num_push_constants_ranges()
+	}
+
+	fn push_constants_range(&self, num: usize) -> Option<PipelineLayoutDescPcRange> {
+		self.desc.push_constants_range(num)
+	}
+
+	fn aggregate(self) -> PipelineLayoutDescAggregation {
+		self.desc
+	}
+}
+
+unsafe impl PipelineLayoutAbstract for PipelineLayout
 {
 	fn sys(&self) -> PipelineLayoutSys { PipelineLayoutSys(&self.layout) }
 
@@ -166,13 +175,11 @@ where
 	}
 }
 
-unsafe impl<D> DeviceOwned for PipelineLayout<D> {
+unsafe impl DeviceOwned for PipelineLayout {
 	fn device(&self) -> &Arc<Device> { &self.device }
 }
 
-impl<D> fmt::Debug for PipelineLayout<D>
-where
-	D: fmt::Debug
+impl fmt::Debug for PipelineLayout
 {
 	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
 		fmt.debug_struct("PipelineLayout")
@@ -183,7 +190,7 @@ where
 	}
 }
 
-impl<L> Drop for PipelineLayout<L> {
+impl Drop for PipelineLayout {
 	fn drop(&mut self) {
 		unsafe {
 			let vk = self.device.pointers();
@@ -254,6 +261,68 @@ impl From<Error> for PipelineLayoutCreationError {
 			Error::OutOfDeviceMemory => PipelineLayoutCreationError::OomError(OomError::from(err)),
 			_ => panic!("unexpected error: {:?}", err)
 		}
+	}
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+pub struct PipelineLayoutDescAggregation {
+	descriptor_sets: Vec<Vec<DescriptorDesc>>,
+	push_constants_ranges: Vec<PipelineLayoutDescPcRange>,
+}
+
+impl PipelineLayoutDescAggregation {
+	pub fn from(other: impl PipelineLayoutDesc) -> Self {
+		let num_sets = other.num_sets();
+		let mut descriptor_sets = Vec::with_capacity(num_sets);
+
+		for set in 0..other.num_sets() {
+			let num_bindings = other.num_bindings_in_set(set).unwrap();
+			let mut bindings = Vec::with_capacity(num_bindings);
+
+			for binding in 0..num_bindings {
+				bindings.push(other.descriptor(set, binding).unwrap());
+			}
+
+			descriptor_sets.push(bindings);
+		}
+
+		let num_pcrs = other.num_push_constants_ranges();
+		let mut pcrs = Vec::with_capacity(num_pcrs);
+
+		for pcr in 0..num_pcrs {
+			pcrs.push(other.push_constants_range(pcr).unwrap());
+		}
+
+		PipelineLayoutDescAggregation {
+			descriptor_sets,
+			push_constants_ranges: pcrs,
+		}
+	}
+}
+
+unsafe impl PipelineLayoutDesc for PipelineLayoutDescAggregation {
+	fn num_sets(&self) -> usize {
+		self.descriptor_sets.len()
+	}
+
+	fn num_bindings_in_set(&self, set: usize) -> Option<usize> {
+		self.descriptor_sets.get(set).map(Vec::len)
+	}
+
+	fn descriptor(&self, set: usize, binding: usize) -> Option<DescriptorDesc> {
+		self.descriptor_sets.get(set).and_then(|set| set.get(binding)).map(Clone::clone)
+	}
+
+	fn num_push_constants_ranges(&self) -> usize {
+		self.push_constants_ranges.len()
+	}
+
+	fn push_constants_range(&self, num: usize) -> Option<PipelineLayoutDescPcRange> {
+		self.push_constants_ranges.get(num).map(Clone::clone)
+	}
+
+	fn aggregate(self) -> Self {
+		self
 	}
 }
 
