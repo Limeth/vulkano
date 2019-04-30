@@ -136,17 +136,7 @@ fn main() {
 		)
 		.unwrap()
 	);
-	let view = Arc::new(
-		ImageView::new(
-			image.clone(),
-			None,
-			None::<Format>,
-			Swizzle::default(),
-			None,
-			RequiredLayouts::default()
-		)
-		.unwrap()
-	);
+	let view = Arc::new(ImageView::whole_image(image.clone()).unwrap());
 
 	let staging_buffer = CpuAccessibleBuffer::from_iter(
 		device.clone(),

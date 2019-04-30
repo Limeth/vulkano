@@ -58,6 +58,13 @@ impl<I: ImageAccess> ImageView<I> {
 		Ok(ImageView { image, view, required_layouts })
 	}
 
+	/// Creates a new view covering the whole image.
+	///
+	/// This is equivalent to calling `new` with all parameters defaulted.
+	pub fn whole_image(image: I) -> Result<ImageView<I>, ImageViewCreationError> {
+		ImageView::new(image, None, None::<Format>, Default::default(), None, Default::default())
+	}
+
 	/// Borrows the inner image.
 	pub fn borrow_image(&self) -> &I { &self.image }
 }
