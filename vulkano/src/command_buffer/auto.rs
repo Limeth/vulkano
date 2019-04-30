@@ -50,7 +50,7 @@ use crate::{
 	},
 	descriptor::{
 		descriptor_set::DescriptorSetsCollection,
-		pipeline_layout::PipelineLayout
+		pipeline_layout::{PipelineLayout, PipelineLayoutDesc}
 	},
 	device::{Device, DeviceOwned, Queue},
 	format::{AcceptsPixels, ClearValue, Format, FormatTy},
@@ -1335,7 +1335,7 @@ unsafe impl<P> DeviceOwned for AutoCommandBufferBuilder<P> {
 
 // Shortcut function to set the push constants.
 unsafe fn push_constants<P, Pc>(
-	destination: &mut SyncCommandBufferBuilder<P>, pipeline: PipelineLayout, push_constants: Pc
+	destination: &mut SyncCommandBufferBuilder<P>, pipeline: Arc<PipelineLayout>, push_constants: Pc
 ) {
 	for num_range in 0 .. pipeline.num_push_constants_ranges() {
 		let range = match pipeline.push_constants_range(num_range) {
@@ -1405,7 +1405,7 @@ unsafe fn vertex_buffers<P>(
 
 unsafe fn descriptor_sets<P, S>(
 	destination: &mut SyncCommandBufferBuilder<P>, state_cacher: &mut StateCacher, gfx: bool,
-	pipeline: PipelineLayout, sets: S
+	pipeline: Arc<PipelineLayout>, sets: S
 ) -> Result<(), SyncCommandBufferBuilderError>
 where
 	S: DescriptorSetsCollection
