@@ -18,7 +18,6 @@ use crate::{
 		descriptor::{DescriptorDesc, ShaderStages},
 		descriptor_set::UnsafeDescriptorSetLayout,
 		pipeline_layout::{
-			PipelineLayoutAbstract,
 			PipelineLayoutDesc,
 			PipelineLayoutDescPcRange,
 			PipelineLayoutLimitsError
@@ -41,7 +40,7 @@ impl PipelineLayout
 	/// Creates a new `PipelineLayout`.
 	pub fn new<L: PipelineLayoutDesc>(
 		device: Arc<Device>, desc: L
-	) -> Result<PipelineLayout, PipelineLayoutCreationError> {
+	) -> Result<Arc<PipelineLayout>, PipelineLayoutCreationError> {
 		let desc = desc.aggregate();
 		let vk = device.pointers();
 
@@ -131,12 +130,18 @@ impl PipelineLayout
 			output
 		};
 
-		Ok(PipelineLayout { device: device.clone(), layout, layouts, desc })
+		Ok(Arc::new(PipelineLayout { device: device.clone(), layout, layouts, desc }))
 	}
 
 	/// Returns the description of the pipeline layout.
 	pub fn desc(&self) -> &PipelineLayoutDescAggregation {
 		&self.desc
+	}
+
+	pub fn sys(&self) -> PipelineLayoutSys { PipelineLayoutSys(&self.layout) }
+
+	pub fn descriptor_set_layout(&self, index: usize) -> Option<&Arc<UnsafeDescriptorSetLayout>> {
+		self.layouts.get(index)
 	}
 }
 
@@ -162,16 +167,7 @@ unsafe impl PipelineLayoutDesc for PipelineLayout {
 	}
 
 	fn aggregate(self) -> PipelineLayoutDescAggregation {
-		self.desc
-	}
-}
-
-unsafe impl PipelineLayoutAbstract for PipelineLayout
-{
-	fn sys(&self) -> PipelineLayoutSys { PipelineLayoutSys(&self.layout) }
-
-	fn descriptor_set_layout(&self, index: usize) -> Option<&Arc<UnsafeDescriptorSetLayout>> {
-		self.layouts.get(index)
+		self.desc.clone()
 	}
 }
 

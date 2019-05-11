@@ -22,7 +22,7 @@ use crate::{
 	descriptor::{
 		descriptor::ShaderStages,
 		descriptor_set::UnsafeDescriptorSet,
-		pipeline_layout::PipelineLayoutAbstract
+		pipeline_layout::{PipelineLayout, PipelineLayoutDesc}
 	},
 	device::{Device, DeviceOwned},
 	format::{ClearValue, FormatTy},
@@ -47,7 +47,7 @@ use crate::{
 		input_assembly::IndexType,
 		viewport::{Scissor, Viewport},
 		ComputePipelineAbstract,
-		GraphicsPipelineAbstract
+		GraphicsPipelineAbstract,
 	},
 	query::{QueryPipelineStatisticFlags, UnsafeQueriesRange, UnsafeQuery},
 	sampler::Filter,
@@ -416,11 +416,10 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 	///
 	/// Does nothing if the list of descriptor sets is empty, as it would be a no-op and isn't a
 	/// valid usage of the command anyway.
-	pub unsafe fn bind_descriptor_sets<'s, Pl, S, I>(
-		&mut self, graphics: bool, pipeline_layout: &Pl, first_binding: u32, sets: S,
+	pub unsafe fn bind_descriptor_sets<'s, S, I>(
+		&mut self, graphics: bool, pipeline_layout: &Arc<PipelineLayout>, first_binding: u32, sets: S,
 		dynamic_offsets: I
 	) where
-		Pl: ?Sized + PipelineLayoutAbstract,
 		S: Iterator<Item = &'s UnsafeDescriptorSet>,
 		I: Iterator<Item = u32>
 	{
@@ -434,7 +433,7 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 		let dynamic_offsets: SmallVec<[u32; 32]> = dynamic_offsets.collect();
 
 		let num_bindings = sets.len() as u32;
-		debug_assert!(first_binding + num_bindings <= pipeline_layout.num_sets() as u32);
+		debug_assert!(first_binding + num_bindings <= pipeline_layout.desc().num_sets() as u32);
 
 		let bind_point = if graphics {
 			vk::PIPELINE_BIND_POINT_GRAPHICS
@@ -1246,10 +1245,9 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 	}
 
 	/// Calls `vkCmdPushConstants` on the builder.
-	pub unsafe fn push_constants<Pl, D>(
-		&mut self, pipeline_layout: &Pl, stages: ShaderStages, offset: u32, size: u32, data: &D
+	pub unsafe fn push_constants<D>(
+		&mut self, pipeline_layout: &Arc<PipelineLayout>, stages: ShaderStages, offset: u32, size: u32, data: &D
 	) where
-		Pl: ?Sized + PipelineLayoutAbstract,
 		D: ?Sized
 	{
 		let vk = self.device().pointers();

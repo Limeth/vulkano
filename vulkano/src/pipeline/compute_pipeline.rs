@@ -15,7 +15,6 @@ use crate::{
 		descriptor_set::UnsafeDescriptorSetLayout,
 		pipeline_layout::{
 			PipelineLayout,
-			PipelineLayoutAbstract,
 			PipelineLayoutCreationError,
 			PipelineLayoutDesc,
 			PipelineLayoutDescPcRange,
@@ -46,7 +45,7 @@ use vk_sys as vk;
 /// `Arc<ComputePipeline>` into an `Arc<ComputePipelineAbstract>` if necessary.
 pub struct ComputePipeline {
 	inner: Inner,
-	pipeline_layout: PipelineLayout
+	pipeline_layout: Arc<PipelineLayout>
 }
 
 struct Inner {
@@ -82,7 +81,7 @@ impl ComputePipeline {
 	/// uses.
 	pub fn with_pipeline_layout<Cs>(
 		device: Arc<Device>, shader: &Cs, specialization: &Cs::SpecializationConstants,
-		pipeline_layout: PipelineLayout
+		pipeline_layout: Arc<PipelineLayout>
 	) -> Result<ComputePipeline, ComputePipelineCreationError>
 	where
 		Cs::PipelineLayout: Clone,
@@ -103,7 +102,7 @@ impl ComputePipeline {
 	/// superset of what the shader expects.
 	pub unsafe fn with_unchecked_pipeline_layout<Cs>(
 		device: Arc<Device>, shader: &Cs, specialization: &Cs::SpecializationConstants,
-		pipeline_layout: PipelineLayout
+		pipeline_layout: Arc<PipelineLayout>
 	) -> Result<ComputePipeline, ComputePipelineCreationError>
 	where
 		Cs::PipelineLayout: Clone,
@@ -139,7 +138,7 @@ impl ComputePipeline {
 				pNext: ptr::null(),
 				flags: 0,
 				stage,
-				layout: PipelineLayoutAbstract::sys(&pipeline_layout).internal_object(),
+				layout: PipelineLayout::sys(&pipeline_layout).internal_object(),
 				basePipelineHandle: 0,
 				basePipelineIndex: 0
 			};
@@ -171,17 +170,21 @@ impl ComputePipeline {
 	pub fn device(&self) -> &Arc<Device> { &self.inner.device }
 
 	/// Returns the pipeline layout used in this compute pipeline.
-	pub fn layout(&self) -> &PipelineLayout { &self.pipeline_layout }
+	pub fn layout(&self) -> &Arc<PipelineLayout> { &self.pipeline_layout }
 }
 
 /// Trait implemented on all compute pipelines.
-pub unsafe trait ComputePipelineAbstract {
+pub unsafe trait ComputePipelineAbstract: DeviceOwned {
+	fn layout(&self) -> &Arc<PipelineLayout>;
+
 	/// Returns an opaque object that represents the inside of the compute pipeline.
 	fn inner(&self) -> ComputePipelineSys;
 }
 
 unsafe impl ComputePipelineAbstract for ComputePipeline
 {
+	fn layout(&self) -> &Arc<PipelineLayout> { &self.pipeline_layout }
+
 	fn inner(&self) -> ComputePipelineSys { ComputePipelineSys(self.inner.pipeline, PhantomData) }
 }
 
@@ -190,6 +193,8 @@ where
 	T: SafeDeref,
 	T::Target: ComputePipelineAbstract
 {
+	fn layout(&self) -> &Arc<PipelineLayout> { (**self).layout() }
+
 	fn inner(&self) -> ComputePipelineSys { (**self).inner() }
 }
 
@@ -358,8 +363,6 @@ mod tests {
 			#[derive(Debug, Copy, Clone)]
 			struct Layout;
 
-                        impl_pipeline_layout_desc_requirements!(Layout);
-
 			unsafe impl PipelineLayoutDesc for Layout {
 				fn num_sets(&self) -> usize { 1 }
 
@@ -417,7 +420,7 @@ mod tests {
 
 		let data_buffer =
 			CpuAccessibleBuffer::from_data(device.clone(), BufferUsage::all(), 0).unwrap();
-		let set = PersistentDescriptorSet::start(pipeline.clone(), 0)
+		let set = PersistentDescriptorSet::start(pipeline.layout().clone(), 0)
 			.add_buffer(data_buffer.clone())
 			.unwrap()
 			.build()

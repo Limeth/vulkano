@@ -25,7 +25,7 @@ use crate::{
 			UnsafeDescriptorSet,
 			UnsafeDescriptorSetLayout
 		},
-		pipeline_layout::{PipelineLayoutDesc, PipelineLayout, PipelineLayoutAbstract}
+		pipeline_layout::{PipelineLayoutDesc, PipelineLayout}
 	},
 	device::{Device, DeviceOwned},
 	image::ImageViewAccess,

@@ -14,8 +14,7 @@ use crate::{
 	descriptor::{
 		descriptor::DescriptorDesc,
 		descriptor_set::UnsafeDescriptorSetLayout,
-		pipeline_layout::{PipelineLayout, PipelineLayoutDesc, PipelineLayoutDescPcRange, PipelineLayoutSys},
-		PipelineLayoutAbstract
+		pipeline_layout::{PipelineLayout, PipelineLayoutDesc, PipelineLayoutDescPcRange, PipelineLayoutSys}
 	},
 	device::{Device, DeviceOwned},
 	format::ClearValue,
@@ -56,7 +55,7 @@ mod creation_error;
 /// implementation should perform the various operations needed by a draw command.
 pub struct GraphicsPipeline<VertexDefinition, RenderP> {
 	inner: Inner,
-	layout: PipelineLayout,
+	layout: Arc<PipelineLayout>,
 
 	render_pass: RenderP,
 	render_pass_subpass: u32,
@@ -110,7 +109,7 @@ impl<Mv, Rp> GraphicsPipeline<Mv, Rp> {
 	pub fn device(&self) -> &Arc<Device> { &self.inner.device }
 
 	/// Returns the pipeline layout used in the constructor.
-	pub fn layout(&self) -> &PipelineLayout { &self.layout }
+	pub fn layout(&self) -> &Arc<PipelineLayout> { &self.layout }
 }
 
 impl<Mv, Rp> GraphicsPipeline<Mv, Rp>
@@ -223,8 +222,10 @@ impl Drop for Inner {
 /// When using this trait `AutoCommandBufferBuilder::draw*` calls will need the buffers to be
 /// wrapped in a `vec!()`.
 pub unsafe trait GraphicsPipelineAbstract:
-	RenderPassAbstract + VertexSource<Vec<Arc<BufferAccess + Send + Sync>>>
+	DeviceOwned + RenderPassAbstract + VertexSource<Vec<Arc<BufferAccess + Send + Sync>>>
 {
+	fn layout(&self) -> &Arc<PipelineLayout>;
+
 	/// Returns an opaque object that represents the inside of the graphics pipeline.
 	fn inner(&self) -> GraphicsPipelineSys;
 
@@ -271,6 +272,8 @@ where
 	Rp: RenderPassAbstract,
 	Mv: VertexSource<Vec<Arc<BufferAccess + Send + Sync>>>
 {
+	fn layout(&self) -> &Arc<PipelineLayout> { &self.layout }
+
 	fn inner(&self) -> GraphicsPipelineSys { GraphicsPipelineSys(self.inner.pipeline, PhantomData) }
 
 	fn subpass_index(&self) -> u32 { self.render_pass_subpass }
@@ -297,6 +300,8 @@ where
 	T: SafeDeref,
 	T::Target: GraphicsPipelineAbstract
 {
+	fn layout(&self) -> &Arc<PipelineLayout> { (**self).layout() }
+
 	fn inner(&self) -> GraphicsPipelineSys { GraphicsPipelineAbstract::inner(&**self) }
 
 	fn subpass_index(&self) -> u32 { (**self).subpass_index() }

@@ -27,33 +27,6 @@ use crate::{
 };
 
 /// Trait for objects that describe the layout of the descriptors and push constants of a pipeline.
-pub unsafe trait PipelineLayoutAbstract: DeviceOwned {
-	/// Returns an opaque object that allows internal access to the pipeline layout.
-	///
-	/// Can be obtained by calling `PipelineLayoutAbstract::sys()` on the pipeline layout.
-	///
-	/// > **Note**: This is an internal function that you normally don't need to call.
-	fn sys(&self) -> PipelineLayoutSys;
-
-	/// Returns the `UnsafeDescriptorSetLayout` object of the specified set index.
-	///
-	/// Returns `None` if out of range or if the set is empty for this index.
-	fn descriptor_set_layout(&self, index: usize) -> Option<&Arc<UnsafeDescriptorSetLayout>>;
-}
-
-unsafe impl<T> PipelineLayoutAbstract for T
-where
-	T: SafeDeref,
-	T::Target: PipelineLayoutAbstract
-{
-	fn sys(&self) -> PipelineLayoutSys { (**self).sys() }
-
-	fn descriptor_set_layout(&self, index: usize) -> Option<&Arc<UnsafeDescriptorSetLayout>> {
-		(**self).descriptor_set_layout(index)
-	}
-}
-
-/// Trait for objects that describe the layout of the descriptors and push constants of a pipeline.
 pub unsafe trait PipelineLayoutDesc {
 	/// Returns the number of sets in the layout. Includes possibly empty sets.
 	///
@@ -108,7 +81,7 @@ pub unsafe trait PipelineLayoutDesc {
 	/// Turns the layout description into a `PipelineLayout` object that can be used by Vulkan.
 	///
 	/// > **Note**: This is just a shortcut for `PipelineLayout::new`.
-	fn build(self, device: Arc<Device>) -> Result<PipelineLayout, PipelineLayoutCreationError>
+	fn build(self, device: Arc<Device>) -> Result<Arc<PipelineLayout>, PipelineLayoutCreationError>
 	where
 		Self: Sized
 	{
@@ -151,7 +124,7 @@ where
 
 /// Traits that allow determining whether a pipeline layout is a superset of another one.
 ///
-/// This trait is automatically implemented on all types that implement `PipelineLayoutAbstract`.
+/// This trait is automatically implemented on all types that implement `PipelineLayoutDesc`.
 /// TODO: once specialization lands, we can add implementations that don't perform deep comparisons
 pub unsafe trait PipelineLayoutSuperset<Other: ?Sized>: PipelineLayoutDesc
 where

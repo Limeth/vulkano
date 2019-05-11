@@ -10,7 +10,7 @@
 use std::{error, fmt};
 
 use crate::descriptor::pipeline_layout::{
-	PipelineLayoutAbstract,
+	PipelineLayoutDesc,
 	PipelineLayoutPushConstantsCompatible
 };
 
@@ -19,7 +19,7 @@ pub fn check_push_constants_validity<Pl, Pc>(
 	pipeline: &Pl, push_constants: &Pc
 ) -> Result<(), CheckPushConstantsValidityError>
 where
-	Pl: ?Sized + PipelineLayoutAbstract + PipelineLayoutPushConstantsCompatible<Pc>,
+	Pl: ?Sized + PipelineLayoutDesc,
 	Pc: ?Sized
 {
 	if !pipeline.is_compatible(push_constants) {

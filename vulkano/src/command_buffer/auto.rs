@@ -956,8 +956,8 @@ impl<P> AutoCommandBufferBuilder<P> {
 			}
 
 			self.ensure_outside_render_pass()?;
-			check_push_constants_validity(&pipeline, &constants)?;
-			check_descriptor_sets_validity(&pipeline, &sets)?;
+			check_push_constants_validity(pipeline.layout(), &constants)?;
+			check_descriptor_sets_validity(pipeline.layout(), &sets)?;
 			check_dispatch(pipeline.device(), dimensions)?;
 
 			if let StateCacherOutcome::NeedChange =
@@ -966,12 +966,12 @@ impl<P> AutoCommandBufferBuilder<P> {
 				self.inner.bind_pipeline_compute(pipeline.clone());
 			}
 
-			push_constants(&mut self.inner, pipeline.clone(), constants);
+			push_constants(&mut self.inner, pipeline.layout(), constants);
 			descriptor_sets(
 				&mut self.inner,
 				&mut self.state_cacher,
 				false,
-				pipeline.clone(),
+				pipeline.layout(),
 				sets
 			)?;
 
@@ -995,8 +995,8 @@ impl<P> AutoCommandBufferBuilder<P> {
 
 			self.ensure_inside_render_pass_inline(&pipeline)?;
 			check_dynamic_state_validity(&pipeline, dynamic)?;
-			check_push_constants_validity(&pipeline, &constants)?;
-			check_descriptor_sets_validity(&pipeline, &sets)?;
+			check_push_constants_validity(pipeline.layout(), &constants)?;
+			check_descriptor_sets_validity(pipeline.layout(), &sets)?;
 			let vb_infos = check_vertex_buffers(&pipeline, vertex_buffer)?;
 
 			if let StateCacherOutcome::NeedChange =
@@ -1007,9 +1007,9 @@ impl<P> AutoCommandBufferBuilder<P> {
 
 			let dynamic = self.state_cacher.dynamic_state(dynamic);
 
-			push_constants(&mut self.inner, pipeline.clone(), constants);
+			push_constants(&mut self.inner, pipeline.layout(), constants);
 			set_state(&mut self.inner, &dynamic);
-			descriptor_sets(&mut self.inner, &mut self.state_cacher, true, pipeline.clone(), sets)?;
+			descriptor_sets(&mut self.inner, &mut self.state_cacher, true, pipeline.layout(), sets)?;
 			vertex_buffers(&mut self.inner, &mut self.state_cacher, vb_infos.vertex_buffers)?;
 
 			debug_assert!(self.graphics_allowed);
@@ -1038,8 +1038,8 @@ impl<P> AutoCommandBufferBuilder<P> {
 			self.ensure_inside_render_pass_inline(&pipeline)?;
 			let ib_infos = check_index_buffer(self.device(), &index_buffer)?;
 			check_dynamic_state_validity(&pipeline, dynamic)?;
-			check_push_constants_validity(&pipeline, &constants)?;
-			check_descriptor_sets_validity(&pipeline, &sets)?;
+			check_push_constants_validity(pipeline.layout(), &constants)?;
+			check_descriptor_sets_validity(pipeline.layout(), &sets)?;
 			let vb_infos = check_vertex_buffers(&pipeline, vertex_buffer)?;
 
 			if let StateCacherOutcome::NeedChange =
@@ -1056,9 +1056,9 @@ impl<P> AutoCommandBufferBuilder<P> {
 
 			let dynamic = self.state_cacher.dynamic_state(dynamic);
 
-			push_constants(&mut self.inner, pipeline.clone(), constants);
+			push_constants(&mut self.inner, pipeline.layout(), constants);
 			set_state(&mut self.inner, &dynamic);
-			descriptor_sets(&mut self.inner, &mut self.state_cacher, true, pipeline.clone(), sets)?;
+			descriptor_sets(&mut self.inner, &mut self.state_cacher, true, pipeline.layout(), sets)?;
 			vertex_buffers(&mut self.inner, &mut self.state_cacher, vb_infos.vertex_buffers)?;
 			// TODO: how to handle an index out of range of the vertex buffers?
 
@@ -1097,8 +1097,8 @@ impl<P> AutoCommandBufferBuilder<P> {
 
 			self.ensure_inside_render_pass_inline(&pipeline)?;
 			check_dynamic_state_validity(&pipeline, dynamic)?;
-			check_push_constants_validity(&pipeline, &constants)?;
-			check_descriptor_sets_validity(&pipeline, &sets)?;
+			check_push_constants_validity(pipeline.layout(), &constants)?;
+			check_descriptor_sets_validity(pipeline.layout(), &sets)?;
 			let vb_infos = check_vertex_buffers(&pipeline, vertex_buffer)?;
 
 			let draw_count = indirect_buffer.len() as u32;
@@ -1111,9 +1111,9 @@ impl<P> AutoCommandBufferBuilder<P> {
 
 			let dynamic = self.state_cacher.dynamic_state(dynamic);
 
-			push_constants(&mut self.inner, pipeline.clone(), constants);
+			push_constants(&mut self.inner, pipeline.layout(), constants);
 			set_state(&mut self.inner, &dynamic);
-			descriptor_sets(&mut self.inner, &mut self.state_cacher, true, pipeline.clone(), sets)?;
+			descriptor_sets(&mut self.inner, &mut self.state_cacher, true, pipeline.layout(), sets)?;
 			vertex_buffers(&mut self.inner, &mut self.state_cacher, vb_infos.vertex_buffers)?;
 
 			debug_assert!(self.graphics_allowed);
@@ -1152,8 +1152,8 @@ impl<P> AutoCommandBufferBuilder<P> {
 			self.ensure_inside_render_pass_inline(&pipeline)?;
 			let ib_infos = check_index_buffer(self.device(), &index_buffer)?;
 			check_dynamic_state_validity(&pipeline, dynamic)?;
-			check_push_constants_validity(&pipeline, &constants)?;
-			check_descriptor_sets_validity(&pipeline, &sets)?;
+			check_push_constants_validity(pipeline.layout(), &constants)?;
+			check_descriptor_sets_validity(pipeline.layout(), &sets)?;
 			let vb_infos = check_vertex_buffers(&pipeline, vertex_buffer)?;
 
 			let draw_count = indirect_buffer.len() as u32;
@@ -1172,9 +1172,9 @@ impl<P> AutoCommandBufferBuilder<P> {
 
 			let dynamic = self.state_cacher.dynamic_state(dynamic);
 
-			push_constants(&mut self.inner, pipeline.clone(), constants);
+			push_constants(&mut self.inner, pipeline.layout(), constants);
 			set_state(&mut self.inner, &dynamic);
-			descriptor_sets(&mut self.inner, &mut self.state_cacher, true, pipeline.clone(), sets)?;
+			descriptor_sets(&mut self.inner, &mut self.state_cacher, true, pipeline.layout(), sets)?;
 			vertex_buffers(&mut self.inner, &mut self.state_cacher, vb_infos.vertex_buffers)?;
 
 			debug_assert!(self.graphics_allowed);
@@ -1335,10 +1335,10 @@ unsafe impl<P> DeviceOwned for AutoCommandBufferBuilder<P> {
 
 // Shortcut function to set the push constants.
 unsafe fn push_constants<P, Pc>(
-	destination: &mut SyncCommandBufferBuilder<P>, pipeline: Arc<PipelineLayout>, push_constants: Pc
+	destination: &mut SyncCommandBufferBuilder<P>, pipeline: &Arc<PipelineLayout>, push_constants: Pc
 ) {
-	for num_range in 0 .. pipeline.num_push_constants_ranges() {
-		let range = match pipeline.push_constants_range(num_range) {
+	for num_range in 0 .. pipeline.desc().num_push_constants_ranges() {
+		let range = match pipeline.desc().push_constants_range(num_range) {
 			Some(r) => r,
 			None => continue
 		};
@@ -1351,7 +1351,7 @@ unsafe fn push_constants<P, Pc>(
 			range.size as usize
 		);
 
-		destination.push_constants::<_, [u8]>(
+		destination.push_constants::<[u8]>(
 			pipeline.clone(),
 			range.stages,
 			range.offset as u32,
@@ -1405,7 +1405,7 @@ unsafe fn vertex_buffers<P>(
 
 unsafe fn descriptor_sets<P, S>(
 	destination: &mut SyncCommandBufferBuilder<P>, state_cacher: &mut StateCacher, gfx: bool,
-	pipeline: Arc<PipelineLayout>, sets: S
+	pipeline: &Arc<PipelineLayout>, sets: S
 ) -> Result<(), SyncCommandBufferBuilderError>
 where
 	S: DescriptorSetsCollection

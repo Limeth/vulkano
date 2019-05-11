@@ -30,17 +30,6 @@
 //! to vulkano. It holds a template parameter whose type must implement the `PipelineLayoutDesc`
 //! trait.
 //!
-//! # The PipelineLayoutAbstract trait
-//!
-//! All the functions in vulkano that operate on pipeline layout objects (for example, creating a
-//! descriptor set) do not take directly a `PipelineLayout` struct as parameter. Instead they can
-//! take any object that implements the `PipelineLayoutAbstract` trait.
-//!
-//! This trait represents any object that holds a `PipelineLayout`. It is implemented on the
-//! `PipelineLayout` struct itself (obviously), but also notably on `GraphicsPipeline` and
-//! `ComputePipeline`. In other words, you can for example create a descriptor set by passing a
-//! graphics pipeline as parameter.
-//!
 //! # Custom pipeline layouts
 //!
 //! In some situations, it is better (as in, faster) to share the same descriptor set or sets
@@ -55,7 +44,6 @@ pub use self::{
 	runtime_desc::{RuntimePipelineDesc, RuntimePipelineDescError},
 	sys::{PipelineLayout, PipelineLayoutCreationError, PipelineLayoutSys, PipelineLayoutDescAggregation},
 	traits::{
-		PipelineLayoutAbstract,
 		PipelineLayoutDesc,
 		PipelineLayoutDescPcRange,
 		PipelineLayoutNotSupersetError,

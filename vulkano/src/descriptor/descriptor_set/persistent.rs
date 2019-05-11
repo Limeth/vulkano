@@ -29,7 +29,7 @@ use crate::{
 			UnsafeDescriptorSet,
 			UnsafeDescriptorSetLayout
 		},
-		pipeline_layout::{PipelineLayout, PipelineLayoutDesc, PipelineLayoutAbstract}
+		pipeline_layout::{PipelineLayout, PipelineLayoutDesc}
 	},
 	device::{Device, DeviceOwned},
 	format::Format,
