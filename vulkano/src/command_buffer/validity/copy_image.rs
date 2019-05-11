@@ -11,7 +11,7 @@ use std::{error, fmt};
 
 use crate::{
 	device::Device,
-	format::{FormatTy, FormatDesc},
+	format::{FormatDesc, FormatTy},
 	image::{ImageDimensionsType, ImageViewAccess},
 	VulkanObject
 };

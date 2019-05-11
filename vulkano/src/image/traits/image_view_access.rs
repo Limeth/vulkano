@@ -1,8 +1,6 @@
 use crate::{
 	buffer::BufferAccess,
-	format::{
-		Format
-	},
+	format::Format,
 	image::{
 		layout::{ImageLayout, ImageLayoutEnd},
 		sys::UnsafeImageView,

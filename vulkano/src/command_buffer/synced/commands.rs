@@ -1357,7 +1357,8 @@ impl<P> SyncCommandBufferBuilder<P> {
 
 	/// Calls `vkCmdPushConstants` on the builder.
 	pub unsafe fn push_constants<D>(
-		&mut self, pipeline_layout: Arc<PipelineLayout>, stages: ShaderStages, offset: u32, size: u32, data: &D
+		&mut self, pipeline_layout: Arc<PipelineLayout>, stages: ShaderStages, offset: u32,
+		size: u32, data: &D
 	) where
 		D: ?Sized + Send + Sync + 'static
 	{
@@ -1369,8 +1370,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 			data: Box<[u8]>
 		}
 
-		impl<P> Command<P> for Cmd
-		{
+		impl<P> Command<P> for Cmd {
 			fn name(&self) -> &'static str { "vkCmdPushConstants" }
 
 			unsafe fn send(&mut self, out: &mut UnsafeCommandBufferBuilder<P>) {
@@ -1385,8 +1385,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 
 			fn into_final_command(self: Box<Self>) -> Box<FinalCommand + Send + Sync> {
 				struct Fin(Arc<PipelineLayout>);
-				impl FinalCommand for Fin
-				{
+				impl FinalCommand for Fin {
 					fn name(&self) -> &'static str { "vkCmdPushConstants" }
 				}
 				Box::new(Fin(self.pipeline_layout))
@@ -1678,7 +1677,8 @@ impl<'b, P> SyncCommandBufferBuilderBindDescriptorSets<'b, P> {
 	}
 
 	pub unsafe fn submit<I>(
-		self, graphics: bool, pipeline_layout: Arc<PipelineLayout>, first_binding: u32, dynamic_offsets: I
+		self, graphics: bool, pipeline_layout: Arc<PipelineLayout>, first_binding: u32,
+		dynamic_offsets: I
 	) -> Result<(), SyncCommandBufferBuilderError>
 	where
 		I: Iterator<Item = u32> + Send + Sync + 'static

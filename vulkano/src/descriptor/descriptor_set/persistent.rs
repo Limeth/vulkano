@@ -72,8 +72,7 @@ impl PersistentDescriptorSet<()> {
 	/// # Panic
 	///
 	/// - Panics if the set id is out of range.
-	pub fn start(layout: Arc<PipelineLayout>, set_id: usize) -> PersistentDescriptorSetBuilder<()>
-	{
+	pub fn start(layout: Arc<PipelineLayout>, set_id: usize) -> PersistentDescriptorSetBuilder<()> {
 		assert!(layout.num_sets() > set_id);
 
 		let cap = layout.num_bindings_in_set(set_id).unwrap_or(0);
@@ -104,8 +103,7 @@ where
 	fn image(&self, index: usize) -> Option<(&ImageViewAccess, u32)> { self.resources.image(index) }
 }
 
-unsafe impl<R, P> DescriptorSetDesc for PersistentDescriptorSet<R, P>
-{
+unsafe impl<R, P> DescriptorSetDesc for PersistentDescriptorSet<R, P> {
 	fn num_bindings(&self) -> usize {
 		self.pipeline_layout.num_bindings_in_set(self.set_id).unwrap()
 	}
@@ -115,8 +113,7 @@ unsafe impl<R, P> DescriptorSetDesc for PersistentDescriptorSet<R, P>
 	}
 }
 
-unsafe impl<R, P> DeviceOwned for PersistentDescriptorSet<R, P>
-{
+unsafe impl<R, P> DeviceOwned for PersistentDescriptorSet<R, P> {
 	fn device(&self) -> &Arc<Device> { self.layout.device() }
 }
 
@@ -141,15 +138,12 @@ pub struct PersistentDescriptorSetBuilder<R> {
 // TODO: lots of checks are still missing, see the docs of
 //       VkDescriptorImageInfo and VkWriteDescriptorSet
 
-impl<R> PersistentDescriptorSetBuilder<R>
-{
+impl<R> PersistentDescriptorSetBuilder<R> {
 	/// Builds a `PersistentDescriptorSet` from the builder.
 	pub fn build(
 		self
-	) -> Result<
-		PersistentDescriptorSet<R, StdDescriptorPoolAlloc>,
-		PersistentDescriptorSetBuildError
-	> {
+	) -> Result<PersistentDescriptorSet<R, StdDescriptorPoolAlloc>, PersistentDescriptorSetBuildError>
+	{
 		let mut pool = Device::standard_descriptor_pool(self.layout.device());
 		self.build_with_pool(&mut pool)
 	}
@@ -301,9 +295,10 @@ impl<R> PersistentDescriptorSetBuilder<R>
 	pub fn add_sampled_image<T>(
 		self, image_view: T, sampler: Arc<Sampler>
 	) -> Result<
-		PersistentDescriptorSetBuilder<
-			((R, PersistentDescriptorSetImg<T>), PersistentDescriptorSetSampler)
-		>,
+		PersistentDescriptorSetBuilder<(
+			(R, PersistentDescriptorSetImg<T>),
+			PersistentDescriptorSetSampler
+		)>,
 		PersistentDescriptorSetError
 	>
 	where
@@ -339,8 +334,7 @@ pub struct PersistentDescriptorSetBuilderArray<R> {
 	desc: DescriptorDesc
 }
 
-impl<R> PersistentDescriptorSetBuilderArray<R>
-{
+impl<R> PersistentDescriptorSetBuilderArray<R> {
 	/// Leaves the array. Call this once you added all the elements of the array.
 	pub fn leave_array(
 		mut self
@@ -659,9 +653,10 @@ impl<R> PersistentDescriptorSetBuilderArray<R>
 	pub fn add_sampled_image<T>(
 		mut self, image_view: T, sampler: Arc<Sampler>
 	) -> Result<
-		PersistentDescriptorSetBuilderArray<
-			((R, PersistentDescriptorSetImg<T>), PersistentDescriptorSetSampler)
-		>,
+		PersistentDescriptorSetBuilderArray<(
+			(R, PersistentDescriptorSetImg<T>),
+			PersistentDescriptorSetSampler
+		)>,
 		PersistentDescriptorSetError
 	>
 	where

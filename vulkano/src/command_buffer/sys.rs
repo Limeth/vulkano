@@ -16,19 +16,14 @@ use vk_sys as vk;
 use crate::{
 	buffer::{BufferAccess, BufferInner},
 	check_errors,
-	command_buffer::{
-		pool::{CommandPool, CommandPoolAlloc, CommandPoolBuilderAlloc},
-	},
+	command_buffer::pool::{CommandPool, CommandPoolAlloc, CommandPoolBuilderAlloc},
 	descriptor::{
 		descriptor::ShaderStages,
 		descriptor_set::UnsafeDescriptorSet,
 		pipeline_layout::{PipelineLayout, PipelineLayoutDesc}
 	},
 	device::{Device, DeviceOwned},
-	format::{ClearValue, FormatTy},
-	format::{
-		FormatDesc
-	},
+	format::{ClearValue, FormatDesc, FormatTy},
 	framebuffer::{
 		EmptySinglePassRenderPassDesc,
 		Framebuffer,
@@ -47,7 +42,7 @@ use crate::{
 		input_assembly::IndexType,
 		viewport::{Scissor, Viewport},
 		ComputePipelineAbstract,
-		GraphicsPipelineAbstract,
+		GraphicsPipelineAbstract
 	},
 	query::{QueryPipelineStatisticFlags, UnsafeQueriesRange, UnsafeQuery},
 	sampler::Filter,
@@ -417,8 +412,8 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 	/// Does nothing if the list of descriptor sets is empty, as it would be a no-op and isn't a
 	/// valid usage of the command anyway.
 	pub unsafe fn bind_descriptor_sets<'s, S, I>(
-		&mut self, graphics: bool, pipeline_layout: &Arc<PipelineLayout>, first_binding: u32, sets: S,
-		dynamic_offsets: I
+		&mut self, graphics: bool, pipeline_layout: &Arc<PipelineLayout>, first_binding: u32,
+		sets: S, dynamic_offsets: I
 	) where
 		S: Iterator<Item = &'s UnsafeDescriptorSet>,
 		I: Iterator<Item = u32>
@@ -1246,7 +1241,8 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 
 	/// Calls `vkCmdPushConstants` on the builder.
 	pub unsafe fn push_constants<D>(
-		&mut self, pipeline_layout: &Arc<PipelineLayout>, stages: ShaderStages, offset: u32, size: u32, data: &D
+		&mut self, pipeline_layout: &Arc<PipelineLayout>, stages: ShaderStages, offset: u32,
+		size: u32, data: &D
 	) where
 		D: ?Sized
 	{

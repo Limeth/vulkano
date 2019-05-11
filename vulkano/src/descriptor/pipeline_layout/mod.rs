@@ -42,7 +42,12 @@ pub use self::{
 	empty::EmptyPipelineDesc,
 	limits_check::PipelineLayoutLimitsError,
 	runtime_desc::{RuntimePipelineDesc, RuntimePipelineDescError},
-	sys::{PipelineLayout, PipelineLayoutCreationError, PipelineLayoutSys, PipelineLayoutDescAggregation},
+	sys::{
+		PipelineLayout,
+		PipelineLayoutCreationError,
+		PipelineLayoutDescAggregation,
+		PipelineLayoutSys
+	},
 	traits::{
 		PipelineLayoutDesc,
 		PipelineLayoutDescPcRange,

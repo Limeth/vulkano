@@ -9,10 +9,9 @@
 
 use crate::descriptor::{
 	descriptor::DescriptorDesc,
-	descriptor_set::UnsafeDescriptorSetLayout,
 	pipeline_layout::{PipelineLayoutDesc, PipelineLayoutDescPcRange}
 };
-use std::{cmp, sync::Arc};
+use std::cmp;
 
 /// Contains the union of two pipeline layout description.
 ///

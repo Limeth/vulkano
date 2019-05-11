@@ -11,11 +11,7 @@ use std::{fmt, marker::PhantomData, ptr, sync::Arc, u32};
 
 use crate::{
 	buffer::BufferAccess,
-	descriptor::{
-		descriptor::DescriptorDesc,
-		descriptor_set::UnsafeDescriptorSetLayout,
-		pipeline_layout::{PipelineLayout, PipelineLayoutDesc, PipelineLayoutDescPcRange, PipelineLayoutSys}
-	},
+	descriptor::pipeline_layout::PipelineLayout,
 	device::{Device, DeviceOwned},
 	format::ClearValue,
 	framebuffer::{

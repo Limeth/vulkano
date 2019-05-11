@@ -1,5 +1,4 @@
-use std::{ptr};
-use std::ops::BitAnd;
+use std::{ops::BitAnd, ptr};
 
 use smallvec::SmallVec;
 
@@ -7,13 +6,8 @@ use vk_sys as vk;
 
 use crate::{
 	buffer::{BufferAccess, BufferInner},
-	command_buffer::{
-		CommandBuffer
-	},
-	format::{
-		Format,
-		FormatDesc
-	},
+	command_buffer::CommandBuffer,
+	format::{Format, FormatDesc},
 	image::{
 		layout::{ImageLayout, ImageLayoutEnd},
 		ImageViewAccess
@@ -86,7 +80,7 @@ impl UnsafeCommandBufferBuilderImageAspect {
 		let mut color = false;
 		let mut depth = false;
 		let mut stencil = false;
-		
+
 		if format.is_depth_stencil() {
 			depth = true;
 			stencil = true;
@@ -99,11 +93,7 @@ impl UnsafeCommandBufferBuilderImageAspect {
 			// TODO: Compressed formats?
 		}
 
-		UnsafeCommandBufferBuilderImageAspect {
-			color,
-			depth,
-			stencil
-		}
+		UnsafeCommandBufferBuilderImageAspect { color, depth, stencil }
 	}
 
 	pub(crate) fn to_vk_bits(&self) -> vk::ImageAspectFlagBits {
@@ -124,12 +114,12 @@ impl BitAnd for UnsafeCommandBufferBuilderImageAspect {
 	type Output = Self;
 
 	fn bitand(self, rhs: Self) -> Self {
-        UnsafeCommandBufferBuilderImageAspect {
+		UnsafeCommandBufferBuilderImageAspect {
 			color: self.color && rhs.color,
 			depth: self.depth && rhs.depth,
 			stencil: self.stencil && rhs.stencil
 		}
-    }
+	}
 }
 
 // TODO: move somewhere else?

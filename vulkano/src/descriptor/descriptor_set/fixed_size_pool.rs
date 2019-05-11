@@ -25,7 +25,7 @@ use crate::{
 			UnsafeDescriptorSet,
 			UnsafeDescriptorSetLayout
 		},
-		pipeline_layout::{PipelineLayoutDesc, PipelineLayout}
+		pipeline_layout::{PipelineLayout, PipelineLayoutDesc}
 	},
 	device::{Device, DeviceOwned},
 	image::ImageViewAccess,
@@ -90,8 +90,7 @@ pub struct FixedSizeDescriptorSetsPool {
 impl FixedSizeDescriptorSetsPool {
 	/// Initializes a new pool. The pool is configured to allocate sets that corresponds to the
 	/// parameters passed to this function.
-	pub fn new(layout: Arc<PipelineLayout>, set_id: usize) -> FixedSizeDescriptorSetsPool
-	{
+	pub fn new(layout: Arc<PipelineLayout>, set_id: usize) -> FixedSizeDescriptorSetsPool {
 		assert!(layout.num_sets() > set_id);
 
 		let device = layout.device().clone();
@@ -112,8 +111,7 @@ impl FixedSizeDescriptorSetsPool {
 	/// Starts the process of building a new descriptor set.
 	///
 	/// The set will corresponds to the set layout that was passed to `new`.
-	pub fn next(&mut self) -> FixedSizeDescriptorSetBuilder<()>
-	{
+	pub fn next(&mut self) -> FixedSizeDescriptorSetBuilder<()> {
 		let inner = PersistentDescriptorSet::start(self.pipeline_layout.clone(), self.set_id);
 
 		FixedSizeDescriptorSetBuilder { pool: self, inner }
@@ -140,8 +138,7 @@ where
 	fn image(&self, index: usize) -> Option<(&ImageViewAccess, u32)> { self.inner.image(index) }
 }
 
-unsafe impl<R> DescriptorSetDesc for FixedSizeDescriptorSet<R>
-{
+unsafe impl<R> DescriptorSetDesc for FixedSizeDescriptorSet<R> {
 	fn num_bindings(&self) -> usize { self.inner.num_bindings() }
 
 	fn descriptor(&self, binding: usize) -> Option<DescriptorDesc> {
@@ -149,8 +146,7 @@ unsafe impl<R> DescriptorSetDesc for FixedSizeDescriptorSet<R>
 	}
 }
 
-unsafe impl<R> DeviceOwned for FixedSizeDescriptorSet<R>
-{
+unsafe impl<R> DeviceOwned for FixedSizeDescriptorSet<R> {
 	fn device(&self) -> &Arc<Device> { self.inner.device() }
 }
 
@@ -266,8 +262,7 @@ pub struct FixedSizeDescriptorSetBuilder<'a, R> {
 	inner: PersistentDescriptorSetBuilder<R>
 }
 
-impl<'a, R> FixedSizeDescriptorSetBuilder<'a, R>
-{
+impl<'a, R> FixedSizeDescriptorSetBuilder<'a, R> {
 	/// Builds a `FixedSizeDescriptorSet` from the builder.
 	pub fn build(self) -> Result<FixedSizeDescriptorSet<R>, PersistentDescriptorSetBuildError> {
 		let inner = self.inner.build_with_pool(&mut self.pool.pool)?;
@@ -408,8 +403,7 @@ pub struct FixedSizeDescriptorSetBuilderArray<'a, R> {
 	inner: PersistentDescriptorSetBuilderArray<R>
 }
 
-impl<'a, R> FixedSizeDescriptorSetBuilderArray<'a, R>
-{
+impl<'a, R> FixedSizeDescriptorSetBuilderArray<'a, R> {
 	/// Leaves the array. Call this once you added all the elements of the array.
 	pub fn leave_array(
 		self

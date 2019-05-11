@@ -10,18 +10,12 @@
 use std::{error, fmt, marker::PhantomData, mem, ptr, sync::Arc};
 
 use crate::{
-	descriptor::{
-		descriptor::DescriptorDesc,
-		descriptor_set::UnsafeDescriptorSetLayout,
-		pipeline_layout::{
-			PipelineLayout,
-			PipelineLayoutCreationError,
-			PipelineLayoutDesc,
-			PipelineLayoutDescPcRange,
-			PipelineLayoutNotSupersetError,
-			PipelineLayoutSuperset,
-			PipelineLayoutSys
-		}
+	descriptor::pipeline_layout::{
+		PipelineLayout,
+		PipelineLayoutCreationError,
+		PipelineLayoutDesc,
+		PipelineLayoutNotSupersetError,
+		PipelineLayoutSuperset
 	},
 	pipeline::shader::{EntryPointAbstract, SpecializationConstants}
 };
@@ -106,7 +100,7 @@ impl ComputePipeline {
 	) -> Result<ComputePipeline, ComputePipelineCreationError>
 	where
 		Cs::PipelineLayout: Clone,
-		Cs: EntryPointAbstract,
+		Cs: EntryPointAbstract
 	{
 		let vk = device.pointers();
 
@@ -181,8 +175,7 @@ pub unsafe trait ComputePipelineAbstract: DeviceOwned {
 	fn inner(&self) -> ComputePipelineSys;
 }
 
-unsafe impl ComputePipelineAbstract for ComputePipeline
-{
+unsafe impl ComputePipelineAbstract for ComputePipeline {
 	fn layout(&self) -> &Arc<PipelineLayout> { &self.pipeline_layout }
 
 	fn inner(&self) -> ComputePipelineSys { ComputePipelineSys(self.inner.pipeline, PhantomData) }

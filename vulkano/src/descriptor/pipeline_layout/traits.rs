@@ -7,22 +7,21 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use std::{cmp, error, fmt, sync::Arc, hash::Hash};
+use std::{cmp, error, fmt, sync::Arc};
 
 use crate::{
 	descriptor::{
 		descriptor::{DescriptorDesc, DescriptorDescSupersetError, ShaderStages},
-		descriptor_set::{DescriptorSetsCollection, UnsafeDescriptorSetLayout},
+		descriptor_set::DescriptorSetsCollection,
 		pipeline_layout::{
 			limits_check,
 			PipelineLayout,
 			PipelineLayoutCreationError,
-			PipelineLayoutDescUnion,
-			PipelineLayoutSys,
-                        PipelineLayoutDescAggregation
+			PipelineLayoutDescAggregation,
+			PipelineLayoutDescUnion
 		}
 	},
-	device::{Device, DeviceOwned},
+	device::Device,
 	SafeDeref
 };
 

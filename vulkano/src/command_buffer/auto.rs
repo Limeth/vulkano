@@ -598,7 +598,7 @@ impl<P> AutoCommandBufferBuilder<P> {
 				// TODO: Allowing choosing a subset of the image aspects, but note that if color
 				// is included, neither depth nor stencil may.
 				aspect: UnsafeCommandBufferBuilderImageAspect::from_format(source.format())
-				& UnsafeCommandBufferBuilderImageAspect::from_format(destination.format()),
+					& UnsafeCommandBufferBuilderImageAspect::from_format(destination.format()),
 				source_mip_level,
 				destination_mip_level,
 				source_base_array_layer,
@@ -689,7 +689,7 @@ impl<P> AutoCommandBufferBuilder<P> {
 			let blit = UnsafeCommandBufferBuilderImageBlit {
 				// TODO:
 				aspect: UnsafeCommandBufferBuilderImageAspect::from_format(source.format())
-				& UnsafeCommandBufferBuilderImageAspect::from_format(destination.format()),
+					& UnsafeCommandBufferBuilderImageAspect::from_format(destination.format()),
 				source_mip_level,
 				destination_mip_level,
 				source_base_array_layer,
@@ -855,7 +855,9 @@ impl<P> AutoCommandBufferBuilder<P> {
 				buffer_image_height: 0,
 
 				// TODO: What does this change break?
-				image_aspect: UnsafeCommandBufferBuilderImageAspect::from_format(destination.format()),
+				image_aspect: UnsafeCommandBufferBuilderImageAspect::from_format(
+					destination.format()
+				),
 				image_mip_level: mipmap,
 				image_base_array_layer: first_layer,
 				image_layer_count: num_layers,
@@ -1009,7 +1011,13 @@ impl<P> AutoCommandBufferBuilder<P> {
 
 			push_constants(&mut self.inner, pipeline.layout(), constants);
 			set_state(&mut self.inner, &dynamic);
-			descriptor_sets(&mut self.inner, &mut self.state_cacher, true, pipeline.layout(), sets)?;
+			descriptor_sets(
+				&mut self.inner,
+				&mut self.state_cacher,
+				true,
+				pipeline.layout(),
+				sets
+			)?;
 			vertex_buffers(&mut self.inner, &mut self.state_cacher, vb_infos.vertex_buffers)?;
 
 			debug_assert!(self.graphics_allowed);
@@ -1058,7 +1066,13 @@ impl<P> AutoCommandBufferBuilder<P> {
 
 			push_constants(&mut self.inner, pipeline.layout(), constants);
 			set_state(&mut self.inner, &dynamic);
-			descriptor_sets(&mut self.inner, &mut self.state_cacher, true, pipeline.layout(), sets)?;
+			descriptor_sets(
+				&mut self.inner,
+				&mut self.state_cacher,
+				true,
+				pipeline.layout(),
+				sets
+			)?;
 			vertex_buffers(&mut self.inner, &mut self.state_cacher, vb_infos.vertex_buffers)?;
 			// TODO: how to handle an index out of range of the vertex buffers?
 
@@ -1113,7 +1127,13 @@ impl<P> AutoCommandBufferBuilder<P> {
 
 			push_constants(&mut self.inner, pipeline.layout(), constants);
 			set_state(&mut self.inner, &dynamic);
-			descriptor_sets(&mut self.inner, &mut self.state_cacher, true, pipeline.layout(), sets)?;
+			descriptor_sets(
+				&mut self.inner,
+				&mut self.state_cacher,
+				true,
+				pipeline.layout(),
+				sets
+			)?;
 			vertex_buffers(&mut self.inner, &mut self.state_cacher, vb_infos.vertex_buffers)?;
 
 			debug_assert!(self.graphics_allowed);
@@ -1174,7 +1194,13 @@ impl<P> AutoCommandBufferBuilder<P> {
 
 			push_constants(&mut self.inner, pipeline.layout(), constants);
 			set_state(&mut self.inner, &dynamic);
-			descriptor_sets(&mut self.inner, &mut self.state_cacher, true, pipeline.layout(), sets)?;
+			descriptor_sets(
+				&mut self.inner,
+				&mut self.state_cacher,
+				true,
+				pipeline.layout(),
+				sets
+			)?;
 			vertex_buffers(&mut self.inner, &mut self.state_cacher, vb_infos.vertex_buffers)?;
 
 			debug_assert!(self.graphics_allowed);
@@ -1335,7 +1361,8 @@ unsafe impl<P> DeviceOwned for AutoCommandBufferBuilder<P> {
 
 // Shortcut function to set the push constants.
 unsafe fn push_constants<P, Pc>(
-	destination: &mut SyncCommandBufferBuilder<P>, pipeline: &Arc<PipelineLayout>, push_constants: Pc
+	destination: &mut SyncCommandBufferBuilder<P>, pipeline: &Arc<PipelineLayout>,
+	push_constants: Pc
 ) {
 	for num_range in 0 .. pipeline.desc().num_push_constants_ranges() {
 		let range = match pipeline.desc().push_constants_range(num_range) {

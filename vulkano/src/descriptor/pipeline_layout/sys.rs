@@ -32,11 +32,10 @@ pub struct PipelineLayout {
 	device: Arc<Device>,
 	layout: vk::PipelineLayout,
 	layouts: SmallVec<[Arc<UnsafeDescriptorSetLayout>; 16]>,
-	desc: PipelineLayoutDescAggregation,
+	desc: PipelineLayoutDescAggregation
 }
 
-impl PipelineLayout
-{
+impl PipelineLayout {
 	/// Creates a new `PipelineLayout`.
 	pub fn new<L: PipelineLayoutDesc>(
 		device: Arc<Device>, desc: L
@@ -134,9 +133,7 @@ impl PipelineLayout
 	}
 
 	/// Returns the description of the pipeline layout.
-	pub fn desc(&self) -> &PipelineLayoutDescAggregation {
-		&self.desc
-	}
+	pub fn desc(&self) -> &PipelineLayoutDescAggregation { &self.desc }
 
 	pub fn sys(&self) -> PipelineLayoutSys { PipelineLayoutSys(&self.layout) }
 
@@ -146,9 +143,7 @@ impl PipelineLayout
 }
 
 unsafe impl PipelineLayoutDesc for PipelineLayout {
-	fn num_sets(&self) -> usize {
-		self.desc.num_sets()
-	}
+	fn num_sets(&self) -> usize { self.desc.num_sets() }
 
 	fn num_bindings_in_set(&self, set: usize) -> Option<usize> {
 		self.desc.num_bindings_in_set(set)
@@ -158,25 +153,20 @@ unsafe impl PipelineLayoutDesc for PipelineLayout {
 		self.desc.descriptor(set, binding)
 	}
 
-	fn num_push_constants_ranges(&self) -> usize {
-		self.desc.num_push_constants_ranges()
-	}
+	fn num_push_constants_ranges(&self) -> usize { self.desc.num_push_constants_ranges() }
 
 	fn push_constants_range(&self, num: usize) -> Option<PipelineLayoutDescPcRange> {
 		self.desc.push_constants_range(num)
 	}
 
-	fn aggregate(self) -> PipelineLayoutDescAggregation {
-		self.desc.clone()
-	}
+	fn aggregate(self) -> PipelineLayoutDescAggregation { self.desc.clone() }
 }
 
 unsafe impl DeviceOwned for PipelineLayout {
 	fn device(&self) -> &Arc<Device> { &self.device }
 }
 
-impl fmt::Debug for PipelineLayout
-{
+impl fmt::Debug for PipelineLayout {
 	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
 		fmt.debug_struct("PipelineLayout")
 			.field("raw", &self.layout)
@@ -263,7 +253,7 @@ impl From<Error> for PipelineLayoutCreationError {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct PipelineLayoutDescAggregation {
 	descriptor_sets: Vec<Vec<DescriptorDesc>>,
-	push_constants_ranges: Vec<PipelineLayoutDescPcRange>,
+	push_constants_ranges: Vec<PipelineLayoutDescPcRange>
 }
 
 impl PipelineLayoutDescAggregation {
@@ -271,11 +261,11 @@ impl PipelineLayoutDescAggregation {
 		let num_sets = other.num_sets();
 		let mut descriptor_sets = Vec::with_capacity(num_sets);
 
-		for set in 0..other.num_sets() {
+		for set in 0 .. other.num_sets() {
 			let num_bindings = other.num_bindings_in_set(set).unwrap();
 			let mut bindings = Vec::with_capacity(num_bindings);
 
-			for binding in 0..num_bindings {
+			for binding in 0 .. num_bindings {
 				bindings.push(other.descriptor(set, binding).unwrap());
 			}
 
@@ -285,21 +275,16 @@ impl PipelineLayoutDescAggregation {
 		let num_pcrs = other.num_push_constants_ranges();
 		let mut pcrs = Vec::with_capacity(num_pcrs);
 
-		for pcr in 0..num_pcrs {
+		for pcr in 0 .. num_pcrs {
 			pcrs.push(other.push_constants_range(pcr).unwrap());
 		}
 
-		PipelineLayoutDescAggregation {
-			descriptor_sets,
-			push_constants_ranges: pcrs,
-		}
+		PipelineLayoutDescAggregation { descriptor_sets, push_constants_ranges: pcrs }
 	}
 }
 
 unsafe impl PipelineLayoutDesc for PipelineLayoutDescAggregation {
-	fn num_sets(&self) -> usize {
-		self.descriptor_sets.len()
-	}
+	fn num_sets(&self) -> usize { self.descriptor_sets.len() }
 
 	fn num_bindings_in_set(&self, set: usize) -> Option<usize> {
 		self.descriptor_sets.get(set).map(Vec::len)
@@ -309,17 +294,13 @@ unsafe impl PipelineLayoutDesc for PipelineLayoutDescAggregation {
 		self.descriptor_sets.get(set).and_then(|set| set.get(binding)).map(Clone::clone)
 	}
 
-	fn num_push_constants_ranges(&self) -> usize {
-		self.push_constants_ranges.len()
-	}
+	fn num_push_constants_ranges(&self) -> usize { self.push_constants_ranges.len() }
 
 	fn push_constants_range(&self, num: usize) -> Option<PipelineLayoutDescPcRange> {
 		self.push_constants_ranges.get(num).map(Clone::clone)
 	}
 
-	fn aggregate(self) -> Self {
-		self
-	}
+	fn aggregate(self) -> Self { self }
 }
 
 // TODO: restore
