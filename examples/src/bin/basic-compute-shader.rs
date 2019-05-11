@@ -112,7 +112,7 @@ void main() {
 	// If you want to run the pipeline on multiple different buffers, you need to create multiple
 	// descriptor sets that each contain the buffer you want to run the shader on.
 	let set = Arc::new(
-		PersistentDescriptorSet::start(pipeline.clone(), 0)
+		PersistentDescriptorSet::start(pipeline.layout().clone(), 0)
 			.add_buffer(data_buffer.clone())
 			.unwrap()
 			.build()

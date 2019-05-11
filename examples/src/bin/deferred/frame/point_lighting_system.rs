@@ -131,7 +131,7 @@ impl PointLightingSystem {
 			position: position.extend(0.0).into()
 		};
 
-		let descriptor_set = PersistentDescriptorSet::start(self.pipeline.clone(), 0)
+		let descriptor_set = PersistentDescriptorSet::start(self.pipeline.layout().clone(), 0)
 			.add_image(color_input)
 			.unwrap()
 			.add_image(normals_input)
