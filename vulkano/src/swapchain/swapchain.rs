@@ -739,14 +739,14 @@ unsafe impl<W> GpuFuture for SwapchainAcquireFuture<W> {
 		{
 			return Err(AccessCheckError::Denied(AccessError::ImageLayoutMismatch {
 				actual: ImageLayout::Undefined,
-				requested: layout
+				expected: layout
 			}))
 		}
 
 		if layout != ImageLayout::Undefined && layout != ImageLayout::PresentSrc {
 			return Err(AccessCheckError::Denied(AccessError::ImageLayoutMismatch {
 				actual: ImageLayout::PresentSrc,
-				requested: layout
+				expected: layout
 			}))
 		}
 

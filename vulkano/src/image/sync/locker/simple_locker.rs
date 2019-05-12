@@ -104,7 +104,7 @@ unsafe impl ImageResourceLocker for SimpleImageResourceLocker {
 		let current_layout = self.current_layout(range).unwrap();
 		if expected_layout != ImageLayout::Undefined && current_layout != expected_layout {
 			return Err(AccessError::ImageLayoutMismatch {
-				requested: expected_layout,
+				expected: expected_layout,
 				actual: current_layout
 			})
 		}

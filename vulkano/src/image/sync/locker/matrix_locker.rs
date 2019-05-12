@@ -181,7 +181,7 @@ impl InnerLocker {
 			}
 			if entry.layout != expected_layout {
 				result = Err(AccessError::ImageLayoutMismatch {
-					requested: expected_layout,
+					expected: expected_layout,
 					actual: entry.layout
 				});
 				break

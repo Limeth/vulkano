@@ -232,7 +232,7 @@ impl<P> SyncCommandBuffer<P> {
 			if layout != ImageLayout::Undefined && ImageLayout::from(value.final_layout) != layout {
 				return Err(AccessCheckError::Denied(AccessError::ImageLayoutMismatch {
 					actual: value.final_layout.into(),
-					requested: layout
+					expected: layout
 				}))
 			}
 

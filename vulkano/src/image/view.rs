@@ -1,7 +1,7 @@
 use std::{error, fmt};
 
 use crate::{
-	format::{FormatDesc, Format},
+	format::{Format, FormatDesc},
 	image::{
 		layout::InvalidLayoutUsageError,
 		sys::{UnsafeImageView, UnsafeImageViewCreationError},

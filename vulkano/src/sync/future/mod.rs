@@ -309,7 +309,7 @@ pub enum AccessError {
 
 	/// The image layout that was requested does not match the layout of one or
 	/// more subresources it overlaps.
-	ImageLayoutMismatch { requested: ImageLayout, actual: ImageLayout },
+	ImageLayoutMismatch { expected: ImageLayout, actual: ImageLayout },
 
 	/// Buffer was not initialized.
 	BufferNotInitialized,
@@ -325,11 +325,11 @@ impl fmt::Display for AccessError {
 			AccessError::ExclusiveDenied
 			=> write!(f, "The exclusive access was denied either because there it is forbidden or because there is already another lock"),
 
-			AccessError::ImageLayoutMismatch { actual, requested } => {
+			AccessError::ImageLayoutMismatch { actual, expected } => {
 				write!(
 					f,
-					"The image layout that was requested ({:?}) does not match the layout of one or more subresources it overlaps ({:?})",
-					requested, actual
+					"The image layout that was expected ({:?}) does not match the layout of one or more subresources it overlaps ({:?})",
+					expected, actual
 				)
 			}
 
