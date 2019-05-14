@@ -11,17 +11,6 @@
 // shader source code. The boilerplate is taken from the "basic-compute-shader.rs" example, where
 // most of the boilerplate is explained.
 
-use std::sync::Arc;
-
-use vulkano::{
-	buffer::{BufferUsage, CpuAccessibleBuffer},
-	command_buffer::AutoCommandBufferBuilder,
-	descriptor::descriptor_set::PersistentDescriptorSet,
-	device::{Device, DeviceExtensions},
-	instance::{Instance, InstanceExtensions, PhysicalDevice},
-	pipeline::ComputePipeline,
-	sync::{self, GpuFuture}
-};
 
 fn main() {
 	// TODO: Disabled because it fails on windows

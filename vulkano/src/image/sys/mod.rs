@@ -49,7 +49,7 @@ pub struct LinearLayout {
 mod tests {
 	use std::{iter::Empty, num::NonZeroU32, u32};
 
-	use super::{ImageCreationError, UnsafeImage};
+	use super::{UnsafeImage, UnsafeImageCreationError};
 
 	use crate::{
 		format::Format,
@@ -126,7 +126,7 @@ mod tests {
 		};
 
 		match res {
-			Err(ImageCreationError::UnsupportedSamplesCount { .. }) => (),
+			Err(UnsafeImageCreationError::UnsupportedSamplesCount { .. }) => (),
 			_ => panic!()
 		};
 	}
@@ -153,7 +153,7 @@ mod tests {
 		};
 
 		match res {
-			Err(ImageCreationError::InvalidMipmapsCount { requested, valid_range }) => {
+			Err(UnsafeImageCreationError::InvalidMipmapsCount { requested, valid_range }) => {
 				assert_eq!(requested, u32::MAX);
 				assert_eq!(valid_range.start, 1);
 			}
@@ -182,8 +182,8 @@ mod tests {
 		};
 
 		match res {
-			Err(ImageCreationError::ShaderStorageImageMultisampleFeatureNotEnabled) => (),
-			Err(ImageCreationError::UnsupportedSamplesCount { .. }) => (), // unlikely but possible
+			Err(UnsafeImageCreationError::ShaderStorageImageMultisampleFeatureNotEnabled) => (),
+			Err(UnsafeImageCreationError::UnsupportedSamplesCount { .. }) => (), /* unlikely but possible */
 			_ => panic!()
 		};
 	}
@@ -209,8 +209,8 @@ mod tests {
 		};
 
 		match res {
-			Err(ImageCreationError::FormatNotSupported) => (),
-			Err(ImageCreationError::UnsupportedUsage) => (),
+			Err(UnsafeImageCreationError::FormatNotSupported) => (),
+			Err(UnsafeImageCreationError::UnsupportedUsage) => (),
 			_ => panic!()
 		};
 	}
@@ -236,7 +236,7 @@ mod tests {
 		};
 
 		match res {
-			Err(ImageCreationError::UnsupportedUsage) => (),
+			Err(UnsafeImageCreationError::UnsupportedUsage) => (),
 			_ => panic!()
 		};
 	}

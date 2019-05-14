@@ -60,7 +60,7 @@ macro_rules! descriptors_count {
         /// };
         /// ```
         ///
-        #[derive(Debug, Copy, Clone)]
+        #[derive(Debug, Copy, Clone, Hash)]
         pub struct DescriptorsCount {
             $(
                 pub $name: u32,

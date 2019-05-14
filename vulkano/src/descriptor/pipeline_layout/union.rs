@@ -9,10 +9,9 @@
 
 use crate::descriptor::{
 	descriptor::DescriptorDesc,
-	descriptor_set::UnsafeDescriptorSetLayout,
 	pipeline_layout::{PipelineLayoutDesc, PipelineLayoutDescPcRange}
 };
-use std::{cmp, sync::Arc};
+use std::cmp;
 
 /// Contains the union of two pipeline layout description.
 ///
@@ -57,10 +56,6 @@ where
 			(None, Some(b)) => Some(b),
 			(None, None) => None
 		}
-	}
-
-	fn provided_set_layout(&self, set: usize) -> Option<Arc<UnsafeDescriptorSetLayout>> {
-		self.a.provided_set_layout(set).or(self.b.provided_set_layout(set))
 	}
 
 	fn num_push_constants_ranges(&self) -> usize {

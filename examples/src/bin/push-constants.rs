@@ -78,7 +78,7 @@ void main() {
 	};
 
 	let set = Arc::new(
-		PersistentDescriptorSet::start(pipeline.clone(), 0)
+		PersistentDescriptorSet::start(pipeline.layout().clone(), 0)
 			.add_buffer(data_buffer.clone())
 			.unwrap()
 			.build()

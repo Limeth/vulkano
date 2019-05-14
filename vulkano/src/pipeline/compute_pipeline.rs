@@ -10,19 +10,12 @@
 use std::{error, fmt, marker::PhantomData, mem, ptr, sync::Arc};
 
 use crate::{
-	descriptor::{
-		descriptor::DescriptorDesc,
-		descriptor_set::UnsafeDescriptorSetLayout,
-		pipeline_layout::{
-			PipelineLayout,
-			PipelineLayoutAbstract,
-			PipelineLayoutCreationError,
-			PipelineLayoutDesc,
-			PipelineLayoutDescPcRange,
-			PipelineLayoutNotSupersetError,
-			PipelineLayoutSuperset,
-			PipelineLayoutSys
-		}
+	descriptor::pipeline_layout::{
+		PipelineLayout,
+		PipelineLayoutCreationError,
+		PipelineLayoutDesc,
+		PipelineLayoutNotSupersetError,
+		PipelineLayoutSuperset
 	},
 	pipeline::shader::{EntryPointAbstract, SpecializationConstants}
 };
@@ -43,10 +36,10 @@ use vk_sys as vk;
 /// The template parameter contains the descriptor set to use with this pipeline.
 ///
 /// All compute pipeline objects implement the `ComputePipelineAbstract` trait. You can turn any
-/// `Arc<ComputePipeline<Pl>>` into an `Arc<ComputePipelineAbstract>` if necessary.
-pub struct ComputePipeline<Pl> {
+/// `Arc<ComputePipeline>` into an `Arc<ComputePipelineAbstract>` if necessary.
+pub struct ComputePipeline {
 	inner: Inner,
-	pipeline_layout: Pl
+	pipeline_layout: Arc<PipelineLayout>
 }
 
 struct Inner {
@@ -54,11 +47,11 @@ struct Inner {
 	device: Arc<Device>
 }
 
-impl ComputePipeline<()> {
+impl ComputePipeline {
 	/// Builds a new `ComputePipeline`.
 	pub fn new<Cs>(
 		device: Arc<Device>, shader: &Cs, specialization: &Cs::SpecializationConstants
-	) -> Result<ComputePipeline<PipelineLayout<Cs::PipelineLayout>>, ComputePipelineCreationError>
+	) -> Result<ComputePipeline, ComputePipelineCreationError>
 	where
 		Cs::PipelineLayout: Clone,
 		Cs: EntryPointAbstract
@@ -75,22 +68,21 @@ impl ComputePipeline<()> {
 	}
 }
 
-impl<Pl> ComputePipeline<Pl> {
+impl ComputePipeline {
 	/// Builds a new `ComputePipeline` with a specific pipeline layout.
 	///
 	/// An error will be returned if the pipeline layout isn't a superset of what the shader
 	/// uses.
 	pub fn with_pipeline_layout<Cs>(
 		device: Arc<Device>, shader: &Cs, specialization: &Cs::SpecializationConstants,
-		pipeline_layout: Pl
-	) -> Result<ComputePipeline<Pl>, ComputePipelineCreationError>
+		pipeline_layout: Arc<PipelineLayout>
+	) -> Result<ComputePipeline, ComputePipelineCreationError>
 	where
 		Cs::PipelineLayout: Clone,
-		Cs: EntryPointAbstract,
-		Pl: PipelineLayoutAbstract
+		Cs: EntryPointAbstract
 	{
 		unsafe {
-			PipelineLayoutSuperset::ensure_superset_of(&pipeline_layout, shader.layout())?;
+			PipelineLayoutSuperset::ensure_superset_of(pipeline_layout.desc(), shader.layout())?;
 			ComputePipeline::with_unchecked_pipeline_layout(
 				device,
 				shader,
@@ -104,12 +96,11 @@ impl<Pl> ComputePipeline<Pl> {
 	/// superset of what the shader expects.
 	pub unsafe fn with_unchecked_pipeline_layout<Cs>(
 		device: Arc<Device>, shader: &Cs, specialization: &Cs::SpecializationConstants,
-		pipeline_layout: Pl
-	) -> Result<ComputePipeline<Pl>, ComputePipelineCreationError>
+		pipeline_layout: Arc<PipelineLayout>
+	) -> Result<ComputePipeline, ComputePipelineCreationError>
 	where
 		Cs::PipelineLayout: Clone,
-		Cs: EntryPointAbstract,
-		Pl: PipelineLayoutAbstract
+		Cs: EntryPointAbstract
 	{
 		let vk = device.pointers();
 
@@ -141,7 +132,7 @@ impl<Pl> ComputePipeline<Pl> {
 				pNext: ptr::null(),
 				flags: 0,
 				stage,
-				layout: PipelineLayoutAbstract::sys(&pipeline_layout).internal_object(),
+				layout: PipelineLayout::sys(&pipeline_layout).internal_object(),
 				basePipelineHandle: 0,
 				basePipelineIndex: 0
 			};
@@ -162,30 +153,31 @@ impl<Pl> ComputePipeline<Pl> {
 	}
 }
 
-impl<Pl> fmt::Debug for ComputePipeline<Pl> {
+impl fmt::Debug for ComputePipeline {
 	fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
 		write!(fmt, "<Vulkan compute pipeline {:?}>", self.inner.pipeline)
 	}
 }
 
-impl<Pl> ComputePipeline<Pl> {
+impl ComputePipeline {
 	/// Returns the `Device` this compute pipeline was created with.
 	pub fn device(&self) -> &Arc<Device> { &self.inner.device }
 
 	/// Returns the pipeline layout used in this compute pipeline.
-	pub fn layout(&self) -> &Pl { &self.pipeline_layout }
+	pub fn layout(&self) -> &Arc<PipelineLayout> { &self.pipeline_layout }
 }
 
 /// Trait implemented on all compute pipelines.
-pub unsafe trait ComputePipelineAbstract: PipelineLayoutAbstract {
+pub unsafe trait ComputePipelineAbstract: DeviceOwned {
+	fn layout(&self) -> &Arc<PipelineLayout>;
+
 	/// Returns an opaque object that represents the inside of the compute pipeline.
 	fn inner(&self) -> ComputePipelineSys;
 }
 
-unsafe impl<Pl> ComputePipelineAbstract for ComputePipeline<Pl>
-where
-	Pl: PipelineLayoutAbstract
-{
+unsafe impl ComputePipelineAbstract for ComputePipeline {
+	fn layout(&self) -> &Arc<PipelineLayout> { &self.pipeline_layout }
+
 	fn inner(&self) -> ComputePipelineSys { ComputePipelineSys(self.inner.pipeline, PhantomData) }
 }
 
@@ -194,6 +186,8 @@ where
 	T: SafeDeref,
 	T::Target: ComputePipelineAbstract
 {
+	fn layout(&self) -> &Arc<PipelineLayout> { (**self).layout() }
+
 	fn inner(&self) -> ComputePipelineSys { (**self).inner() }
 }
 
@@ -210,46 +204,12 @@ unsafe impl<'a> VulkanObject for ComputePipelineSys<'a> {
 	fn internal_object(&self) -> vk::Pipeline { self.0 }
 }
 
-unsafe impl<Pl> PipelineLayoutAbstract for ComputePipeline<Pl>
-where
-	Pl: PipelineLayoutAbstract
-{
-	fn sys(&self) -> PipelineLayoutSys { self.layout().sys() }
-
-	fn descriptor_set_layout(&self, index: usize) -> Option<&Arc<UnsafeDescriptorSetLayout>> {
-		self.layout().descriptor_set_layout(index)
-	}
-}
-
-unsafe impl<Pl> PipelineLayoutDesc for ComputePipeline<Pl>
-where
-	Pl: PipelineLayoutDesc
-{
-	fn num_sets(&self) -> usize { self.pipeline_layout.num_sets() }
-
-	fn num_bindings_in_set(&self, set: usize) -> Option<usize> {
-		self.pipeline_layout.num_bindings_in_set(set)
-	}
-
-	fn descriptor(&self, set: usize, binding: usize) -> Option<DescriptorDesc> {
-		self.pipeline_layout.descriptor(set, binding)
-	}
-
-	fn num_push_constants_ranges(&self) -> usize {
-		self.pipeline_layout.num_push_constants_ranges()
-	}
-
-	fn push_constants_range(&self, num: usize) -> Option<PipelineLayoutDescPcRange> {
-		self.pipeline_layout.push_constants_range(num)
-	}
-}
-
-unsafe impl<Pl> DeviceOwned for ComputePipeline<Pl> {
+unsafe impl DeviceOwned for ComputePipeline {
 	fn device(&self) -> &Arc<Device> { self.device() }
 }
 
 // TODO: remove in favor of ComputePipelineAbstract?
-unsafe impl<Pl> VulkanObject for ComputePipeline<Pl> {
+unsafe impl VulkanObject for ComputePipeline {
 	type Object = vk::Pipeline;
 
 	const TYPE: vk::DebugReportObjectTypeEXT = vk::DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT;
@@ -395,6 +355,7 @@ mod tests {
 		let shader = unsafe {
 			#[derive(Debug, Copy, Clone)]
 			struct Layout;
+
 			unsafe impl PipelineLayoutDesc for Layout {
 				fn num_sets(&self) -> usize { 1 }
 
@@ -452,7 +413,7 @@ mod tests {
 
 		let data_buffer =
 			CpuAccessibleBuffer::from_data(device.clone(), BufferUsage::all(), 0).unwrap();
-		let set = PersistentDescriptorSet::start(pipeline.clone(), 0)
+		let set = PersistentDescriptorSet::start(pipeline.layout().clone(), 0)
 			.add_buffer(data_buffer.clone())
 			.unwrap()
 			.build()
