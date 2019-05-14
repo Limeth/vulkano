@@ -17,12 +17,12 @@ pub use self::{
 		SyncCommandBufferBuilderBindVertexBuffer,
 		SyncCommandBufferBuilderExecuteCommands
 	},
-	misc::SyncCommandBufferBuilderError
+	state::buffer::SyncCommandBufferBuilderError
 };
 
 mod buffer;
 mod builder;
-mod misc;
+mod state;
 
 mod commands;
 

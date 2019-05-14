@@ -19,53 +19,18 @@ use crate::{
 
 use super::{
 	buffer::SyncCommandBuffer,
-	misc::{
-		BuilderKey,
+	state::builder::{
 		Command,
 		Commands,
 		KeyTy,
+		BuilderKey,
 		ResourceState,
-		ResourceTypeInfo,
+		ResourceTypeInfo
+	},
+	state::buffer::{
 		SyncCommandBufferBuilderError
 	}
 };
-
-/// Wrapper around `UnsafeCommandBufferBuilder` that handles synchronization for you.
-///
-/// Each method of the `UnsafeCommandBufferBuilder` has an equivalent in this wrapper, except
-/// for `pipeline_layout` which is automatically handled. This wrapper automatically builds
-/// pipeline barriers, keeps used resources alive and implements the `CommandBuffer` trait.
-///
-/// Since the implementation needs to cache commands in a `Vec`, most methods have additional
-/// `Send + Sync + 'static` trait requirements on their generics.
-///
-/// If this builder finds out that a command isn't valid because of synchronization reasons (eg.
-/// trying to copy from a buffer to an image which share the same memory), then an error is
-/// returned.
-/// Note that all methods are still unsafe, because this builder doesn't check the validity of
-/// the commands except for synchronization purposes. The builder may panic if you pass invalid
-/// commands.
-///
-/// The `P` generic is the same as `UnsafeCommandBufferBuilder`.
-pub struct SyncCommandBufferBuilder<P> {
-	// The actual Vulkan command buffer builder.
-	inner: UnsafeCommandBufferBuilder<P>,
-
-	// Stores the current state of all resources (buffers and images) that are in use by the
-	// command buffer.
-	resources: FnvHashMap<BuilderKey<P>, ResourceState>,
-
-	// Prototype for the pipeline barrier that must be submitted before flushing the commands
-	// in `commands`.
-	pending_barrier: UnsafeCommandBufferBuilderPipelineBarrier,
-
-	// Stores all the commands that were added to the sync builder. Some of them are maybe not
-	// submitted to the inner builder yet. A copy of this `Arc` is stored in each `BuilderKey`.
-	commands: Arc<Mutex<Commands<P>>>,
-
-	// True if we're a secondary command buffer.
-	is_secondary: bool
-}
 
 // # How pipeline stages work in Vulkan
 //
@@ -122,10 +87,45 @@ pub struct SyncCommandBufferBuilder<P> {
 // queue. If not possible, the queue will be entirely flushed and the command added to a fresh new
 // queue with a fresh new barrier prototype.
 
+/// Wrapper around `UnsafeCommandBufferBuilder` that handles synchronization for you.
+///
+/// Each method of the `UnsafeCommandBufferBuilder` has an equivalent in this wrapper, except
+/// for `pipeline_layout` which is automatically handled. This wrapper automatically builds
+/// pipeline barriers, keeps used resources alive and implements the `CommandBuffer` trait.
+///
+/// Since the implementation needs to cache commands in a `Vec`, most methods have additional
+/// `Send + Sync + 'static` trait requirements on their generics.
+///
+/// If this builder finds out that a command isn't valid because of synchronization reasons (eg.
+/// trying to copy from a buffer to an image which share the same memory), then an error is
+/// returned.
+/// Note that all methods are still unsafe, because this builder doesn't check the validity of
+/// the commands except for synchronization purposes. The builder may panic if you pass invalid
+/// commands.
+///
+/// The `P` generic is the same as `UnsafeCommandBufferBuilder`.
+pub struct SyncCommandBufferBuilder<P> {
+	// The actual Vulkan command buffer builder.
+	inner: UnsafeCommandBufferBuilder<P>,
+
+	// Stores the current state of all resources (buffers and images) that are in use by the
+	// command buffer.
+	resources: FnvHashMap<BuilderKey<P>, ResourceState>,
+
+	// Prototype for the pipeline barrier that must be submitted before flushing the commands
+	// in `commands`.
+	pending_barrier: UnsafeCommandBufferBuilderPipelineBarrier,
+
+	// Stores all the commands that were added to the sync builder. Some of them are maybe not
+	// submitted to the inner builder yet. A copy of this `Arc` is stored in each `BuilderKey`.
+	commands: Arc<Mutex<Commands<P>>>,
+
+	// True if we're a secondary command buffer.
+	is_secondary: bool
+}
 impl<P> fmt::Debug for SyncCommandBufferBuilder<P> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { fmt::Debug::fmt(&self.inner, f) }
 }
-
 impl<P> SyncCommandBufferBuilder<P> {
 	/// Builds a new `SyncCommandBufferBuilder`. The parameters are the same as the
 	/// `UnsafeCommandBufferBuilder::new` function.
@@ -238,6 +238,105 @@ impl<P> SyncCommandBufferBuilder<P> {
 		};
 
 		match self.resources.entry(key) {
+			// Situation where this is the first time we use this resource in this command buffer.
+			Entry::Vacant(entry) => {
+				if let ResourceTypeInfo::Buffer = resource_type_info {
+					entry.insert(ResourceState {
+						stages,
+						access,
+
+						exclusive_any: exclusive,
+						exclusive,
+
+						// We don't care about these values for buffers
+						initial_layout: ImageLayout::Undefined,
+						current_layout: ImageLayout::Undefined
+					});
+				} else {
+					let (start_layout, current_layout) = match resource_type_info {
+						ResourceTypeInfo::Image(start_layout) => (start_layout, start_layout),
+						ResourceTypeInfo::ImageTransitioning(start_layout, end_layout) => {
+							debug_assert!(
+								start_layout != ImageLayout::from(end_layout),
+								"ResourceTypeInfo::ImageTransitioning(start_layout, end_layout) start_layout must not be equal to end_layout"
+							);
+							debug_assert!(exclusive, "Access must be exclusive when ResourceTypeInfo::ImageTransitioning");
+
+							(start_layout, end_layout.into())
+						},
+						_ => unsafe { std::hint::unreachable_unchecked() } // checked in the if branch
+					};
+
+					let initial_layout;
+					let layout_change;
+					if 
+						start_layout == ImageLayout::Undefined
+						|| 
+						start_layout == ImageLayout::Preinitialized
+						||
+						self.is_secondary
+					{
+						initial_layout = start_layout;
+						layout_change = false;
+					} else {
+						let commands_lock = self.commands.lock().unwrap();
+						let img = commands_lock.commands[latest_command_id]
+							.image(resource_index);
+						let current_layout = img.current_layout().expect(
+							"Cannot process an image view which has multiple different layouts"
+						);
+
+						if current_layout != start_layout {
+							// Note that we transition from `bottom_of_pipe`, which means that we
+							// wait for all the previous commands to be entirely finished. This is
+							// suboptimal, but:
+							//
+							// - If we're at the start of the command buffer we have no choice anyway,
+							//   because we have no knowledge about what comes before.
+							// - If we're in the middle of the command buffer, this pipeline is going
+							//   to be merged with an existing barrier. While it may still be
+							//   suboptimal in some cases, in the general situation it will be ok.
+							//
+							unsafe {
+								let b = &mut self.pending_barrier;
+								b.add_image_memory_barrier(
+									img,
+									PipelineStages {
+										bottom_of_pipe: true,
+										..PipelineStages::none()
+									},
+									AccessFlagBits::none(),
+									stages,
+									access,
+									true,
+									None,
+									current_layout,
+									ImageLayoutEnd::try_from_image_layout(start_layout).unwrap() // already checked above
+								);
+							}
+
+							initial_layout = current_layout;
+							layout_change = true;
+						} else {
+							initial_layout = start_layout;
+							layout_change = false;
+						}
+					}
+
+					entry.insert(ResourceState {
+						exclusive_any: exclusive || layout_change,
+
+						stages,
+						access,
+
+						exclusive,
+
+						initial_layout,
+						current_layout
+					});
+				}
+			}
+			
 			// Situation where this resource was used before in this command buffer.
 			Entry::Occupied(entry) => {
 				// `collision_cmd_id` contains the ID of the command that we are potentially colliding with.
@@ -248,211 +347,154 @@ impl<P> SyncCommandBufferBuilder<P> {
 				let entry_key_resource_type = entry.key().resource_type;
 				let entry = entry.into_mut();
 
-				match resource_type_info {
-					ResourceTypeInfo::Buffer => {
-						if exclusive || entry.exclusive {
-							// We might need to insert a new barrier between the `collision_cmd_id` and `latest_command_id`.
-							// Here we detect a case where the `pending_barrier` is still before `collision_cmd_id`.
-							// That is, we detect a state where:
-							//
-							// |---B---C---L|
-							//
-							// because we want a state where:
-							//
-							// |---C---BL|
-							//
-							// where C = collision_cmd_id, L = latest_command_id and B = pending_barrier.
-							if collision_cmd_id >= first_unflushed_cmd_id {
-								unsafe {
-									SyncCommandBufferBuilder::flush_pending_barrier(
-										&mut self.inner,
-										&self.pending_barrier,
-										&self.commands,
-										collision_cmd_id,
-										entry_key_resource_index,
-										entry_key_resource_type,
-										latest_command_id,
-										resource_index,
-										resource_type
-									)?;
-									self.pending_barrier =
-										UnsafeCommandBufferBuilderPipelineBarrier::new();
-								}
-							}
-
-							// We add a buffer barrier.
+				if let ResourceTypeInfo::Buffer = resource_type_info {
+					if exclusive || entry.exclusive {
+						// We might need to insert a new barrier between the `collision_cmd_id` and `latest_command_id`.
+						// Here we detect a case where the `pending_barrier` is still before `collision_cmd_id`.
+						// That is, we detect a state where:
+						//
+						// |---B---C---L|
+						//
+						// because we want a state where:
+						//
+						// |---C---BL|
+						//
+						// where C = collision_cmd_id, L = latest_command_id and B = pending_barrier.
+						if collision_cmd_id >= first_unflushed_cmd_id {
 							unsafe {
-								let commands_lock = self.commands.lock().unwrap();
-								let buf = commands_lock.commands[latest_command_id]
-									.buffer(resource_index);
-
-								let b = &mut self.pending_barrier;
-								b.add_buffer_memory_barrier(
-									buf,
-									entry.stages,
-									entry.access,
-									stages,
-									access,
-									true,
-									None,
-									0,
-									buf.size()
-								);
+								SyncCommandBufferBuilder::flush_pending_barrier(
+									&mut self.inner,
+									&self.pending_barrier,
+									&self.commands,
+									collision_cmd_id,
+									entry_key_resource_index,
+									entry_key_resource_type,
+									latest_command_id,
+									resource_index,
+									resource_type
+								)?;
+								self.pending_barrier =
+									UnsafeCommandBufferBuilderPipelineBarrier::new();
 							}
-
-							// Update state.
-							entry.stages = stages;
-							entry.access = access;
-							entry.exclusive_any = true;
-							entry.exclusive = exclusive;
-						} else {
-							// There is no collision. Simply merge the stages and accesses.
-							// TODO: what about simplifying the newly-constructed stages/accesses?
-							//       this would simplify the job of the driver, but is it worth it?
-							entry.stages = entry.stages | stages;
-							entry.access = entry.access | access;
 						}
-					}
-					ResourceTypeInfo::Image(start_layout, end_layout) => {
-						// If the command doesn't care about the start layout, we set it the the
-						// current one because we still need to handle exclusivity.
-						let start_layout = match start_layout {
-							ImageLayout::Undefined | ImageLayout::Preinitialized => {
-								entry.current_layout
-							}
-							_ => ImageLayoutEnd::try_from_image_layout(start_layout).unwrap()
-						};
-						if exclusive || entry.exclusive || entry.current_layout != start_layout {
-							// More info in `ResourceTypeInfo::Buffer` arm above.
-							if collision_cmd_id >= first_unflushed_cmd_id {
-								unsafe {
-									SyncCommandBufferBuilder::flush_pending_barrier(
-										&mut self.inner,
-										&self.pending_barrier,
-										&self.commands,
-										collision_cmd_id,
-										entry_key_resource_index,
-										entry_key_resource_type,
-										latest_command_id,
-										resource_index,
-										resource_type
-									)?;
-									self.pending_barrier =
-										UnsafeCommandBufferBuilderPipelineBarrier::new();
-								}
-							}
 
-							// We add an image barrier, possibly transitioning layouts.
-							unsafe {
-								let commands_lock = self.commands.lock().unwrap();
-								let img =
-									commands_lock.commands[latest_command_id].image(resource_index);
+						// We add a buffer barrier.
+						unsafe {
+							let commands_lock = self.commands.lock().unwrap();
+							let buf = commands_lock.commands[latest_command_id]
+								.buffer(resource_index);
 
-								let b = &mut self.pending_barrier;
-								b.add_image_memory_barrier(
-									img,
-									entry.stages,
-									entry.access,
-									stages,
-									access,
-									true,
-									None,
-									entry.current_layout.into(),
-									start_layout
-								);
-							}
-
-							// Update state.
-							entry.stages = stages;
-							entry.access = access;
-							entry.exclusive_any = true;
-							entry.exclusive = exclusive;
-							entry.current_layout = end_layout;
-						} else {
-							// There is no collision. Simply merge the stages and accesses.
-							// TODO: what about simplifying the newly-constructed stages/accesses?
-							//       this would simplify the job of the driver, but is it worth it?
-							entry.stages = entry.stages | stages;
-							entry.access = entry.access | access;
+							let b = &mut self.pending_barrier;
+							b.add_buffer_memory_barrier(
+								buf,
+								entry.stages,
+								entry.access,
+								stages,
+								access,
+								true,
+								None,
+								0,
+								buf.size()
+							);
 						}
+
+						// Update state.
+						entry.stages = stages;
+						entry.access = access;
+						entry.exclusive_any = true;
+						entry.exclusive = exclusive;
+					} else {
+						// There is no collision. Simply merge the stages and accesses.
+						// TODO: what about simplifying the newly-constructed stages/accesses?
+						//       this would simplify the job of the driver, but is it worth it?
+						entry.stages = entry.stages | stages;
+						entry.access = entry.access | access;
 					}
-				}
-			}
+				} else {
+					let (start_layout, current_layout) = match resource_type_info {
+						ResourceTypeInfo::Image(start_layout) => {
+							let start_layout = match start_layout {
+								ImageLayout::Undefined | ImageLayout::Preinitialized => entry.current_layout,
+								_ => start_layout
+							};
+							
+							(start_layout, start_layout)
+						},
+						ResourceTypeInfo::ImageTransitioning(start_layout, end_layout) => {
+							debug_assert!(
+								start_layout != ImageLayout::from(end_layout),
+								"ResourceTypeInfo::ImageTransitioning(start_layout, end_layout) start_layout must not be equal to end_layout"
+							);
+							debug_assert!(exclusive, "Access must be exclusive when ResourceTypeInfo::ImageTransitioning");
 
-			// Situation where this is the first time we use this resource in this command buffer.
-			Entry::Vacant(entry) => {
-				match resource_type_info {
-					// No image barriers for buffers.
-					ResourceTypeInfo::Buffer => {
-						entry.insert(ResourceState {
-							stages,
-							access,
-							exclusive_any: exclusive,
-							exclusive,
-							// TODO: Buffers don't need these, is it worth splitting?
-							initial_layout: ImageLayout::Undefined,
-							// Bogus value because we disallow undefined in `current_layout` field on
-							// typelevel.
-							current_layout: ImageLayoutEnd::General
-						});
-					}
-					// Barrier possibly required.
-					ResourceTypeInfo::Image(start_layout, end_layout) => {
-						let (actually_exclusive, actual_start_layout) =
-							match ImageLayoutEnd::try_from_image_layout(start_layout) {
-								Some(parsed_layout) if !self.is_secondary => {
-									let commands_lock = self.commands.lock().unwrap();
-									let img = commands_lock.commands[latest_command_id]
-										.image(resource_index);
-									let current_layout = img.current_layout().expect(
-									"Cannot process an image view which has multiple different layouts"
-								);
-
-									if current_layout != start_layout {
-										// Note that we transition from `bottom_of_pipe`, which means that we
-										// wait for all the previous commands to be entirely finished. This is
-										// suboptimal, but:
-										//
-										// - If we're at the start of the command buffer we have no choice anyway,
-										//   because we have no knowledge about what comes before.
-										// - If we're in the middle of the command buffer, this pipeline is going
-										//   to be merged with an existing barrier. While it may still be
-										//   suboptimal in some cases, in the general situation it will be ok.
-										//
-										unsafe {
-											let b = &mut self.pending_barrier;
-											b.add_image_memory_barrier(
-												img,
-												PipelineStages {
-													bottom_of_pipe: true,
-													..PipelineStages::none()
-												},
-												AccessFlagBits::none(),
-												stages,
-												access,
-												true,
-												None,
-												current_layout,
-												parsed_layout
-											);
-										}
-
-										(true, current_layout)
-									} else {
-										(exclusive, start_layout)
-									}
-								}
-								_ => (exclusive, start_layout)
+							let start_layout = match start_layout {
+								ImageLayout::Undefined | ImageLayout::Preinitialized => entry.current_layout,
+								_ => start_layout
 							};
 
-						entry.insert(ResourceState {
-							stages,
-							access,
-							exclusive_any: actually_exclusive,
-							exclusive: actually_exclusive,
-							initial_layout: actual_start_layout,
-							current_layout: end_layout
-						});
+							(start_layout, end_layout.into())
+						},
+						_ => unsafe { std::hint::unreachable_unchecked() } // checked in the if branch
+					};
+
+					if
+						exclusive
+						||
+						entry.exclusive
+						||
+						start_layout != entry.current_layout
+					{
+						// More info in `ResourceTypeInfo::Buffer` arm above.
+						if collision_cmd_id >= first_unflushed_cmd_id {
+							unsafe {
+								SyncCommandBufferBuilder::flush_pending_barrier(
+									&mut self.inner,
+									&self.pending_barrier,
+									&self.commands,
+									collision_cmd_id,
+									entry_key_resource_index,
+									entry_key_resource_type,
+									latest_command_id,
+									resource_index,
+									resource_type
+								)?;
+								self.pending_barrier =
+									UnsafeCommandBufferBuilderPipelineBarrier::new();
+							}
+						}
+
+						// We add an image barrier, possibly transitioning layouts.
+						unsafe {
+							let commands_lock = self.commands.lock().unwrap();
+							let img =
+								commands_lock.commands[latest_command_id].image(resource_index);
+
+							let b = &mut self.pending_barrier;
+							b.add_image_memory_barrier(
+								img,
+								entry.stages,
+								entry.access,
+								stages,
+								access,
+								true,
+								None,
+								entry.current_layout.into(),
+								ImageLayoutEnd::try_from_image_layout(start_layout).unwrap() // checked above
+							);
+						}
+
+						// Update state.
+						entry.stages = stages;
+						entry.access = access;
+						entry.exclusive_any = true;
+						entry.exclusive = exclusive;
+						entry.current_layout = current_layout;
+					} else {
+						// There is no collision. Simply merge the stages and accesses.
+						// TODO: what about simplifying the newly-constructed stages/accesses?
+						// This would simplify the job of the driver, but is it worth it?
+						entry.stages = entry.stages | stages;
+						entry.access = entry.access | access;
 					}
 				}
 			}
@@ -546,7 +588,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 						None => continue,
 						Some(l) => l
 					};;
-					if requested_layout == state.current_layout {
+					if ImageLayout::from(requested_layout) == state.current_layout {
 						continue
 					}
 
@@ -563,7 +605,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 					);
 
 					state.exclusive_any = true;
-					state.current_layout = requested_layout;
+					state.current_layout = ImageLayout::from(requested_layout);
 				}
 
 				self.inner.pipeline_barrier(&barrier);
@@ -596,7 +638,6 @@ impl<P> SyncCommandBufferBuilder<P> {
 		})
 	}
 }
-
 unsafe impl<P> DeviceOwned for SyncCommandBufferBuilder<P> {
 	fn device(&self) -> &Arc<Device> { self.inner.device() }
 }

@@ -9,7 +9,10 @@ use crate::{
 	sync::{AccessCheckError, AccessError, AccessFlagBits, GpuFuture, PipelineStages}
 };
 
-use super::misc::{CbKey, FinalCommand, KeyTy, ResourceFinalState};
+use super::state::{
+	builder::KeyTy,
+	buffer::{CbKey, ResourceFinalState, FinalCommand}
+};
 
 /// Command buffer built from a `SyncCommandBufferBuilder` that provides utilities to handle
 /// synchronization.
@@ -25,11 +28,9 @@ pub struct SyncCommandBuffer<P> {
 	// here in case `resources` is empty.
 	pub(super) commands: Arc<Mutex<Vec<Box<FinalCommand + Send + Sync>>>>
 }
-
 impl<P> AsRef<UnsafeCommandBuffer<P>> for SyncCommandBuffer<P> {
 	fn as_ref(&self) -> &UnsafeCommandBuffer<P> { &self.inner }
 }
-
 impl<P> SyncCommandBuffer<P> {
 	/// Tries to lock the resources used by the command buffer.
 	///
@@ -173,7 +174,7 @@ impl<P> SyncCommandBuffer<P> {
 	pub unsafe fn unlock(&self) {
 		let commands_lock = self.commands.lock().unwrap();
 
-		for (key, val) in self.resources.iter() {
+		for (key, value) in self.resources.iter() {
 			let (command_id, resource_ty, resource_index) = match *key {
 				CbKey::Command { command_id, resource_ty, resource_index, .. } => {
 					(command_id, resource_ty, resource_index)
@@ -190,12 +191,8 @@ impl<P> SyncCommandBuffer<P> {
 				KeyTy::Image => {
 					let cmd = &commands_lock[command_id];
 					let img = cmd.image(resource_index);
-					let trans = if ImageLayout::from(val.final_layout) != val.initial_layout {
-						Some(val.final_layout)
-					} else {
-						None
-					};
-					img.decrease_gpu_lock(trans);
+
+					img.decrease_gpu_lock(value.final_layout);
 				}
 			}
 		}
@@ -229,9 +226,13 @@ impl<P> SyncCommandBuffer<P> {
 		// TODO: check the queue family
 
 		if let Some(value) = self.resources.get(&CbKey::ImageRef(image)) {
-			if layout != ImageLayout::Undefined && ImageLayout::from(value.final_layout) != layout {
+			if
+				layout != ImageLayout::Undefined
+				&&
+				value.current_layout() != layout
+			{
 				return Err(AccessCheckError::Denied(AccessError::ImageLayoutMismatch {
-					actual: value.final_layout.into(),
+					actual: value.current_layout(),
 					expected: layout
 				}))
 			}
@@ -246,7 +247,6 @@ impl<P> SyncCommandBuffer<P> {
 		Err(AccessCheckError::Unknown)
 	}
 }
-
 unsafe impl<P> DeviceOwned for SyncCommandBuffer<P> {
 	fn device(&self) -> &Arc<Device> { self.inner.device() }
 }

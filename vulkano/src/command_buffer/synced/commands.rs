@@ -16,7 +16,10 @@ use crate::{
 	command_buffer::{
 		synced::{
 			builder::SyncCommandBufferBuilder,
-			misc::{Command, FinalCommand, ResourceTypeInfo, SyncCommandBufferBuilderError}
+			state::{
+				builder::{Command, ResourceTypeInfo},
+				buffer::{FinalCommand, SyncCommandBufferBuilderError}
+			}
 		},
 		sys::{
 			UnsafeCommandBufferBuilder,
@@ -134,7 +137,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 					depth_stencil_attachment_write: true,
 					.. AccessFlagBits::none()
 				}, // TODO: suboptimal
-				ResourceTypeInfo::Image(
+				ResourceTypeInfo::ImageTransitioning(
 					desc.initial_layout,
 					ImageLayoutEnd::try_from_image_layout(desc.final_layout)
 					.expect(
@@ -407,14 +410,14 @@ impl<P> SyncCommandBufferBuilder<P> {
 			false,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_read: true, ..AccessFlagBits::none() },
-			ResourceTypeInfo::Image(source_layout.into(), source_layout.into())
+			ResourceTypeInfo::Image(source_layout.into())
 		)?;
 		self.prev_cmd_resource(
 			1,
 			true,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_write: true, ..AccessFlagBits::none() },
-			ResourceTypeInfo::Image(destination_layout.into(), destination_layout.into())
+			ResourceTypeInfo::Image(destination_layout.into())
 		)?;
 		Ok(())
 	}
@@ -529,14 +532,14 @@ impl<P> SyncCommandBufferBuilder<P> {
 			false,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_read: true, ..AccessFlagBits::none() },
-			ResourceTypeInfo::Image(source_layout.into(), source_layout.into())
+			ResourceTypeInfo::Image(source_layout.into())
 		)?;
 		self.prev_cmd_resource(
 			1,
 			true,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_write: true, ..AccessFlagBits::none() },
-			ResourceTypeInfo::Image(destination_layout.into(), destination_layout.into())
+			ResourceTypeInfo::Image(destination_layout.into())
 		)?;
 		Ok(())
 	}
@@ -615,7 +618,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 			true,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_write: true, ..AccessFlagBits::none() },
-			ResourceTypeInfo::Image(layout.into(), layout.into())
+			ResourceTypeInfo::Image(layout.into())
 		)?;
 		Ok(())
 	}
@@ -833,7 +836,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 			true,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_write: true, ..AccessFlagBits::none() },
-			ResourceTypeInfo::Image(destination_layout.into(), destination_layout.into())
+			ResourceTypeInfo::Image(destination_layout.into())
 		)?;
 		Ok(())
 	}
@@ -941,7 +944,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 			false,
 			PipelineStages { transfer: true, ..PipelineStages::none() },
 			AccessFlagBits { transfer_read: true, ..AccessFlagBits::none() },
-			ResourceTypeInfo::Image(source_layout.into(), source_layout.into())
+			ResourceTypeInfo::Image(source_layout.into())
 		)?;
 		self.prev_cmd_resource(
 			0,
@@ -1923,7 +1926,7 @@ impl<'b, P> SyncCommandBufferBuilderBindDescriptorSets<'b, P> {
 				write,
 				stages,
 				access,
-				ResourceTypeInfo::Image(layout.into(), layout)
+				ResourceTypeInfo::Image(layout.into())
 			)?;
 		}
 
