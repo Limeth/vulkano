@@ -17,8 +17,8 @@ use crate::{
 		synced::{
 			builder::SyncCommandBufferBuilder,
 			state::{
-				builder::{Command, ResourceTypeInfo},
-				buffer::{FinalCommand, SyncCommandBufferBuilderError}
+				buffer::{FinalCommand, SyncCommandBufferBuilderError},
+				builder::{Command, ResourceTypeInfo}
 			}
 		},
 		sys::{

@@ -14,6 +14,9 @@ categories = ["rendering::graphics-api"]
 [lib]
 proc-macro = true
 
+[features]
+shaderc-build-from-source = ["shaderc/build-from-source"]
+
 [dependencies]
 shaderc = "0.5"
 syn = "0.15"

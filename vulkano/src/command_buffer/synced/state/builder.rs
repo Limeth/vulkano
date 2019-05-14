@@ -11,7 +11,7 @@ use crate::{
 	sync::{AccessFlagBits, PipelineStages}
 };
 
-use super::buffer::{CbKey, ResourceFinalState, FinalCommand};
+use super::buffer::{CbKey, FinalCommand, ResourceFinalState};
 
 // List of commands stored inside a `SyncCommandBufferBuilder`.
 pub struct Commands<P> {
@@ -190,7 +190,7 @@ impl<P> Hash for BuilderKey<P> {
 pub struct ResourceState {
 	// True if any commands had exclusive set to true.
 	pub exclusive_any: bool,
-	
+
 	// Stage of the command that last used this resource.
 	pub stages: PipelineStages,
 	// Access for the command that last used this resource.
@@ -206,19 +206,17 @@ pub struct ResourceState {
 }
 impl ResourceState {
 	/// Turns this `ResourceState` into a `ResourceFinalState`.
-	/// 
+	///
 	/// Called when the command buffer is being built.
 	pub fn finalize(self) -> ResourceFinalState {
 		let final_layout = {
 			if self.current_layout == self.initial_layout {
 				None
 			} else {
-				Some(
-					ImageLayoutEnd::try_from_image_layout(self.current_layout).unwrap()
-				)
+				Some(ImageLayoutEnd::try_from_image_layout(self.current_layout).unwrap())
 			}
 		};
-		
+
 		ResourceFinalState {
 			final_stages: self.stages,
 			final_access: self.access,

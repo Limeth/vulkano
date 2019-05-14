@@ -9,6 +9,8 @@ publish = false
 # The `vulkano` crate is the main crate that you must use to use Vulkan.
 vulkano = { path = "../vulkano" }
 # Provides the `shader!` macro that is used to generate code for using shaders.
+# In case you'd like to have shaderc-rs build it's shaderc dependency, enable the
+# `shaderc-build-from-source` feature on vulkano-shaders crate
 vulkano-shaders = { path = "../vulkano-shaders" }
 # The Vulkan library doesn't provide any functionality to create and handle windows, as
 # this would be out of scope. In order to open a window, we are going to use the `winit` crate.

@@ -10,8 +10,8 @@ use crate::{
 };
 
 use super::state::{
-	builder::KeyTy,
-	buffer::{CbKey, ResourceFinalState, FinalCommand}
+	buffer::{CbKey, FinalCommand, ResourceFinalState},
+	builder::KeyTy
 };
 
 /// Command buffer built from a `SyncCommandBufferBuilder` that provides utilities to handle
@@ -226,11 +226,7 @@ impl<P> SyncCommandBuffer<P> {
 		// TODO: check the queue family
 
 		if let Some(value) = self.resources.get(&CbKey::ImageRef(image)) {
-			if
-				layout != ImageLayout::Undefined
-				&&
-				value.current_layout() != layout
-			{
+			if layout != ImageLayout::Undefined && value.current_layout() != layout {
 				return Err(AccessCheckError::Denied(AccessError::ImageLayoutMismatch {
 					actual: value.current_layout(),
 					expected: layout

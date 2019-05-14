@@ -19,16 +19,9 @@ use crate::{
 
 use super::{
 	buffer::SyncCommandBuffer,
-	state::builder::{
-		Command,
-		Commands,
-		KeyTy,
-		BuilderKey,
-		ResourceState,
-		ResourceTypeInfo
-	},
-	state::buffer::{
-		SyncCommandBufferBuilderError
+	state::{
+		buffer::SyncCommandBufferBuilderError,
+		builder::{BuilderKey, Command, Commands, KeyTy, ResourceState, ResourceTypeInfo}
 	}
 };
 
@@ -263,25 +256,21 @@ impl<P> SyncCommandBufferBuilder<P> {
 							debug_assert!(exclusive, "Access must be exclusive when ResourceTypeInfo::ImageTransitioning");
 
 							(start_layout, end_layout.into())
-						},
-						_ => unsafe { std::hint::unreachable_unchecked() } // checked in the if branch
+						}
+						_ => unsafe { std::hint::unreachable_unchecked() } /* checked in the if branch */
 					};
 
 					let initial_layout;
 					let layout_change;
-					if 
-						start_layout == ImageLayout::Undefined
-						|| 
-						start_layout == ImageLayout::Preinitialized
-						||
-						self.is_secondary
+					if start_layout == ImageLayout::Undefined
+						|| start_layout == ImageLayout::Preinitialized
+						|| self.is_secondary
 					{
 						initial_layout = start_layout;
 						layout_change = false;
 					} else {
 						let commands_lock = self.commands.lock().unwrap();
-						let img = commands_lock.commands[latest_command_id]
-							.image(resource_index);
+						let img = commands_lock.commands[latest_command_id].image(resource_index);
 						let current_layout = img.current_layout().expect(
 							"Cannot process an image view which has multiple different layouts"
 						);
@@ -311,7 +300,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 									true,
 									None,
 									current_layout,
-									ImageLayoutEnd::try_from_image_layout(start_layout).unwrap() // already checked above
+									ImageLayoutEnd::try_from_image_layout(start_layout).unwrap() /* already checked above */
 								);
 							}
 
@@ -336,7 +325,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 					});
 				}
 			}
-			
+
 			// Situation where this resource was used before in this command buffer.
 			Entry::Occupied(entry) => {
 				// `collision_cmd_id` contains the ID of the command that we are potentially colliding with.
@@ -381,8 +370,8 @@ impl<P> SyncCommandBufferBuilder<P> {
 						// We add a buffer barrier.
 						unsafe {
 							let commands_lock = self.commands.lock().unwrap();
-							let buf = commands_lock.commands[latest_command_id]
-								.buffer(resource_index);
+							let buf =
+								commands_lock.commands[latest_command_id].buffer(resource_index);
 
 							let b = &mut self.pending_barrier;
 							b.add_buffer_memory_barrier(
@@ -414,12 +403,14 @@ impl<P> SyncCommandBufferBuilder<P> {
 					let (start_layout, current_layout) = match resource_type_info {
 						ResourceTypeInfo::Image(start_layout) => {
 							let start_layout = match start_layout {
-								ImageLayout::Undefined | ImageLayout::Preinitialized => entry.current_layout,
+								ImageLayout::Undefined | ImageLayout::Preinitialized => {
+									entry.current_layout
+								}
 								_ => start_layout
 							};
-							
+
 							(start_layout, start_layout)
-						},
+						}
 						ResourceTypeInfo::ImageTransitioning(start_layout, end_layout) => {
 							debug_assert!(
 								start_layout != ImageLayout::from(end_layout),
@@ -428,22 +419,18 @@ impl<P> SyncCommandBufferBuilder<P> {
 							debug_assert!(exclusive, "Access must be exclusive when ResourceTypeInfo::ImageTransitioning");
 
 							let start_layout = match start_layout {
-								ImageLayout::Undefined | ImageLayout::Preinitialized => entry.current_layout,
+								ImageLayout::Undefined | ImageLayout::Preinitialized => {
+									entry.current_layout
+								}
 								_ => start_layout
 							};
 
 							(start_layout, end_layout.into())
-						},
-						_ => unsafe { std::hint::unreachable_unchecked() } // checked in the if branch
+						}
+						_ => unsafe { std::hint::unreachable_unchecked() } /* checked in the if branch */
 					};
 
-					if
-						exclusive
-						||
-						entry.exclusive
-						||
-						start_layout != entry.current_layout
-					{
+					if exclusive || entry.exclusive || start_layout != entry.current_layout {
 						// More info in `ResourceTypeInfo::Buffer` arm above.
 						if collision_cmd_id >= first_unflushed_cmd_id {
 							unsafe {
@@ -479,7 +466,7 @@ impl<P> SyncCommandBufferBuilder<P> {
 								true,
 								None,
 								entry.current_layout.into(),
-								ImageLayoutEnd::try_from_image_layout(start_layout).unwrap() // checked above
+								ImageLayoutEnd::try_from_image_layout(start_layout).unwrap() /* checked above */
 							);
 						}
 
