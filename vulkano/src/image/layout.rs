@@ -93,7 +93,7 @@ impl ImageLayout {
 }
 
 /// Describes how the view behaves in respect to requesting layouts.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct RequiredLayouts {
 	/// The layout required at the end of a command buffer.
 	///
