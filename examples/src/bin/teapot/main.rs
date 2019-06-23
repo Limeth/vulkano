@@ -297,10 +297,10 @@ fn main() {
 
 /// This method is called once during initialization, then again whenever the window is resized
 fn window_size_dependent_setup(
-	device: Arc<Device>, vs: &vs::Shader, fs: &fs::Shader, images: &[Arc<SwapchainImage<Window>>],
+	device: Arc<Device>, vs: &vs::Shader, fs: &fs::Shader, images: &[Arc<SwapchainImage>],
 	render_pass: Arc<RenderPassAbstract + Send + Sync>
 ) -> (Arc<GraphicsPipelineAbstract + Send + Sync>, Vec<Arc<FramebufferAbstract + Send + Sync>>) {
-	let dimensions = images[0].dimensions();
+	let dimensions = images[0].inner_dimensions();
 
 	let depth_buffer_view = {
 		// First create the image.

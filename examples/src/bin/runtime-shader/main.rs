@@ -506,10 +506,10 @@ fn main() {
 
 /// This method is called once during initialization, then again whenever the window is resized
 fn window_size_dependent_setup(
-	images: &[Arc<SwapchainImage<Window>>], render_pass: Arc<RenderPassAbstract + Send + Sync>,
+	images: &[Arc<dyn SwapchainImage>], render_pass: Arc<RenderPassAbstract + Send + Sync>,
 	dynamic_state: &mut DynamicState
 ) -> Vec<Arc<FramebufferAbstract + Send + Sync>> {
-	let dimensions = images[0].dimensions();
+	let dimensions = images[0].inner_dimensions();
 
 	let viewport = Viewport {
 		origin: [0.0, 0.0],

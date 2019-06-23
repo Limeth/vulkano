@@ -35,6 +35,7 @@ use crate::{
 		ImageLayout,
 		ImageUsage,
 		ImageViewAccess,
+		VulkanSwapchainImage,
 		SwapchainImage
 	},
 	swapchain::{
@@ -212,6 +213,7 @@ pub struct Swapchain<W> {
 	mode: PresentMode,
 	clipped: bool
 }
+
 impl<W> Swapchain<W> {
 	/// Builds a new swapchain. Allocates images who content can be made visible on a surface.
 	///
@@ -233,12 +235,14 @@ impl<W> Swapchain<W> {
 	/// - Panics if the device and the surface don't belong to the same instance.
 	/// - Panics if `usage` is empty.
 	// TODO: isn't it unsafe to take the surface through an Arc when it comes to vulkano-win?
-	pub fn new<F: FormatDesc, S: Into<SharingMode>>(
+	pub fn new<'a, F: FormatDesc, S: Into<SharingMode>>(
 		device: Arc<Device>, surface: Arc<Surface<W>>, sharing: S, dimensions: [NonZeroU32; 2],
 		layers: NonZeroU32, num_images: NonZeroU32, format: F, color_space: ColorSpace,
 		usage: ImageUsage, transform: SurfaceTransform, alpha: CompositeAlpha, mode: PresentMode,
 		clipped: bool, old_swapchain: Option<&Swapchain<W>>
-	) -> Result<(Arc<Swapchain<W>>, Vec<Arc<SwapchainImage<W>>>), SwapchainCreationError> {
+	) -> Result<(Arc<Swapchain<W>>, Vec<Arc<dyn SwapchainImage + 'a>>), SwapchainCreationError>
+            where W: 'a + Send + Sync
+        {
 		assert_eq!(device.instance().internal_object(), surface.instance().internal_object());
 
 		// Checking that the requested parameters match the capabilities.
@@ -444,7 +448,8 @@ impl<W> Swapchain<W> {
 		let swapchain_images = unsafe {
 			let mut swapchain_images = Vec::with_capacity(swapchain.images.len());
 			for n in 0 .. swapchain.images.len() {
-				swapchain_images.push(SwapchainImage::from_raw(swapchain.clone(), n)?);
+				let image = VulkanSwapchainImage::from_raw(swapchain.clone(), n)?;
+				swapchain_images.push(image);
 			}
 			swapchain_images
 		};
@@ -453,9 +458,11 @@ impl<W> Swapchain<W> {
 	}
 
 	/// Recreates the swapchain with new dimensions.
-	pub fn recreate_with_dimension(
+	pub fn recreate_with_dimension<'a>(
 		&self, dimensions: [NonZeroU32; 2]
-	) -> Result<(Arc<Swapchain<W>>, Vec<Arc<SwapchainImage<W>>>), SwapchainCreationError> {
+	) -> Result<(Arc<Swapchain<W>>, Vec<Arc<dyn SwapchainImage + 'a>>), SwapchainCreationError>
+            where W: 'a + Send + Sync
+        {
 		Swapchain::new(
 			self.device.clone(),
 			self.surface.clone(),

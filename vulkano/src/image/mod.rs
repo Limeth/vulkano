@@ -65,7 +65,7 @@ pub mod sync;
 pub use sync::{ImageCreationError, SyncImage};
 
 mod swapchain;
-pub use swapchain::SwapchainImage;
+pub use swapchain::{VulkanSwapchainImage, SwapchainImage};
 
 pub mod view;
 pub use view::{AttachmentImageViewCreationError, ImageView, ImageViewCreationError};

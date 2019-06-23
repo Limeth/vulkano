@@ -26,6 +26,22 @@ use crate::{
 	OomError
 };
 
+pub trait SwapchainImage: Send + Sync + std::fmt::Debug + ImageAccess + ImageViewAccess {
+	// type Swapchain;
+
+	/// Returns the dimensions of the image.
+	///
+	/// A `SwapchainImage` is always two-dimensional.
+	fn inner_dimensions(&self) -> [NonZeroU32; 2];
+
+	// /// Returns the swapchain this image belongs to.
+	// fn swapchain(&self) -> &Arc<Self::Swapchain>;
+
+	fn inner_image(&self) -> &UnsafeImage;
+
+	fn index(&self) -> usize;
+}
+
 /// An image and view combination that is part of a swapchain.
 ///
 /// Creating a `SwapchainImage` is automatically done when creating a swapchain.
@@ -39,21 +55,22 @@ use crate::{
 /// method on the swapchain), which will have the effect of showing the content of the image to
 /// the screen. Once an image has been presented, it can no longer be used unless it is acquired
 /// again.
-pub struct SwapchainImage<W> {
+pub struct VulkanSwapchainImage<W> {
 	swapchain: Arc<Swapchain<W>>,
 	image_offset: usize,
 	view: UnsafeImageView
 }
-impl<W> SwapchainImage<W> {
+
+impl<'a, W: 'a + Send + Sync> VulkanSwapchainImage<W> {
 	const REQUIRED_LAYOUTS: RequiredLayouts =
 		RequiredLayouts { global: Some(ImageLayoutEnd::PresentSrc), ..RequiredLayouts::none() };
 
-	/// Builds a `SwapchainImage` from raw components.
+	/// Builds a `VulkanSwapchainImage` from raw components.
 	///
 	/// This is an internal method that you shouldn't call.
 	pub unsafe fn from_raw(
 		swapchain: Arc<Swapchain<W>>, id: usize
-	) -> Result<Arc<SwapchainImage<W>>, OomError> {
+	) -> Result<Arc<dyn SwapchainImage + 'a>, OomError> {
 		let image = swapchain.raw_image(id).unwrap();
 		let view = match UnsafeImageView::new(
 			&image,
@@ -73,20 +90,27 @@ impl<W> SwapchainImage<W> {
 			e => panic!("Could not create swapchain view: {:?}", e)
 		};
 
-		Ok(Arc::new(SwapchainImage { swapchain: swapchain.clone(), image_offset: id, view }))
+		Ok(Arc::new(VulkanSwapchainImage { swapchain: swapchain.clone(), image_offset: id, view }))
 	}
+}
+
+impl<W: Send + Sync> SwapchainImage for VulkanSwapchainImage<W> {
+	// type Swapchain = Swapchain<W>;
 
 	/// Returns the dimensions of the image.
 	///
 	/// A `SwapchainImage` is always two-dimensional.
-	pub fn dimensions(&self) -> [NonZeroU32; 2] { self.inner_image().dimensions().width_height() }
+	fn inner_dimensions(&self) -> [NonZeroU32; 2] { self.inner_image().dimensions().width_height() }
 
-	/// Returns the swapchain this image belongs to.
-	pub fn swapchain(&self) -> &Arc<Swapchain<W>> { &self.swapchain }
+	// /// Returns the swapchain this image belongs to.
+	// fn swapchain(&self) -> &Arc<Self::Swapchain> { &self.swapchain }
 
 	fn inner_image(&self) -> &UnsafeImage { self.swapchain.raw_image(self.image_offset).unwrap() }
+
+        fn index(&self) -> usize { self.image_offset }
 }
-unsafe impl<W> ImageAccess for SwapchainImage<W> {
+
+unsafe impl<W: Send + Sync> ImageAccess for VulkanSwapchainImage<W> {
 	fn inner(&self) -> &UnsafeImage { self.inner_image() }
 
 	fn conflicts_buffer(&self, other: &BufferAccess) -> bool { false }
@@ -128,17 +152,17 @@ unsafe impl<W> ImageAccess for SwapchainImage<W> {
 	}
 }
 
-unsafe impl<W> ImageClearValue<<Format as FormatDesc>::ClearValue> for SwapchainImage<W> {
-	fn decode(&self, value: <Format as FormatDesc>::ClearValue) -> Option<ClearValue> {
-		Some(self.swapchain.format().decode_clear_value(value))
-	}
-}
-unsafe impl<P, W> ImageContent<P> for SwapchainImage<W> {
-	fn matches_format(&self) -> bool {
-		true // FIXME:
-	}
-}
-unsafe impl<W> ImageViewAccess for SwapchainImage<W> {
+// unsafe impl<W: Send + Sync> ImageClearValue<<Format as FormatDesc>::ClearValue> for VulkanSwapchainImage<W> {
+// 	fn decode(&self, value: <Format as FormatDesc>::ClearValue) -> Option<ClearValue> {
+// 		Some(self.swapchain.format().decode_clear_value(value))
+// 	}
+// }
+// unsafe impl<P, W: Send + Sync> ImageContent<P> for VulkanSwapchainImage<W> {
+// 	fn matches_format(&self) -> bool {
+// 		true // FIXME:
+// 	}
+// }
+unsafe impl<W: Send + Sync> ImageViewAccess for VulkanSwapchainImage<W> {
 	fn parent(&self) -> &ImageAccess { self }
 
 	fn inner(&self) -> &UnsafeImageView { &self.view }
@@ -149,11 +173,11 @@ unsafe impl<W> ImageViewAccess for SwapchainImage<W> {
 
 	fn required_layouts(&self) -> &RequiredLayouts { &Self::REQUIRED_LAYOUTS }
 }
-impl<W> std::fmt::Debug for SwapchainImage<W> {
+impl<W> std::fmt::Debug for VulkanSwapchainImage<W> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		write!(
 			f,
-			"SwapchainImage {{ swapchain: {:?}, image_offset: {}, view: {:?} }}",
+			"VulkanSwapchainImage {{ swapchain: {:?}, image_offset: {}, view: {:?} }}",
 			self.swapchain, self.image_offset, self.view
 		)
 	}
