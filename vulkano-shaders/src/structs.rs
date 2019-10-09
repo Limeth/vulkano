@@ -192,6 +192,25 @@ fn write_struct(doc: &Spirv, struct_id: u32, members: &[u32]) -> (TokenStream, O
 	(ast, spirv_req_total_size.map(|sz| sz as usize).or(current_rust_offset))
 }
 
+macro_rules! get_size_and_alignment {
+	($type:ty) => {{
+		#[repr(C)]
+		#[derive(Default)]
+		struct Foo {
+			data: $type,
+			after: u8
+		}
+		let size = {
+			let instance = Foo::default();
+			let instance_address = &instance as *const Foo as usize;
+			let field_address = &instance.after as *const u8 as usize;
+			field_address - instance_address
+		};
+
+		(size, mem::align_of::<Foo>())
+	}}
+}
+
 /// Returns the type name to put in the Rust struct, and its size and alignment.
 ///
 /// The size can be `None` if it's only known at runtime.
@@ -204,100 +223,126 @@ pub fn type_from_id(doc: &Spirv, searched: u32) -> (TokenStream, Option<usize>, 
 			&Instruction::TypeInt { result_id, width, signedness } if result_id == searched => {
 				match (width, signedness) {
 					(8, true) => {
-						#[repr(C)]
-						struct Foo {
-							data: i8,
-							after: u8
-						}
-						let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
-						return (quote! {i8}, Some(size), mem::align_of::<Foo>())
+						let (size, alignment) = get_size_and_alignment!(i8);
+						// #[repr(C)]
+						// struct Foo {
+						// 	data: i8,
+						// 	after: u8
+						// }
+						// let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
+						return (quote! {i8}, Some(size), alignment)
 					}
 					(8, false) => {
-						#[repr(C)]
-						struct Foo {
-							data: u8,
-							after: u8
-						}
-						let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
-						return (quote! {u8}, Some(size), mem::align_of::<Foo>())
+						let (size, alignment) = get_size_and_alignment!(u8);
+						// #[repr(C)]
+						// struct Foo {
+						// 	data: u8,
+						// 	after: u8
+						// }
+						// let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
+						return (quote! {u8}, Some(size), alignment)
 					}
 					(16, true) => {
-						#[repr(C)]
-						struct Foo {
-							data: i16,
-							after: u8
-						}
-						let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
-						return (quote! {i16}, Some(size), mem::align_of::<Foo>())
+						let (size, alignment) = get_size_and_alignment!(i16);
+						// #[repr(C)]
+						// struct Foo {
+						// 	data: i16,
+						// 	after: u8
+						// }
+						// let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
+						return (quote! {i16}, Some(size), alignment)
 					}
 					(16, false) => {
-						#[repr(C)]
-						struct Foo {
-							data: u16,
-							after: u8
-						}
-						let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
-						return (quote! {u16}, Some(size), mem::align_of::<Foo>())
+						let (size, alignment) = get_size_and_alignment!(u16);
+						// #[repr(C)]
+						// struct Foo {
+						// 	data: u16,
+						// 	after: u8
+						// }
+						// let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
+						return (quote! {u16}, Some(size), alignment)
 					}
 					(32, true) => {
-						#[repr(C)]
-						struct Foo {
-							data: i32,
-							after: u8
-						}
-						let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
-						return (quote! {i32}, Some(size), mem::align_of::<Foo>())
+						let (size, alignment) = get_size_and_alignment!(i32);
+						// #[repr(C)]
+						// struct Foo {
+						// 	data: i32,
+						// 	after: u8
+						// }
+						// let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
+						return (quote! {i32}, Some(size), alignment)
 					}
 					(32, false) => {
-						#[repr(C)]
-						struct Foo {
-							data: u32,
-							after: u8
-						}
-						let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
-						return (quote! {u32}, Some(size), mem::align_of::<Foo>())
+						let (size, alignment) = get_size_and_alignment!(u32);
+						// #[repr(C)]
+						// struct Foo {
+						// 	data: u32,
+						// 	after: u8
+						// }
+						// let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
+						return (quote! {u32}, Some(size), alignment)
 					}
 					(64, true) => {
-						#[repr(C)]
-						struct Foo {
-							data: i64,
-							after: u8
-						}
-						let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
-						return (quote! {i64}, Some(size), mem::align_of::<Foo>())
+						let (size, alignment) = get_size_and_alignment!(i64);
+						// #[repr(C)]
+						// struct Foo {
+						// 	data: i64,
+						// 	after: u8
+						// }
+						// let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
+						return (quote! {i64}, Some(size), alignment)
 					}
 					(64, false) => {
-						#[repr(C)]
-						struct Foo {
-							data: u64,
-							after: u8
-						}
-						let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
-						return (quote! {u64}, Some(size), mem::align_of::<Foo>())
+						let (size, alignment) = get_size_and_alignment!(u64);
+						// #[repr(C)]
+						// struct Foo {
+						// 	data: u64,
+						// 	after: u8
+						// }
+						// let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
+						return (quote! {u64}, Some(size), alignment)
 					}
 					_ => panic!("No Rust equivalent for an integer of width {}", width)
 				}
 			}
-			&Instruction::TypeFloat { result_id, width } if result_id == searched => match width {
-				32 => {
-					#[repr(C)]
-					struct Foo {
-						data: f32,
-						after: u8
-					}
-					let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
-					return (quote! {f32}, Some(size), mem::align_of::<Foo>())
+			&Instruction::TypeFloat { result_id, width } if result_id == searched => {
+				match width {
+					32 => {
+						let (size, alignment) = get_size_and_alignment!(f32);
+						// #[repr(C)]
+						// #[derive(Default)]
+						// struct Foo {
+						// 	data: f32,
+						// 	after: u8
+						// }
+						// let size = {
+						// 	let instance = Foo::default();
+						// 	let instance_address = &instance as *const Foo as usize;
+						// 	let field_address = &instance.after as *const u8 as usize;
+						// 	field_address - instance_address
+						// };
+						// let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
+						return (quote! {f32}, Some(size), alignment)
+					},
+					64 => {
+						let (size, alignment) = get_size_and_alignment!(f64);
+						// #[repr(C)]
+						// #[derive(Default)]
+						// struct Foo {
+						// 	data: f64,
+						// 	after: u8
+						// }
+						// let size = {
+						// 	let instance = Foo::default();
+						// 	let instance_address = &instance as *const Foo as usize;
+						// 	let field_address = &instance.after as *const u8 as usize;
+						// 	field_address - instance_address
+						// };
+						// let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
+						return (quote! {f64}, Some(size), alignment)
+					},
+					_ => panic!("No Rust equivalent for a floating-point of width {}", width),
 				}
-				64 => {
-					#[repr(C)]
-					struct Foo {
-						data: f64,
-						after: u8
-					}
-					let size = unsafe { (&(&*(0 as *const Foo)).after) as *const u8 as usize };
-					return (quote! {f64}, Some(size), mem::align_of::<Foo>())
-				}
-				_ => panic!("No Rust equivalent for a floating-point of width {}", width)
 			},
 			&Instruction::TypeVector { result_id, component_id, count }
 				if result_id == searched =>
