@@ -22,6 +22,16 @@ pub struct Version {
 	pub patch: u16
 }
 
+impl From<(u16, u16, u16)> for Version {
+    fn from(other: (u16, u16, u16)) -> Self {
+        Version {
+            major: other.0,
+            minor: other.1,
+            patch: other.2,
+        }
+    }
+}
+
 impl fmt::Debug for Version {
 	fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
 		write!(formatter, "{}.{}.{}", self.major, self.minor, self.patch)
