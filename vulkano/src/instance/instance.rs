@@ -100,6 +100,14 @@ pub struct Instance {
 	function_pointers: OwnedOrRef<FunctionPointers<Box<Loader + Send + Sync>>>
 }
 
+impl PartialEq<Instance> for Instance {
+	fn eq(&self, other: &Instance) -> bool {
+		self.instance == other.instance
+	}
+}
+
+impl Eq for Instance {}
+
 // TODO: fix the underlying cause instead
 impl std::panic::UnwindSafe for Instance {}
 impl std::panic::RefUnwindSafe for Instance {}
@@ -651,7 +659,7 @@ struct PhysicalDeviceInfos {
 /// 	println!("Name: {}", dev.name());
 /// 	}
 /// ```
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct PhysicalDevice<'a> {
 	instance: &'a Arc<Instance>,
 	device: usize
@@ -890,7 +898,7 @@ pub enum PhysicalDeviceType {
 ///
 /// A queue family is group of one or multiple queues. All queues of one family have the same
 /// characteristics.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct QueueFamily<'a> {
 	physical_device: PhysicalDevice<'a>,
 	id: u32
