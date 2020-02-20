@@ -8,7 +8,12 @@ use vulkano::{
 	instance::{Instance, InstanceExtensions},
 	swapchain::{Surface, SurfaceCreationError}
 };
-use winit::{CreationError as WindowCreationError, EventsLoop, WindowBuilder};
+use winit::event_loop::EventLoop;
+use winit::window::{
+    WindowBuilder,
+    Window,
+};
+use winit::error::OsError;
 
 #[cfg(target_os = "macos")]
 use cocoa::appkit::{NSView, NSWindow};
@@ -47,21 +52,21 @@ pub fn create_vk_surface<W>(
 	window: W, instance: Arc<Instance>
 ) -> Result<Arc<Surface<W>>, SurfaceCreationError>
 where
-	W: SafeBorrow<winit::Window>
+	W: SafeBorrow<Window>
 {
 	unsafe { winit_to_surface(instance, window) }
 }
 
 pub trait VkSurfaceBuild {
 	fn build_vk_surface(
-		self, events_loop: &EventsLoop, instance: Arc<Instance>
-	) -> Result<Arc<Surface<winit::Window>>, CreationError>;
+		self, events_loop: &EventLoop<()>, instance: Arc<Instance>
+	) -> Result<Arc<Surface<Window>>, CreationError>;
 }
 
 impl VkSurfaceBuild for WindowBuilder {
 	fn build_vk_surface(
-		self, events_loop: &EventsLoop, instance: Arc<Instance>
-	) -> Result<Arc<Surface<winit::Window>>, CreationError> {
+		self, events_loop: &EventLoop<()>, instance: Arc<Instance>
+	) -> Result<Arc<Surface<Window>>, CreationError> {
 		let window = self.build(events_loop)?;
 		Ok(create_vk_surface(window, instance)?)
 	}
@@ -73,7 +78,7 @@ pub enum CreationError {
 	/// Error when creating the surface.
 	SurfaceCreationError(SurfaceCreationError),
 	/// Error when creating the window.
-	WindowCreationError(WindowCreationError)
+	OsError(OsError)
 }
 impl fmt::Display for CreationError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -81,7 +86,7 @@ impl fmt::Display for CreationError {
 			CreationError::SurfaceCreationError(e) => {
 				write!(f, "Error while creating the surface: {}", e)
 			}
-			CreationError::WindowCreationError(e) => {
+			CreationError::OsError(e) => {
 				write!(f, "Error while creating the window: {}", e)
 			}
 		}
@@ -91,7 +96,7 @@ impl error::Error for CreationError {
 	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
 		match self {
 			CreationError::SurfaceCreationError(e) => e.source(),
-			CreationError::WindowCreationError(e) => e.source()
+			CreationError::OsError(e) => e.source()
 		}
 	}
 }
@@ -99,24 +104,24 @@ impl error::Error for CreationError {
 impl From<SurfaceCreationError> for CreationError {
 	fn from(err: SurfaceCreationError) -> CreationError { CreationError::SurfaceCreationError(err) }
 }
-impl From<WindowCreationError> for CreationError {
-	fn from(err: WindowCreationError) -> CreationError { CreationError::WindowCreationError(err) }
+impl From<OsError> for CreationError {
+	fn from(err: OsError) -> CreationError { CreationError::OsError(err) }
 }
 
 #[cfg(target_os = "android")]
-unsafe fn winit_to_surface<W: SafeBorrow<winit::Window>>(
+unsafe fn winit_to_surface<W: SafeBorrow<Window>>(
 	instance: Arc<Instance>, win: W
 ) -> Result<Arc<Surface<W>>, SurfaceCreationError> {
-	use winit::os::android::WindowExt;
+	use winit::platform::unix::WindowExtUnix;
 	Surface::from_anativewindow(instance, win.borrow().get_native_window(), win)
 }
 
 #[cfg(all(unix, not(target_os = "android"), not(target_os = "macos")))]
-unsafe fn winit_to_surface<W: SafeBorrow<winit::Window>>(
+unsafe fn winit_to_surface<W: SafeBorrow<Window>>(
 	instance: Arc<Instance>, win: W
 ) -> Result<Arc<Surface<W>>, SurfaceCreationError> {
-	use winit::os::unix::WindowExt;
-	match (win.borrow().get_wayland_display(), win.borrow().get_wayland_surface()) {
+	use winit::platform::unix::WindowExtUnix;
+	match (win.borrow().wayland_display(), win.borrow().wayland_surface()) {
 		(Some(display), Some(surface)) => Surface::from_wayland(instance, display, surface, win),
 		_ => {
 			// No wayland display found, check if we can use xlib.
@@ -124,15 +129,15 @@ unsafe fn winit_to_surface<W: SafeBorrow<winit::Window>>(
 			if instance.loaded_extensions().khr_xlib_surface {
 				Surface::from_xlib(
 					instance,
-					win.borrow().get_xlib_display().unwrap(),
-					win.borrow().get_xlib_window().unwrap() as _,
+					win.borrow().xlib_display().unwrap(),
+					win.borrow().xlib_window().unwrap() as _,
 					win
 				)
 			} else {
 				Surface::from_xcb(
 					instance,
-					win.borrow().get_xcb_connection().unwrap(),
-					win.borrow().get_xlib_window().unwrap() as _,
+					win.borrow().xcb_connection().unwrap(),
+					win.borrow().xlib_window().unwrap() as _,
 					win
 				)
 			}
@@ -141,10 +146,10 @@ unsafe fn winit_to_surface<W: SafeBorrow<winit::Window>>(
 }
 
 #[cfg(target_os = "windows")]
-unsafe fn winit_to_surface<W: SafeBorrow<winit::Window>>(
+unsafe fn winit_to_surface<W: SafeBorrow<Window>>(
 	instance: Arc<Instance>, win: W
 ) -> Result<Arc<Surface<W>>, SurfaceCreationError> {
-	use winit::os::windows::WindowExt;
+	use winit::platform::unix::WindowExtUnix;
 	Surface::from_hwnd(
 		instance,
 		ptr::null() as *const (), // FIXME
@@ -154,7 +159,7 @@ unsafe fn winit_to_surface<W: SafeBorrow<winit::Window>>(
 }
 
 #[cfg(target_os = "macos")]
-unsafe fn winit_to_surface<W: SafeBorrow<winit::Window>>(
+unsafe fn winit_to_surface<W: SafeBorrow<Window>>(
 	instance: Arc<Instance>, win: W
 ) -> Result<Arc<Surface<W>>, SurfaceCreationError> {
 	use winit::os::macos::WindowExt;
