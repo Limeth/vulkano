@@ -667,21 +667,22 @@ impl<P> UnsafeCommandBufferBuilder<P> {
 		let regions: SmallVec<[_; 8]> = regions
 			.filter_map(|blit| {
 				// TODO: not everything is checked here
-				debug_assert!(
-					blit.source_base_array_layer + blit.layer_count
-						<= source.subresource_range().array_layers.get()
-				);
-				debug_assert!(
-					blit.destination_base_array_layer + blit.layer_count
-						<= destination.subresource_range().array_layers.get()
-				);
-				debug_assert!(
-					blit.source_mip_level < destination.subresource_range().mipmap_levels.get()
-				);
-				debug_assert!(
-					blit.destination_mip_level
-						< destination.subresource_range().mipmap_levels.get()
-				);
+				// debug_assert!(
+				// 	blit.source_mip_level < source.subresource_range().mipmap_levels.get()
+				// );
+				// debug_assert!(
+				// 	blit.destination_mip_level
+				// 		< destination.subresource_range().mipmap_levels.get()
+				// );
+
+				// debug_assert!(
+				// 	blit.source_base_array_layer + blit.layer_count
+				// 		<= source.subresource_range().array_layers.get()
+				// );
+				// debug_assert!(
+				// 	blit.destination_base_array_layer + blit.layer_count
+				// 		<= destination.subresource_range().array_layers.get()
+				// );
 
 				if blit.layer_count == 0 {
 					return None
